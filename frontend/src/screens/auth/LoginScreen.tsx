@@ -91,7 +91,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
       {/* Header Bar */}
       <View style={{ width: "100%", paddingVertical: 16, alignItems: "center", justifyContent: "center", backgroundColor: "#ffffff", borderBottomWidth: 1, borderBottomColor: "#f1f5f9" }}>
         <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 20, color: "#005bbf" }}>
-          SpareChange AI
+          Penny Pilot
         </Text>
       </View>
 

@@ -181,7 +181,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
             <MaterialIcons name="arrow-back" size={24} color="#181c20" />
           </Pressable>
           <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
-            SpareChange AI
+            Penny Pilot
           </Text>
         </View>
         <View className="flex-row items-center space-x-2">

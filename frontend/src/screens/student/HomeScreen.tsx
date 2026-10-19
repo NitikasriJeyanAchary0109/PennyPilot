@@ -148,7 +148,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
       <View className="flex-row justify-between items-center mb-6">
         <View>
           <Text className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Welcome Student</Text>
-          <Text className="text-on-surface text-2xl font-black">SpareChange Dashboard</Text>
+          <Text className="text-on-surface text-2xl font-black">Penny Pilot Dashboard</Text>
         </View>
         <TouchableOpacity 
           onPress={logout}
@@ -203,7 +203,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
       >
         <View className="flex-1 pr-2">
           <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-ob-primary text-sm">🤔 Thinking of buying something?</Text>
-          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-on-primary-fixed-variant text-xs mt-1">Let SpareChange AI evaluate the delay it will cause to your savings goals.</Text>
+          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-on-primary-fixed-variant text-xs mt-1">Let Penny Pilot evaluate the delay it will cause to your savings goals.</Text>
         </View>
         <MaterialIcons name="chevron-right" size={20} color="#005bbf" />
       </TouchableOpacity>

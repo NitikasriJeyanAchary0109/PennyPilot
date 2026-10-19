@@ -144,7 +144,7 @@ async def create_transaction(
             )
             try:
                 explanation = await call_llama(
-                    system_prompt="You are SpareChange AI, explaining transaction roundups in one sentence.",
+                    system_prompt="You are Penny Pilot, explaining transaction roundups in one sentence.",
                     user_prompt=prompt,
                 )
             except Exception:

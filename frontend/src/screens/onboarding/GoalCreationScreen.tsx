@@ -315,7 +315,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
             triggerHaptic();
             Alert.alert(
               "Goal Configured!",
-              `SpareChange AI created your dream goal: "${goalName || "Savings Goal"}" with target ₹${formattedAmount}.`,
+              `Penny Pilot created your dream goal: "${goalName || "Savings Goal"}" with target ₹${formattedAmount}.`,
               [{ text: "Continue to Setup Spending", onPress: () => navigation.navigate("SpendingSetup") }]
             );
           }}
