@@ -113,7 +113,7 @@ class GoalDetailResponse(GoalResponse):
 # ==========================================
 class SavingsBase(BaseModel):
     amount: Decimal
-    source: Literal["round_up", "manual", "transfer"]
+    source: Literal["round_up", "manual", "transfer", "roundup"]
     goal_id: Optional[int] = None
 
 
@@ -123,7 +123,7 @@ class SavingsCreate(SavingsBase):
 
 class SavingsUpdate(BaseModel):
     amount: Optional[Decimal] = None
-    source: Optional[Literal["round_up", "manual", "transfer"]] = None
+    source: Optional[Literal["round_up", "manual", "transfer", "roundup"]] = None
     goal_id: Optional[int] = None
 
 

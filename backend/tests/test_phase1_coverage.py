@@ -5,7 +5,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from app.models.models import Budget, Goal
+from app.models.models import Budget, Goal, Savings
 from app.services.csv_parser import parse_transactions_csv
 from app.utils.prompts import (
     coach_system_prompt,
@@ -445,3 +445,87 @@ def test_savings_endpoints(client, db, student_user, student_token):
     # 5. Delete savings (204 No Content)
     r_del = client.delete(f"/api/savings/{s_id}", headers=headers)
     assert r_del.status_code == 204
+
+
+def test_bcrypt_backward_compatibility_with_passlib_hashes():
+    """Verify that bcrypt hashes created under Passlib (standard $2b$12$) verify correctly."""
+    from app.utils.security import verify_password
+
+    # Vector 1: 'PasslibLegacyPassword2024!'
+    hash1 = "$2b$12$OQWWLmquJjWpN98ua4gY6evJZ3Rf70oYKf1/JlQ5fDeFJG9pArP/2"
+    assert verify_password("PasslibLegacyPassword2024!", hash1) is True
+    assert verify_password("IncorrectPassword!", hash1) is False
+    assert verify_password("", hash1) is False
+
+    # Vector 2: 'CollegeStudent2026!'
+    hash2 = "$2b$12$Oeb.eTAy/HbyKuu7Z5jD0.1.7QLC370nLhchjnD/bOfKjdAK93yE6"
+    assert verify_password("CollegeStudent2026!", hash2) is True
+    assert verify_password("WrongStudentPassword", hash2) is False
+
+    # Corrupt / malformed hash must fail safely and return False
+    assert verify_password("CollegeStudent2026!", "not_a_valid_hash") is False
+    assert verify_password("CollegeStudent2026!", "$2b$invalid$format") is False
+
+
+def test_roundups_endpoints_and_stats(client, db, student_user, student_token):
+    """Verify GET /api/roundups/ and GET /api/roundups/stats against real models."""
+    headers = {"Authorization": f"Bearer {student_token}"}
+
+    # Verify initially empty stats
+    r_initial_stats = client.get("/api/roundups/stats", headers=headers)
+    assert r_initial_stats.status_code == 200
+    init_data = r_initial_stats.json()
+    assert Decimal(str(init_data["total_saved"])) == Decimal("0.00")
+    assert init_data["roundup_transactions_count"] == 0
+    assert init_data["currency"] == "INR"
+
+    # Add active roundups and another user's savings
+    now = datetime.datetime.utcnow()
+    s1 = Savings(
+        user_id=student_user.user_id,
+        amount=Decimal("4.50"),
+        source="round_up",
+        created_at=now,
+    )
+    s2 = Savings(
+        user_id=student_user.user_id,
+        amount=Decimal("15.50"),
+        source="roundup",
+        created_at=now + datetime.timedelta(seconds=1),
+    )
+    s_other_user = Savings(
+        user_id=9999,
+        amount=Decimal("100.00"),
+        source="round_up",
+        created_at=now,
+    )
+    # Manual savings shouldn't count in roundups
+    s_manual = Savings(
+        user_id=student_user.user_id,
+        amount=Decimal("50.00"),
+        source="manual",
+        created_at=now,
+    )
+    db.add_all([s1, s2, s_other_user, s_manual])
+    db.commit()
+
+    # 1. Fetch history
+    r_hist = client.get("/api/roundups/", headers=headers)
+    assert r_hist.status_code == 200
+    hist = r_hist.json()
+    assert len(hist) == 2
+    # Check ordering (most recent first)
+    assert hist[0]["id"] == s2.id
+    assert hist[1]["id"] == s1.id
+
+    # 2. Fetch stats
+    r_stats = client.get("/api/roundups/stats", headers=headers)
+    assert r_stats.status_code == 200
+    stats = r_stats.json()
+    assert Decimal(str(stats["total_saved"])) == Decimal("20.00")  # 4.50 + 15.50
+    assert stats["roundup_transactions_count"] == 2
+    assert stats["currency"] == "INR"
+
+    # 3. Unauthenticated access blocked
+    r_unauth = client.get("/api/roundups/stats")
+    assert r_unauth.status_code == 401

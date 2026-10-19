@@ -9,7 +9,9 @@ from app.services.rule_engine import (
     GOAL_UNREACHABLE_DATE,
     apply_roundup_if_eligible,
     budget_status,
+    calculate_accelerated_savings_options,
     calculate_roundup,
+    format_accelerated_options,
     goal_forecast,
     is_eligible_for_roundup,
     process_transaction,
@@ -155,3 +157,99 @@ def test_apply_roundup_if_eligible_cases():
     assert goal.current_amount == Decimal("500.50")
     db.add.assert_called_once()
     db.commit.assert_called_once()
+
+
+def test_calculate_accelerated_savings_options_already_met():
+    # If target <= current, returns empty list
+    opts = calculate_accelerated_savings_options(
+        target_amount=Decimal("1000.00"),
+        current_amount=Decimal("1000.00"),
+        base_velocity=Decimal("200.00"),
+    )
+    assert opts == []
+
+    opts2 = calculate_accelerated_savings_options(
+        target_amount=Decimal("1000.00"),
+        current_amount=Decimal("1200.00"),
+        base_velocity=Decimal("200.00"),
+    )
+    assert opts2 == []
+
+
+def test_calculate_accelerated_savings_options_default_increments():
+    # Target 10,000, current 0, base_velocity 500
+    opts = calculate_accelerated_savings_options(
+        target_amount=Decimal("10000.00"),
+        current_amount=Decimal("0.00"),
+        base_velocity=Decimal("500.00"),
+    )
+    assert len(opts) == 3
+    # Increments: 250, 500, 1000
+    assert opts[0]["extra_monthly"] == Decimal("250.00")
+    assert opts[0]["new_velocity"] == Decimal("750.00")
+    assert opts[1]["extra_monthly"] == Decimal("500.00")
+    assert opts[1]["new_velocity"] == Decimal("1000.00")
+    assert opts[2]["extra_monthly"] == Decimal("1000.00")
+    assert opts[2]["new_velocity"] == Decimal("1500.00")
+
+    # Dates should be monotonic (earlier completion for higher velocity)
+    assert opts[0]["projected_date"] > opts[1]["projected_date"]
+    assert opts[1]["projected_date"] > opts[2]["projected_date"]
+    assert opts[0]["months_saved"] > 0
+    assert opts[1]["months_saved"] > opts[0]["months_saved"]
+    assert opts[2]["months_saved"] > opts[1]["months_saved"]
+
+
+def test_calculate_accelerated_savings_options_unreachable_baseline():
+    # Base velocity = 0 (baseline unreachable)
+    opts = calculate_accelerated_savings_options(
+        target_amount=Decimal("10000.00"),
+        current_amount=Decimal("1000.00"),
+        base_velocity=Decimal("0.00"),
+        increments=[Decimal("500.00")],
+    )
+    assert len(opts) == 1
+    assert opts[0]["new_velocity"] == Decimal("500.00")
+    assert opts[0]["projected_date"] < GOAL_UNREACHABLE_DATE
+    assert opts[0]["months_saved"] == 0  # Baseline was unreachable
+
+
+def test_calculate_accelerated_savings_options_negative_increments_skipped():
+    opts = calculate_accelerated_savings_options(
+        target_amount=Decimal("5000.00"),
+        current_amount=Decimal("1000.00"),
+        base_velocity=Decimal("200.00"),
+        increments=[Decimal("-50.00"), Decimal("0.00"), Decimal("300.00")],
+    )
+    assert len(opts) == 1
+    assert opts[0]["extra_monthly"] == Decimal("300.00")
+
+
+def test_format_accelerated_options():
+    empty_str = format_accelerated_options([])
+    assert "None" in empty_str
+
+    sample_opts = [
+        {
+            "extra_monthly": Decimal("250.00"),
+            "new_velocity": Decimal("750.00"),
+            "projected_date": datetime.date(2027, 4, 1),
+            "months_saved": 5,
+        },
+        {
+            "extra_monthly": Decimal("500.00"),
+            "new_velocity": Decimal("1000.00"),
+            "projected_date": datetime.date(2026, 12, 1),
+            "months_saved": 9,
+        },
+    ]
+    formatted = format_accelerated_options(sample_opts)
+    assert "Accelerated savings options (precomputed):" in formatted
+    assert (
+        "Save an extra ₹250/month (total ₹750/month): reach goal by April 2027 (5 months sooner)"
+        in formatted
+    )
+    assert (
+        "Save an extra ₹500/month (total ₹1000/month): reach goal by December 2026 (9 months sooner)"
+        in formatted
+    )

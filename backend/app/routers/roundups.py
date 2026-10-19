@@ -22,8 +22,11 @@ def get_roundup_history(
     """
     return (
         db.query(Savings)
-        .filter(Savings.user_id == current_user.user_id, Savings.source == "roundup")
-        .order_by(Savings.date.desc())
+        .filter(
+            Savings.user_id == current_user.user_id,
+            Savings.source.in_(["round_up", "roundup"]),
+        )
+        .order_by(Savings.created_at.desc())
         .all()
     )
 
@@ -38,9 +41,12 @@ def get_roundup_stats(
     stats = (
         db.query(
             func.sum(Savings.amount).label("total_saved"),
-            func.count(Savings.save_id).label("count_transactions"),
+            func.count(Savings.id).label("count_transactions"),
         )
-        .filter(Savings.user_id == current_user.user_id, Savings.source == "roundup")
+        .filter(
+            Savings.user_id == current_user.user_id,
+            Savings.source.in_(["round_up", "roundup"]),
+        )
         .first()
     )
 
@@ -54,5 +60,5 @@ def get_roundup_stats(
     return {
         "total_saved": total_saved,
         "roundup_transactions_count": count_transactions,
-        "currency": "USD",
+        "currency": "INR",
     }

@@ -281,8 +281,116 @@ def goal_forecast(
 
     months_needed = remaining / velocity
     days_needed = int(months_needed * Decimal("30"))
-    projected_date = datetime.date.today() + datetime.timedelta(days=days_needed)
-    return projected_date
+    try:
+        projected_date = datetime.date.today() + datetime.timedelta(days=days_needed)
+        if projected_date >= GOAL_UNREACHABLE_DATE:
+            return GOAL_UNREACHABLE_DATE
+        return projected_date
+    except (OverflowError, ValueError):
+        return GOAL_UNREACHABLE_DATE
+
+
+def calculate_accelerated_savings_options(
+    target_amount: Decimal,
+    current_amount: Decimal,
+    base_velocity: Decimal,
+    increments: Optional[list[Decimal]] = None,
+) -> list[dict]:
+    """
+    Precompute deterministic accelerated savings options showing how extra
+    monthly contributions bring goal completion dates closer.
+
+    Ensures that any timeline acceleration or monthly bump figures
+    shown to the user (or discussed by the LLM) are computed here deterministically
+    via Decimal math, adhering to the Zero-Arithmetic Contract.
+
+    Args:
+        target_amount:  Total goal cost in INR.
+        current_amount: Current amount saved in INR.
+        base_velocity:  Current monthly savings rate in INR.
+        increments:     List of extra monthly contribution increments to evaluate.
+                        Defaults to [₹250, ₹500, ₹1000].
+
+    Returns:
+        List of dicts, each containing:
+          - extra_monthly: Decimal
+          - new_velocity: Decimal
+          - projected_date: Optional[datetime.date]
+          - months_saved: int (0 if baseline was already unreachable or already met)
+    """
+    remaining = target_amount - current_amount
+    if remaining <= Decimal("0"):
+        return []
+
+    if increments is None:
+        increments = [Decimal("250.00"), Decimal("500.00"), Decimal("1000.00")]
+
+    base_date = goal_forecast(target_amount, current_amount, base_velocity)
+
+    results = []
+    for inc in increments:
+        if inc <= Decimal("0"):
+            continue
+        effective_vel = max(base_velocity, Decimal("0")) + inc
+        new_date = goal_forecast(target_amount, current_amount, effective_vel)
+
+        if base_date is None or base_date >= GOAL_UNREACHABLE_DATE:
+            # Baseline was unreachable; extra savings makes it reachable
+            months_saved = 0
+        elif new_date is not None and base_date is not None and new_date < base_date:
+            days_diff = (base_date - new_date).days
+            months_saved = max(0, days_diff // 30)
+        else:
+            months_saved = 0
+
+        results.append(
+            {
+                "extra_monthly": inc,
+                "new_velocity": effective_vel,
+                "projected_date": new_date,
+                "months_saved": months_saved,
+            }
+        )
+
+    return results
+
+
+def format_accelerated_options(options: list[dict]) -> str:
+    """
+    Format precomputed acceleration options into a deterministic string block
+    ready for direct insertion into LLM prompts.
+
+    Args:
+        options: List of scenario dicts from calculate_accelerated_savings_options.
+
+    Returns:
+        Formatted multi-line scenario string.
+    """
+    if not options:
+        return "Accelerated savings options: None (goal is already met or no valid increments)."
+
+    lines = ["Accelerated savings options (precomputed):"]
+    for opt in options:
+        extra = opt["extra_monthly"]
+        new_vel = opt["new_velocity"]
+        p_date = opt["projected_date"]
+        months_saved = opt["months_saved"]
+
+        date_str = (
+            p_date.strftime("%B %Y")
+            if p_date and p_date < GOAL_UNREACHABLE_DATE
+            else "unreachable"
+        )
+        if months_saved > 0:
+            lines.append(
+                f"  • Save an extra ₹{extra:.0f}/month (total ₹{new_vel:.0f}/month): reach goal by {date_str} ({months_saved} months sooner)"
+            )
+        else:
+            lines.append(
+                f"  • Save an extra ₹{extra:.0f}/month (total ₹{new_vel:.0f}/month): reach goal by {date_str}"
+            )
+
+    return "\n".join(lines)
 
 
 # ===========================================================================

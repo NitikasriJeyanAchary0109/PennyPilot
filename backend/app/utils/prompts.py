@@ -181,6 +181,7 @@ def dream_engine_prompt(
     current_amount: Decimal,
     forecast_date: Optional[datetime.date],
     velocity: Decimal,
+    accelerated_options_text: Optional[str] = None,
 ) -> str:
     """
     Build the prompt for the Dream Engine goal-forecast explainer.
@@ -190,12 +191,14 @@ def dream_engine_prompt(
     them into encouraging language for the LLM to narrate.
 
     Args:
-        goal_name:      Student's goal label, e.g. "New Laptop".
-        target_amount:  Total amount needed (INR).
-        current_amount: Amount already saved (INR).
-        forecast_date:  Projected completion date from rule_engine, or None /
-                        date(9999,12,31) if velocity is zero.
-        velocity:       Monthly savings rate in INR from rule_engine.
+        goal_name:                Student's goal label, e.g. "New Laptop".
+        target_amount:            Total amount needed (INR).
+        current_amount:           Amount already saved (INR).
+        forecast_date:            Projected completion date from rule_engine, or None /
+                                  date(9999,12,31) if velocity is zero.
+        velocity:                 Monthly savings rate in INR from rule_engine.
+        accelerated_options_text: Pre-formatted text of deterministic scenario
+                                  options computed by rule_engine.
 
     Returns:
         Prompt string for the AI narration.
@@ -214,16 +217,23 @@ def dream_engine_prompt(
             f"{forecast_date.strftime('%B %Y')}."
         )
 
+    options_block = (
+        f"\n\n{accelerated_options_text}" if accelerated_options_text else ""
+    )
+
     return (
         "You are SpareChange AI. Motivate this college student about their savings goal "
-        "in 3 sentences or fewer. Be upbeat and specific — use the numbers provided.\n\n"
+        "in 3 sentences or fewer. Be upbeat and specific — use ONLY the precomputed numbers provided below.\n\n"
         f"Goal: {goal_name}\n"
         f"Target: ₹{target_amount:.0f} | Saved so far: ₹{current_amount:.0f} "
         f"| Remaining: ₹{remaining:.0f}\n"
-        f"{timeline_line}\n\n"
-        "Explain the timeline in plain language, then suggest ONE concrete action "
-        "(e.g. saving an extra ₹X per month) that would bring the date meaningfully "
-        "closer. Keep it specific and encouraging."
+        f"{timeline_line}"
+        f"{options_block}\n\n"
+        "ZERO-ARITHMETIC RULES:\n"
+        "1. Do NOT calculate, estimate, add, subtract, project, or invent ANY numbers or dates.\n"
+        "2. Only restate the precomputed figures provided in the context above.\n"
+        "3. If accelerated options are provided above, you may encourage the student by citing "
+        "ONE of those exact precomputed scenarios verbatim."
     )
 
 

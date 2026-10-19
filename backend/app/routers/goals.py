@@ -318,7 +318,14 @@ async def get_goal_forecast(
 
     # 3. Call AI narration
     from app.services.ai_engine import AIEngineError, call_llama
+    from app.services.rule_engine import (
+        calculate_accelerated_savings_options,
+        format_accelerated_options,
+    )
     from app.utils.prompts import dream_engine_prompt
+
+    accel_options = calculate_accelerated_savings_options(target, current, velocity)
+    accel_text = format_accelerated_options(accel_options)
 
     prompt = dream_engine_prompt(
         goal_name=goal.title,
@@ -326,11 +333,16 @@ async def get_goal_forecast(
         current_amount=current,
         forecast_date=forecast_date,
         velocity=velocity,
+        accelerated_options_text=accel_text,
     )
 
     try:
         ai_forecast = await call_llama(
-            system_prompt="You are SpareChange AI's Dream Engine, describing savings forecasts in plain language.",
+            system_prompt=(
+                "You are SpareChange AI's Dream Engine, describing savings forecasts in plain language. "
+                "Strictly adhere to Zero-Arithmetic: only restate precomputed numbers from the prompt, "
+                "and never calculate, estimate, project, or invent dates or amounts."
+            ),
             user_prompt=prompt,
         )
     except AIEngineError as exc:

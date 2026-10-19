@@ -33,7 +33,12 @@ from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.models import Goal, Savings, User
 from app.services.ai_engine import AIEngineError, call_llama
-from app.services.rule_engine import goal_forecast, savings_velocity
+from app.services.rule_engine import (
+    calculate_accelerated_savings_options,
+    format_accelerated_options,
+    goal_forecast,
+    savings_velocity,
+)
 from app.utils.prompts import dream_engine_prompt
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -167,12 +172,16 @@ async def get_goal_forecast(
     )
 
     # ── 4. Build prompt ──────────────────────────────────────────────────
+    accel_options = calculate_accelerated_savings_options(target, current, velocity)
+    accel_text = format_accelerated_options(accel_options)
+
     prompt = dream_engine_prompt(
         goal_name=goal.title,
         target_amount=target,
         current_amount=current,
         forecast_date=raw_forecast,  # pass raw sentinel — prompts.py handles it
         velocity=velocity,
+        accelerated_options_text=accel_text,
     )
 
     # ── 5. LLM call ──────────────────────────────────────────────────────
@@ -181,8 +190,9 @@ async def get_goal_forecast(
             system_prompt=(
                 "You are SpareChange AI. You motivate college students about "
                 "their savings goals in plain, upbeat language. Be specific — "
-                "use the numbers provided. Suggest exactly one concrete action "
-                "to reach the goal sooner (e.g. saving an extra ₹X/month). "
+                "use ONLY the precomputed numbers provided. If suggesting an action, "
+                "cite one of the precomputed accelerated savings scenarios verbatim. "
+                "Never calculate, estimate, project, or invent any numbers or dates. "
                 "Keep your reply to 3 sentences or fewer."
             ),
             user_prompt=prompt,

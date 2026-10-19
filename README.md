@@ -1,7 +1,7 @@
 # SpareChange AI
 
-[![CI](https://github.com/NitikasriJeyanAchary0109/ConsumerLiterarcyTrack/actions/workflows/ci.yml/badge.svg)](https://github.com/NitikasriJeyanAchary0109/ConsumerLiterarcyTrack/actions/workflows/ci.yml)
-[![Coverage: 86%](https://img.shields.io/badge/Coverage-86%25-brightgreen.svg)](docs/evidence/phase1/coverage.txt)
+[![CI](https://github.com/NitikasriJeyanAchary0109/PennyPilot/actions/workflows/ci.yml/badge.svg)](https://github.com/NitikasriJeyanAchary0109/PennyPilot/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/Coverage-Report-blue.svg)](docs/evidence/phase1b/coverage.txt)
 
 SpareChange AI is an automated micro-savings and financial literacy assistant designed for college students, with a companion dashboard for educators/advisors. It automates savings through transaction round-ups and uses a local AI model (Llama3) to explain financial decisions in plain language.
 

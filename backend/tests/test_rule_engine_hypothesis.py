@@ -14,6 +14,7 @@ from app.services.rule_engine import (
     BUDGET_WARNING_THRESHOLD,
     GOAL_UNREACHABLE_DATE,
     budget_status,
+    calculate_accelerated_savings_options,
     calculate_roundup,
     goal_forecast,
     process_transaction,
@@ -211,3 +212,62 @@ def test_property_stress_score_bounds(
     """Property: Financial stress score must always lie within [0, 100]."""
     score = stress_score(savings_rate, spend_velocity, overruns)
     assert 0 <= score <= 100
+
+
+# ---------------------------------------------------------------------------
+# 4. ACCELERATED SAVINGS INVARIANTS
+# ---------------------------------------------------------------------------
+
+
+@given(
+    target=st.decimals(
+        min_value=Decimal("100.00"), max_value=Decimal("500000.00"), places=2
+    ),
+    current=st.decimals(
+        min_value=Decimal("0.00"), max_value=Decimal("100.00"), places=2
+    ),
+    base_vel=st.decimals(
+        min_value=Decimal("0.00"), max_value=Decimal("5000.00"), places=2
+    ),
+    inc1=st.decimals(min_value=Decimal("50.00"), max_value=Decimal("500.00"), places=2),
+    inc2_delta=st.decimals(
+        min_value=Decimal("50.00"), max_value=Decimal("500.00"), places=2
+    ),
+)
+def test_property_accelerated_options_monotonicity_and_bounds(
+    target: Decimal,
+    current: Decimal,
+    base_vel: Decimal,
+    inc1: Decimal,
+    inc2_delta: Decimal,
+):
+    """Property 4: Accelerated options must be monotonic and never have negative months saved."""
+    inc2 = inc1 + inc2_delta  # inc2 > inc1
+    opts = calculate_accelerated_savings_options(
+        target_amount=target,
+        current_amount=current,
+        base_velocity=base_vel,
+        increments=[inc1, inc2],
+    )
+    if target <= current:
+        assert opts == []
+        return
+
+    assert len(opts) == 2
+    opt1, opt2 = opts[0], opts[1]
+
+    # Invariant 1: extra_monthly values match inputs
+    assert opt1["extra_monthly"] == inc1
+    assert opt2["extra_monthly"] == inc2
+
+    # Invariant 2: new_velocity is strictly increasing
+    assert opt2["new_velocity"] > opt1["new_velocity"]
+
+    # Invariant 3: months_saved never negative
+    assert opt1["months_saved"] >= 0
+    assert opt2["months_saved"] >= 0
+
+    # Invariant 4: Monotonicity - higher contribution reaches goal on or before lower contribution
+    if opt1["projected_date"] and opt2["projected_date"]:
+        assert opt2["projected_date"] <= opt1["projected_date"]
+        assert opt2["months_saved"] >= opt1["months_saved"]

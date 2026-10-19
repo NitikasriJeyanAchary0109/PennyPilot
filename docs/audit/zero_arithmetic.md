@@ -1,7 +1,7 @@
 # Zero-Arithmetic Contract Audit Report
 
 **Date:** 2026-10-19  
-**Branch:** `phase-1-tests-ci`  
+**Branch:** `phase-1b-zero-arithmetic` (branched from `phase-1-tests-ci`)  
 **Contract Definition:** The LLM never calculates; `rule_engine.py` precomputes all figures, and prompts receive formatted strings. The model is strictly an empathetic communicator and translator, never a calculator.
 
 ---
@@ -9,8 +9,11 @@
 ## Summary of Findings
 
 Across the backend codebase, exactly **8 call sites** invoke `call_llama()`:
-* **PASS:** 5 call sites
-* **VIOLATION:** 3 call sites (due to `dream_engine_prompt` asking the model to invent extra contribution projections `₹X/month` that bring goal dates closer without precomputed scenarios)
+
+| Phase | PASS | VIOLATION | Status |
+|---|---|---|---|
+| **Phase 1 Initial Audit** | 5 | 3 | 3 violations in `dream.py`, `goals.py`, `forecast.py` (`dream_engine_prompt`) |
+| **Phase 1.5 Post-Fix Re-Verification** | **8** | **0** | **100% PASS** — all arithmetic precomputed in `rule_engine.py` |
 
 ---
 
@@ -51,35 +54,35 @@ Across the backend codebase, exactly **8 call sites** invoke `call_llama()`:
 
 ### 3. `backend/app/routers/dream.py:180`
 * **Calling Function:** `get_dream_forecast`
-* **Prompt Builder:** `dream_engine_prompt(goal_name, target_amount, current_amount, forecast_date, velocity)` in `backend/app/utils/prompts.py:178`
+* **Prompt Builder:** `dream_engine_prompt(goal_name, target_amount, current_amount, forecast_date, velocity, accelerated_options_text)` in `backend/app/utils/prompts.py:178`
 * **Data Injected into Prompt:**
   * `goal_name`: string title
   * `target_amount`: Decimal target
   * `current_amount`: Decimal saved
   * `forecast_date`: projected `datetime.date` from `rule_engine.goal_forecast`
   * `velocity`: Decimal monthly rate from `rule_engine.savings_velocity`
+  * `accelerated_options_text`: deterministic precomputed options from `rule_engine.calculate_accelerated_savings_options` formatted by `rule_engine.format_accelerated_options`
 * **Are Figures Pre-formatted from `rule_engine.py`?**
-  * Yes, `forecast_date` and `velocity` are precomputed.
+  * Yes: 100% of numbers (dates, velocity, extra monthly amounts, new velocities, months saved) are precomputed in `rule_engine.py`.
 * **Does Prompt Ask Model to Add, Subtract, Compare, Project, or Rank?**
-  * **Yes.** `prompts.py:224-226` explicitly instructs:
-    > *"Explain the timeline in plain language, then suggest ONE concrete action (e.g. saving an extra ₹X per month) that would bring the date meaningfully closer. Keep it specific and encouraging."*
-  * In `dream.py:184-185`, system prompt states:
-    > *"Suggest exactly one concrete action to reach the goal sooner (e.g. saving an extra ₹X/month)."*
-  * Because the prompt does not precompute what `₹X` is or what new completion date `₹X` would produce, the model is invited to perform mental math or hallucinate financial projections (e.g., "If you save ₹400 more, you will finish 2 months earlier").
-* **Rating:** **VIOLATION**
+  * **No (Fixed in Phase 1.5).**
+  * The prompt now includes strict Zero-Arithmetic rules:
+    > *"1. Do NOT calculate, estimate, add, subtract, project, or invent ANY numbers or dates.\n2. Only restate the precomputed figures provided in the context above.\n3. If accelerated options are provided above, you may encourage the student by citing ONE of those exact precomputed scenarios verbatim."*
+  * The system prompt reinforces: *"use ONLY the precomputed numbers provided. If suggesting an action, cite one of the precomputed accelerated savings scenarios verbatim. Never calculate, estimate, project, or invent any numbers or dates."*
+* **Rating:** **PASS** (Formerly VIOLATION in Phase 1)
 
 ---
 
 ### 4. `backend/app/routers/goals.py:332`
 * **Calling Function:** `forecast_goal`
-* **Prompt Builder:** `dream_engine_prompt`
+* **Prompt Builder:** `dream_engine_prompt(goal_name, target_amount, current_amount, forecast_date, velocity, accelerated_options_text)`
 * **Data Injected into Prompt:**
-  * Same as `dream.py:180` (`goal_name`, `target_amount`, `current_amount`, `forecast_date`, `velocity`)
+  * Same as `dream.py` with precomputed `accelerated_options_text`.
 * **Are Figures Pre-formatted from `rule_engine.py`?**
-  * Yes (`goal_forecast`, `savings_velocity`).
+  * Yes (`goal_forecast`, `savings_velocity`, `calculate_accelerated_savings_options`).
 * **Does Prompt Ask Model to Add, Subtract, Compare, Project, or Rank?**
-  * **Yes.** Re-uses `dream_engine_prompt`, which prompts the model to invent an extra contribution amount and project its impact.
-* **Rating:** **VIOLATION**
+  * **No (Fixed in Phase 1.5).** All acceleration scenarios are precomputed and prompt explicitly prohibits mathematical calculation.
+* **Rating:** **PASS** (Formerly VIOLATION in Phase 1)
 
 ---
 
@@ -115,14 +118,14 @@ Across the backend codebase, exactly **8 call sites** invoke `call_llama()`:
 
 ### 7. `backend/app/routers/forecast.py:57`
 * **Calling Function:** `forecast_savings_goal`
-* **Prompt Builder:** `dream_engine_prompt`
+* **Prompt Builder:** `dream_engine_prompt(goal_name, target_amount, current_amount, forecast_date, velocity, accelerated_options_text)`
 * **Data Injected into Prompt:**
-  * Same `dream_engine_prompt` parameters with user-provided `monthly_contribution`.
+  * Same `dream_engine_prompt` parameters with user-provided `monthly_contribution` and precomputed `accelerated_options_text`.
 * **Are Figures Pre-formatted from `rule_engine.py`?**
-  * Yes.
+  * Yes (`goal_forecast`, `calculate_accelerated_savings_options`, `format_accelerated_options`).
 * **Does Prompt Ask Model to Add, Subtract, Compare, Project, or Rank?**
-  * **Yes.** Invokes `dream_engine_prompt` containing the projection instruction.
-* **Rating:** **VIOLATION**
+  * **No (Fixed in Phase 1.5).** Uses updated prompt and strict zero-arithmetic system prompt.
+* **Rating:** **PASS** (Formerly VIOLATION in Phase 1)
 
 ---
 
