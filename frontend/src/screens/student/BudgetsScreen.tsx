@@ -172,7 +172,7 @@ export const BudgetsScreen = () => {
             <MaterialIcons name="arrow-back" size={20} color="#181c20" />
           </Pressable>
           <Text
-            style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+            style={{ fontFamily: "Inter_700Bold" }}
             className="text-lg text-slate-800 font-bold ml-2"
           >
             Manage Budgets
@@ -209,7 +209,7 @@ export const BudgetsScreen = () => {
           </Text>
           <View className="flex-row justify-between items-baseline mb-4">
             <Text
-              style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }}
+              style={{ fontFamily: "Inter_800ExtraBold" }}
               className="text-3xl text-slate-800 font-extrabold"
             >
               ₹{summary.total_spent.toLocaleString("en-IN")}
@@ -253,7 +253,7 @@ export const BudgetsScreen = () => {
             </View>
             <Text
               style={{
-                fontFamily: "PlusJakartaSans_700Bold",
+                fontFamily: "Inter_700Bold",
                 color: summary.remaining >= 0 ? "#137333" : "#c5221f",
               }}
               className="text-sm font-bold"
@@ -266,7 +266,7 @@ export const BudgetsScreen = () => {
         {/* Budgets List */}
         <View className="space-y-4">
           <Text
-            style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+            style={{ fontFamily: "Inter_700Bold" }}
             className="text-base text-slate-800 mb-1"
           >
             Category Budgets
@@ -278,7 +278,7 @@ export const BudgetsScreen = () => {
             <View className="items-center justify-center py-12 bg-white rounded-3xl border border-slate-100 p-6">
               <MaterialIcons name="pie-chart-outlined" size={40} color="#94a3b8" className="mb-3" />
               <Text
-                style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+                style={{ fontFamily: "Inter_700Bold" }}
                 className="text-slate-800 text-sm mb-1"
               >
                 No Budgets Setup
@@ -325,7 +325,7 @@ export const BudgetsScreen = () => {
                       </View>
                       <View>
                         <Text
-                          style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+                          style={{ fontFamily: "Inter_700Bold" }}
                           className="text-sm text-slate-800"
                         >
                           {b.category}
@@ -428,7 +428,7 @@ export const BudgetsScreen = () => {
           <View className="bg-white rounded-3xl p-5 border border-slate-100 space-y-4">
             <View className="flex-row justify-between items-center">
               <Text
-                style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+                style={{ fontFamily: "Inter_700Bold" }}
                 className="text-lg text-slate-800"
               >
                 {editingBudget ? "Modify Budget limit" : "Establish new boundary"}
@@ -486,7 +486,7 @@ export const BudgetsScreen = () => {
                   Category
                 </Text>
                 <Text
-                  style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+                  style={{ fontFamily: "Inter_700Bold" }}
                   className="text-sm text-slate-800 ml-1"
                 >
                   {editingBudget.category}
@@ -522,7 +522,7 @@ export const BudgetsScreen = () => {
               className="bg-blue-600 w-full h-12 rounded-xl items-center justify-center"
             >
               <Text
-                style={{ fontFamily: "PlusJakartaSans_600SemiBold" }}
+                style={{ fontFamily: "Inter_600SemiBold" }}
                 className="text-white text-sm"
               >
                 {editingBudget ? "Apply changes" : "Create Budget"}

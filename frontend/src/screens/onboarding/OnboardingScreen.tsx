@@ -57,14 +57,14 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
     <SafeAreaView className="flex-1 bg-white">
       {/* Header */}
       <View className="w-full py-4 px-5 flex-row items-center justify-between border-b border-slate-100">
-        <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-xl text-[#005bbf]">
+        <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-xl text-[#005bbf]">
           Penny Pilot
         </Text>
         <Pressable 
           onPress={() => navigation.navigate("Login")}
           className="py-1 px-3 bg-blue-50 border border-blue-100 rounded-full"
         >
-          <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-xs text-[#005bbf] font-bold">
+          <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-xs text-[#005bbf] font-bold">
             Log In
           </Text>
         </Pressable>
@@ -103,7 +103,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
 
         {/* Typography */}
         <View className="items-center mb-8 px-4">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface text-center mb-2">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface text-center mb-2">
             Welcome to Penny Pilot
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-base text-on-surface-variant text-center px-4">
@@ -122,7 +122,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
             ]}
             onPress={() => navigation.navigate("GoalCreation")}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-base">
               Set a Goal First
             </Text>
           </Pressable>
@@ -136,7 +136,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
             ]}
             onPress={() => navigation.navigate("SpendingChoice")}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-ob-primary text-base">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-ob-primary text-base">
               Tell Us About Your Spending
             </Text>
           </Pressable>

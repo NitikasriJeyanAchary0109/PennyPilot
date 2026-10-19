@@ -125,7 +125,7 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
 
         {/* Header Title with Back button */}
         <View className="flex-row items-center justify-between mb-4">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-slate-800">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-slate-800">
             AI Negotiator
           </Text>
           <Pressable 
@@ -211,7 +211,7 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
                             <MaterialIcons name="subscriptions" size={20} color={isSelected ? "#005bbf" : "#64748b"} />
                           </View>
                           <View>
-                            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-slate-800">
+                            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-slate-800">
                               {sub.name}
                             </Text>
                             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[10px] text-slate-400">
@@ -219,7 +219,7 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
                             </Text>
                           </View>
                         </View>
-                        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-slate-800">
+                        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-slate-800">
                           ₹{sub.amount}/mo
                         </Text>
                       </Pressable>
@@ -305,7 +305,7 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
             ) : (
               <>
                 <MaterialIcons name="auto-awesome" size={16} color="#ffffff" className="mr-2" />
-                <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-sm">
+                <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-sm">
                   {activeTab === "subscriptions" ? "Evaluate Pause" : "Should I Buy?"}
                 </Text>
               </>
@@ -318,7 +318,7 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center space-x-2">
                   <MaterialIcons name="smart-toy" size={18} color="#005bbf" />
-                  <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xs text-slate-800">
+                  <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xs text-slate-800">
                     AI recommendation
                   </Text>
                 </View>
@@ -345,7 +345,7 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
               <View className="border-t border-slate-200/60 pt-3 flex-row items-start space-x-2">
                 <MaterialIcons name="track-changes" size={16} color="#64748b" className="mt-0.5" />
                 <View className="flex-1">
-                  <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-[10px] text-slate-700 font-bold mb-0.5">
+                  <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-[10px] text-slate-700 font-bold mb-0.5">
                     Goal impact
                   </Text>
                   <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-500">

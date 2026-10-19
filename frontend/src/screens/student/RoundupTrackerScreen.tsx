@@ -180,7 +180,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
           >
             <MaterialIcons name="arrow-back" size={24} color="#181c20" />
           </Pressable>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-ob-primary">
             Penny Pilot
           </Text>
         </View>
@@ -215,7 +215,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
               Total Round-up Savings
             </Text>
             <View className="flex-row items-baseline space-x-2 mb-4">
-              <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-4xl text-white">
+              <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-4xl text-white">
                 ₹{totalSaved.toLocaleString("en-IN")}
               </Text>
               <View className="bg-tertiary px-2 py-0.5 rounded-full border border-emerald-400/20">
@@ -231,7 +231,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
                 <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-white/80 uppercase tracking-wider font-bold">
                   Today
                 </Text>
-                <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-white">
+                <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-white">
                   ₹{todaySaved.toLocaleString("en-IN")}
                 </Text>
               </View>
@@ -239,7 +239,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
                 <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-white/80 uppercase tracking-wider font-bold">
                   Transactions
                 </Text>
-                <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-white">
+                <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-white">
                   {activities.length}
                 </Text>
               </View>
@@ -279,7 +279,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
 
         {/* Transaction list header */}
         <View className="flex-row items-center justify-between mb-4 px-1">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-on-surface">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-on-surface">
             Recent Activity
           </Text>
           <Pressable 
@@ -321,7 +321,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
                     )}
                   </View>
                   <View>
-                    <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface">
+                    <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface">
                       {act.merchant}
                     </Text>
                     <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[10px] text-on-secondary-container">
@@ -331,7 +331,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
                 </View>
 
                 <View className="items-end space-y-1">
-                  <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface">
+                  <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface">
                     ₹{act.amount}
                   </Text>
                   <View className="bg-tertiary/10 px-2 py-0.5 rounded-full border border-tertiary/20">
@@ -349,7 +349,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
         <View className="p-4 bg-primary-fixed text-on-primary-fixed-variant rounded-2xl border border-primary-fixed-dim flex-row space-x-4 items-start">
           <MaterialIcons name="smart-toy" size={24} color="#005bbf" className="mt-0.5" />
           <View className="flex-1 space-y-1">
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface">
               AI Coach Insight
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-5">

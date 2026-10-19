@@ -90,7 +90,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f7f9ff" }}>
       {/* Header Bar */}
       <View style={{ width: "100%", paddingVertical: 16, alignItems: "center", justifyContent: "center", backgroundColor: "#ffffff", borderBottomWidth: 1, borderBottomColor: "#f1f5f9" }}>
-        <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 20, color: "#005bbf" }}>
+        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 20, color: "#005bbf" }}>
           Penny Pilot
         </Text>
       </View>
@@ -106,7 +106,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
           <View style={{ width: "100%", maxWidth: 440 }}>
             {/* Subtitle */}
             <View style={{ marginBottom: 24, alignItems: "center" }}>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 24, color: "#1e293b", textAlign: "center" }}>
+              <Text style={{ fontFamily: "Inter_700Bold", fontSize: 24, color: "#1e293b", textAlign: "center" }}>
                 Welcome Back
               </Text>
               <Text style={{ fontFamily: "WorkSans_400Regular", fontSize: 14, color: "#64748b", marginTop: 4, textAlign: "center" }}>
@@ -171,13 +171,13 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
                 activeOpacity={0.8}
                 className="py-3.5 px-6 rounded-full border border-slate-200 bg-slate-50 active:bg-slate-100 flex-row justify-center items-center my-1"
               >
-                <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-slate-700 text-sm">Continue with Google</Text>
+                <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-700 text-sm">Continue with Google</Text>
               </TouchableOpacity>
 
               <View className="flex-row justify-center items-center mt-5">
                 <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-xs">Don't have an account? </Text>
                 <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-                  <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-[#005bbf] text-xs font-bold">Register Now</Text>
+                  <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-[#005bbf] text-xs font-bold">Register Now</Text>
                 </TouchableOpacity>
               </View>
             </Card>

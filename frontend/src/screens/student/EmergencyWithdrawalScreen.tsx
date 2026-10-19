@@ -86,7 +86,7 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
           >
             <MaterialIcons name="arrow-back" size={24} color="#181c20" />
           </Pressable>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-ob-primary">
             Penny Pilot
           </Text>
         </View>
@@ -113,7 +113,7 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
           <View className="w-16 h-16 bg-error-container text-on-error-container rounded-full items-center justify-center mb-4 shadow-sm">
             <MaterialIcons name="emergency" size={32} color="#ba1a1a" />
           </View>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface text-center mb-1">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface text-center mb-1">
             Emergency Withdrawal
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant text-center px-4">
@@ -132,7 +132,7 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
         {/* Amount Input */}
         <View className="items-center mb-6">
           <View className="flex-row items-center justify-center">
-            <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-4xl text-on-surface mr-2">
+            <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-4xl text-on-surface mr-2">
               ₹
             </Text>
             <TextInput
@@ -140,7 +140,7 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
               onChangeText={setAmount}
               keyboardType="numeric"
               maxLength={6}
-              style={{ fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 44, color: "#181c20", minWidth: 100, textAlign: "center" }}
+              style={{ fontFamily: "Inter_800ExtraBold", fontSize: 44, color: "#181c20", minWidth: 100, textAlign: "center" }}
             />
           </View>
           <View className="mt-2 bg-slate-100 px-3.5 py-1.5 rounded-full border border-slate-200/50">
@@ -175,7 +175,7 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
             <MaterialIcons name="smart-toy" size={24} color="#005bbf" />
           </View>
           <View className="flex-1">
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface mb-1">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface mb-1">
               Coach's Tip
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-relaxed">
@@ -189,7 +189,7 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
           <View style={styles.pickerModalOverlay} className="flex-1 justify-end">
             <View className="bg-white rounded-t-3xl pt-2 pb-8 px-margin-mobile">
               <View className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-on-surface mb-4 px-2">
+              <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface mb-4 px-2">
                 Select a reason
               </Text>
               {REASONS.map((r) => (
@@ -233,20 +233,20 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
           {isProcessing ? (
             <View className="flex-row items-center space-x-2">
               <ActivityIndicator size="small" color="#ffffff" />
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base">
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-base">
                 Processing...
               </Text>
             </View>
           ) : isCompleted ? (
             <View className="flex-row items-center space-x-2">
               <MaterialIcons name="check-circle" size={20} color="#ffffff" />
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base">
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-base">
                 Transfer Complete
               </Text>
             </View>
           ) : (
             <View className="flex-row items-center space-x-2">
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base mr-1">
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-base mr-1">
                 Confirm Withdrawal
               </Text>
               <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />

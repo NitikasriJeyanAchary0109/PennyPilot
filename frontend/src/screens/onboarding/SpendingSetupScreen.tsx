@@ -112,7 +112,7 @@ export const SpendingSetupScreen = ({ navigation }: { navigation: any }) => {
         >
           <MaterialIcons name="arrow-back" size={24} color="#181c20" />
         </Pressable>
-        <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-lg text-ob-primary">
+        <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-lg text-ob-primary">
           Penny Pilot
         </Text>
         <View className="w-6" /> {/* Spacer */}
@@ -129,10 +129,10 @@ export const SpendingSetupScreen = ({ navigation }: { navigation: any }) => {
             Enter your monthly income
           </Text>
           <View className="flex-row items-center justify-center">
-            <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-4xl text-on-surface mr-1">
+            <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-4xl text-on-surface mr-1">
               ₹
             </Text>
-            <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-4xl text-on-surface">
+            <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-4xl text-on-surface">
               {currentInput}
             </Text>
             {/* Blinking blue cursor */}
@@ -143,7 +143,7 @@ export const SpendingSetupScreen = ({ navigation }: { navigation: any }) => {
         {/* Expense Selection Card */}
         <View style={styles.card} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5">
           <View className="flex-row items-center justify-between mb-4">
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-base text-on-surface">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-base text-on-surface">
               Add recurring expenses
             </Text>
             <MaterialIcons name="info" size={20} color="#1a73e8" />
@@ -210,7 +210,7 @@ export const SpendingSetupScreen = ({ navigation }: { navigation: any }) => {
                 Selected expenses ({selectedExpenses.size})
               </Text>
             )}
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-on-surface">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface">
               ₹{totalExpenses.toLocaleString("en-IN")}
             </Text>
           </View>
@@ -271,7 +271,7 @@ export const SpendingSetupScreen = ({ navigation }: { navigation: any }) => {
               });
             }}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base mr-1">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-base mr-1">
               Continue
             </Text>
             <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />

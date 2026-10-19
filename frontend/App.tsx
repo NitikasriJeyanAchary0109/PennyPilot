@@ -8,6 +8,7 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
+  Inter_800ExtraBold,
 } from "@expo-google-fonts/inter";
 import { AuthProvider } from "./src/context/AuthContext";
 import RootNavigator from "./src/navigation/RootNavigator";
@@ -21,6 +22,7 @@ export default function App() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Inter_800ExtraBold,
   });
 
   if (!fontsLoaded && !fontError) {
@@ -34,7 +36,7 @@ export default function App() {
   return (
     <View style={styles.outerContainer}>
       <View style={styles.phoneFrame}>
-        {showTestScreen ? (
+        {__DEV__ && showTestScreen ? (
           <TestStyleScreen onDismiss={() => setShowTestScreen(false)} />
         ) : (
           <AuthProvider>
@@ -44,8 +46,8 @@ export default function App() {
           </AuthProvider>
         )}
 
-        {/* Floating Test Mode Pill for Step 0 styling verification */}
-        {Platform.OS === "web" && (
+        {/* Floating Test Mode Pill for Step 0 styling verification (DEV only) */}
+        {__DEV__ && Platform.OS === "web" && (
           <TouchableOpacity
             onPress={() => setShowTestScreen(!showTestScreen)}
             style={styles.testBadge}

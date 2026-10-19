@@ -134,7 +134,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
           >
             <MaterialIcons name="arrow-back" size={24} color="#181c20" />
           </Pressable>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-ob-primary">
             Penny Pilot
           </Text>
         </View>
@@ -153,7 +153,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
         {/* Header Text */}
         <View className="mb-6">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface mb-2">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface mb-2">
             Connect your spending
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant">
@@ -171,7 +171,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
             <View className="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-4">
               <MaterialIcons name="cloud-upload" size={32} color="#1a73e8" />
             </View>
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-base text-on-surface text-center px-4">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-base text-on-surface text-center px-4">
               Tap to upload transactions.csv
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant mt-1">
@@ -204,7 +204,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
           {/* Card 1 */}
           <View style={styles.gridCard} className="flex-1 bg-surface-container-low p-4 rounded-xl">
             <MaterialIcons name="security" size={24} color="#005bbf" className="mb-2" />
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-sm text-on-surface mb-1 mt-1">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-sm text-on-surface mb-1 mt-1">
               Privacy first
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-5">
@@ -215,7 +215,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
           {/* Card 2 */}
           <View style={styles.gridCard} className="flex-1 bg-surface-container-low p-4 rounded-xl">
             <MaterialIcons name="auto-awesome" size={24} color="#006d2a" className="mb-2" />
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-sm text-on-surface mb-1 mt-1">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-sm text-on-surface mb-1 mt-1">
               AI Insights
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-5">
@@ -234,7 +234,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
               <MaterialIcons name="sync" size={48} color="#1a73e8" />
             </Animated.View>
 
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-on-surface text-center mb-2">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface text-center mb-2">
               Analyzing spending...
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant text-center mb-6">

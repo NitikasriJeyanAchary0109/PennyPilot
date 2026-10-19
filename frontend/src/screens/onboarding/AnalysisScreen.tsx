@@ -30,7 +30,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
       {/* Top App Bar */}
       <View className="flex-row justify-between items-center px-margin-mobile py-stack-md border-b border-slate-100 bg-white">
         <View className="flex-row items-center space-x-3">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-ob-primary">
             Penny Pilot
           </Text>
         </View>
@@ -49,7 +49,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}>
         {/* AI Analysis Header */}
         <View className="mb-6">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface mb-1">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface mb-1">
             AI Analysis Results
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant">
@@ -63,7 +63,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
             <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-white/80 uppercase tracking-wider mb-1">
               Detected Monthly Income
             </Text>
-            <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-3xl text-white">
+            <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-3xl text-white">
               ₹45,000
             </Text>
           </View>
@@ -129,7 +129,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
               <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-on-surface-variant uppercase">
                 Spent
               </Text>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-on-surface">
+              <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-on-surface">
                 ₹33,750
               </Text>
             </View>
@@ -144,7 +144,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
                   Savings
                 </Text>
               </View>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface">
+              <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface">
                 ₹11,250
               </Text>
             </View>
@@ -156,7 +156,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
                   Rent
                 </Text>
               </View>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface">
+              <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface">
                 ₹13,500
               </Text>
             </View>
@@ -168,7 +168,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
                   Food
                 </Text>
               </View>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface">
+              <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface">
                 ₹11,250
               </Text>
             </View>
@@ -180,7 +180,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
                   Fun
                 </Text>
               </View>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface">
+              <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface">
                 ₹9,000
               </Text>
             </View>
@@ -189,7 +189,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
 
         {/* Subscriptions List */}
         <View className="mb-8">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-on-surface mb-3 px-1">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-on-surface mb-3 px-1">
             Active Subscriptions
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
@@ -230,7 +230,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
               navigation.navigate("Login");
             }}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base mr-1">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-base mr-1">
               Continue
             </Text>
             <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />

@@ -115,7 +115,7 @@ export const NotificationsScreen = () => {
             <MaterialIcons name="arrow-back" size={20} color="#181c20" />
           </Pressable>
           <Text
-            style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+            style={{ fontFamily: "Inter_700Bold" }}
             className="text-lg text-slate-800 font-bold ml-2"
           >
             Notifications
@@ -162,7 +162,7 @@ export const NotificationsScreen = () => {
           <View className="flex-1 items-center justify-center py-20">
             <MaterialIcons name="notifications-none" size={48} color="#94a3b8" className="mb-4" />
             <Text
-              style={{ fontFamily: "PlusJakartaSans_700Bold" }}
+              style={{ fontFamily: "Inter_700Bold" }}
               className="text-slate-800 text-base mb-1"
             >
               All Caught Up!
@@ -215,8 +215,8 @@ export const NotificationsScreen = () => {
                       <Text
                         style={{
                           fontFamily: isUnread
-                            ? "PlusJakartaSans_700Bold"
-                            : "PlusJakartaSans_600SemiBold",
+                            ? "Inter_700Bold"
+                            : "Inter_600SemiBold",
                         }}
                         className={`text-sm ${
                           isUnread ? "text-slate-900" : "text-slate-700"

@@ -40,7 +40,7 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f7f9ff" }}>
       {/* Header Bar */}
       <View style={{ width: "100%", paddingVertical: 16, alignItems: "center", justifyContent: "center", backgroundColor: "#ffffff", borderBottomWidth: 1, borderBottomColor: "#f1f5f9" }}>
-        <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 20, color: "#005bbf" }}>
+        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 20, color: "#005bbf" }}>
           Penny Pilot
         </Text>
       </View>
@@ -55,7 +55,7 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
         >
           <View style={{ width: "100%", maxWidth: 440 }}>
             <View style={{ marginBottom: 24, alignItems: "center" }}>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 24, color: "#1e293b", textAlign: "center" }}>
+              <Text style={{ fontFamily: "Inter_700Bold", fontSize: 24, color: "#1e293b", textAlign: "center" }}>
                 Create Account
               </Text>
               <Text style={{ fontFamily: "WorkSans_400Regular", fontSize: 14, color: "#64748b", marginTop: 4, textAlign: "center" }}>
@@ -137,7 +137,7 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
                       role === "student" ? "bg-blue-50 border-[#005bbf]" : "bg-slate-50 border-slate-200"
                     }`}
                   >
-                    <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${role === "student" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
+                    <Text style={{ fontFamily: "Inter_600SemiBold" }} className={`text-xs ${role === "student" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
                       Student
                     </Text>
                   </TouchableOpacity>
@@ -149,7 +149,7 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
                       role === "educator" ? "bg-blue-50 border-[#005bbf]" : "bg-slate-50 border-slate-200"
                     }`}
                   >
-                    <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${role === "educator" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
+                    <Text style={{ fontFamily: "Inter_600SemiBold" }} className={`text-xs ${role === "educator" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
                       Educator
                     </Text>
                   </TouchableOpacity>
@@ -161,7 +161,7 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
               <View className="flex-row justify-center items-center mt-5">
                 <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-xs">Already have an account? </Text>
                 <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-                  <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-[#005bbf] text-xs font-bold">Login</Text>
+                  <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-[#005bbf] text-xs font-bold">Login</Text>
                 </TouchableOpacity>
               </View>
             </Card>

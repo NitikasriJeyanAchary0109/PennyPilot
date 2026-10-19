@@ -79,7 +79,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
               style={{ width: "100%", height: "100%", resizeMode: "cover" }}
             />
           </View>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-ob-primary">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-ob-primary">
             Penny Pilot
           </Text>
         </View>
@@ -95,7 +95,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
       <ScrollView className="flex-grow" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 60 }}>
         {/* Welcome Header */}
         <View className="mb-6">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface mb-1">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface mb-1">
             Hi Alex,
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant">
@@ -125,7 +125,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
                 {loading ? (
                   <ActivityIndicator size="small" color="#1a73e8" />
                 ) : (
-                  <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-primary">
+                  <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-primary">
                     {healthScore}
                   </Text>
                 )}
@@ -157,7 +157,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
                 <Path d="M 20 50 A 30 30 0 0 1 80 50" fill="none" stroke="#ba1a1a" strokeWidth="8" strokeLinecap="round" strokeDasharray="94 94" strokeDashoffset={stressOffset} />
               </Svg>
               <View className="absolute bottom-1">
-                <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-error">
+                <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-error">
                   {stressScore}
                 </Text>
               </View>
@@ -175,7 +175,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
         <View style={styles.card} className="bg-white p-5 rounded-2xl border border-outline-variant/30 shadow-sm mb-6">
           <View className="flex-row justify-between items-start mb-4">
             <View>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-on-surface">
+              <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-on-surface">
                 Savings over time
               </Text>
               <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant">
@@ -241,7 +241,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
             <MaterialIcons name="lightbulb" size={24} color="#ffffff" />
           </View>
           <View className="flex-1">
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface mb-1">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-on-surface mb-1">
               AI Smart Suggestion
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-relaxed">
@@ -283,7 +283,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
             }}
             className="flex-1 bg-slate-50 border border-slate-200 py-3.5 rounded-xl items-center"
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-xs text-ob-primary">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-xs text-ob-primary">
               AI Investment Advisor
             </Text>
           </Pressable>
@@ -294,7 +294,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
             }}
             className="flex-1 bg-slate-50 border border-slate-200 py-3.5 rounded-xl items-center"
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-xs text-[#ba1a1a]">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-xs text-[#ba1a1a]">
               Emergency Withdrawal
             </Text>
           </Pressable>

@@ -22,7 +22,7 @@ export const SpendingChoiceScreen = ({ navigation }: { navigation: any }) => {
         >
           <MaterialIcons name="arrow-back" size={24} color="#181c20" />
         </Pressable>
-        <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-lg text-ob-primary">
+        <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-lg text-ob-primary">
           Penny Pilot
         </Text>
         <View className="w-6" />
@@ -30,7 +30,7 @@ export const SpendingChoiceScreen = ({ navigation }: { navigation: any }) => {
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 40 }}>
         <View className="mb-8">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-slate-800 mb-2">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-slate-800 mb-2">
             Tell us about your spending
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-slate-500">
@@ -54,7 +54,7 @@ export const SpendingChoiceScreen = ({ navigation }: { navigation: any }) => {
             <MaterialIcons name="edit" size={28} color="#005bbf" />
           </View>
           <View className="flex-1">
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-slate-800 font-bold mb-1">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-slate-800 font-bold mb-1">
               Enter income manually
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-500 leading-relaxed">
@@ -80,7 +80,7 @@ export const SpendingChoiceScreen = ({ navigation }: { navigation: any }) => {
             <MaterialIcons name="cloud-upload" size={28} color="#16893a" />
           </View>
           <View className="flex-1">
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-slate-800 font-bold mb-1">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-slate-800 font-bold mb-1">
               Upload transaction CSV
             </Text>
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-500 leading-relaxed">

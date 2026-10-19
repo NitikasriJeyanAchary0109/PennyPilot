@@ -95,7 +95,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
           >
             <MaterialIcons name="close" size={24} color="#181c20" />
           </Pressable>
-          <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-lg text-ob-primary">
+          <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-lg text-ob-primary">
             New Goal
           </Text>
         </View>
@@ -116,7 +116,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
               Dream Engine AI
             </Text>
           </View>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface text-center mb-2">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface text-center mb-2">
             What are we saving for?
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant text-center px-4">
@@ -142,10 +142,10 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
             Target Amount
           </Text>
           <View className="flex-row items-baseline justify-center">
-            <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-3xl text-primary-container mr-1">
+            <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-3xl text-primary-container mr-1">
               ₹
             </Text>
-            <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-4xl text-on-surface">
+            <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-4xl text-on-surface">
               {formattedAmount}
             </Text>
           </View>
@@ -202,7 +202,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
               <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-ob-secondary">
                 Target Date
               </Text>
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-sm text-on-surface">
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-sm text-on-surface">
                 {targetDate}
               </Text>
             </View>
@@ -261,7 +261,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
               ]}
               className="w-[80px] h-[48px] items-center justify-center mb-3"
             >
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-xl text-on-surface-variant">
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-xl text-on-surface-variant">
                 {num}
               </Text>
             </Pressable>
@@ -274,7 +274,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
             ]}
             className="w-[80px] h-[48px] items-center justify-center"
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-lg text-on-surface-variant">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-lg text-on-surface-variant">
               C
             </Text>
           </Pressable>
@@ -286,7 +286,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
             ]}
             className="w-[80px] h-[48px] items-center justify-center"
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-xl text-on-surface-variant">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-xl text-on-surface-variant">
               0
             </Text>
           </Pressable>
@@ -320,7 +320,7 @@ export const GoalCreationScreen = ({ navigation }: { navigation: any }) => {
             );
           }}
         >
-          <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base mr-1">
+          <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-base mr-1">
             Create Goal
           </Text>
           <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />

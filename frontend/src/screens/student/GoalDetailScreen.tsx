@@ -57,7 +57,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
         >
           <MaterialIcons name="arrow-back" size={24} color="#181c20" />
         </Pressable>
-        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-slate-800">
+        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-slate-800">
           Goal Details
         </Text>
       </View>
@@ -67,7 +67,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
         <View style={styles.card} className="bg-white rounded-3xl p-6 border border-slate-100 mb-6">
           <View className="items-center mb-6">
             <Text className="text-4xl mb-2">{goal.goal_name.split(" ")[0]}</Text>
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-slate-800 text-center font-bold">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-slate-800 text-center font-bold">
               {goal.goal_name.substring(goal.goal_name.indexOf(" ") + 1) || goal.goal_name}
             </Text>
           </View>
@@ -78,7 +78,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
               <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-slate-400 text-xs uppercase tracking-wider">
                 Saved So Far
               </Text>
-              <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-2xl text-emerald-600 font-extrabold mt-0.5">
+              <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-2xl text-emerald-600 font-extrabold mt-0.5">
                 ₹{saved.toLocaleString("en-IN")}
               </Text>
             </View>
@@ -86,7 +86,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
               <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-slate-400 text-xs uppercase tracking-wider">
                 Target Amount
               </Text>
-              <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-2xl text-slate-800 font-extrabold mt-0.5">
+              <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-2xl text-slate-800 font-extrabold mt-0.5">
                 ₹{target.toLocaleString("en-IN")}
               </Text>
             </View>
@@ -104,20 +104,20 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
           <View className="space-y-4 border-t border-slate-100 pt-4">
             <View className="flex-row justify-between items-center">
               <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Percent Complete</Text>
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-slate-800 text-sm font-bold">{percent}%</Text>
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">{percent}%</Text>
             </View>
             <View className="flex-row justify-between items-center">
               <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Remaining Balance</Text>
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-slate-800 text-sm font-bold">₹{left.toLocaleString("en-IN")}</Text>
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">₹{left.toLocaleString("en-IN")}</Text>
             </View>
             <View className="flex-row justify-between items-center">
               <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Target Date</Text>
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-slate-800 text-sm font-bold">{formattedDeadline}</Text>
+              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">{formattedDeadline}</Text>
             </View>
             {remainingDays !== null && (
               <View className="flex-row justify-between items-center">
                 <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Days Remaining</Text>
-                <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-slate-800 text-sm font-bold">{remainingDays} days</Text>
+                <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">{remainingDays} days</Text>
               </View>
             )}
           </View>
@@ -127,7 +127,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
         <View style={styles.card} className="bg-white rounded-3xl p-5 border border-slate-100 mb-6">
           <View className="flex-row items-center space-x-2.5 mb-3">
             <MaterialIcons name="smart-toy" size={20} color="#005bbf" />
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-slate-800 font-bold">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-slate-800 font-bold">
               Dream Engine AI
             </Text>
           </View>
@@ -157,7 +157,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
         {/* Withdrawal action box */}
         <View style={styles.card} className="bg-white rounded-3xl p-5 border border-slate-100 items-center">
           <MaterialIcons name="help-outline" size={28} color="#ba1a1a" className="mb-2" />
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-slate-800 text-sm font-bold text-center mb-1">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-slate-800 text-sm font-bold text-center mb-1">
             Need funds for an emergency?
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-xs text-center mb-4 px-2">
@@ -176,7 +176,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
             className="w-full py-3.5 rounded-xl bg-red-50 border border-red-200 active:bg-red-100 flex-row justify-center items-center"
           >
             <MaterialIcons name="emergency" size={16} color="#ba1a1a" className="mr-1.5" />
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-red-700 text-xs font-bold uppercase tracking-wider">
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-red-700 text-xs font-bold uppercase tracking-wider">
               Emergency Withdrawal
             </Text>
           </Pressable>

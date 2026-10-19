@@ -32,7 +32,7 @@ export const ProfileScreen = () => {
     <SafeAreaView className="flex-1 bg-[#f7f9ff]">
       {/* Header */}
       <View className="flex-row items-center justify-between px-margin-mobile py-stack-md bg-white border-b border-slate-100">
-        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-slate-800 font-bold">
+        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-slate-800 font-bold">
           Profile Settings
         </Text>
       </View>
@@ -46,7 +46,7 @@ export const ProfileScreen = () => {
               style={{ width: "100%", height: "100%", resizeMode: "cover" }}
             />
           </View>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-slate-800 font-bold mb-1">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-slate-800 font-bold mb-1">
             Alex Morgan
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-400">
@@ -116,7 +116,7 @@ export const ProfileScreen = () => {
           className="bg-red-50 border border-red-100 py-4 rounded-2xl items-center flex-row justify-center"
         >
           <MaterialIcons name="logout" size={18} color="#ba1a1a" className="mr-1.5" />
-          <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-red-700 text-sm font-bold uppercase tracking-wider">
+          <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-red-700 text-sm font-bold uppercase tracking-wider">
             Log Out Account
           </Text>
         </Pressable>

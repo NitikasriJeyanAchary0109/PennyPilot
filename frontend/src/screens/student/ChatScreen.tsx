@@ -201,7 +201,7 @@ export const ChatScreen = ({ mode = "coach" }: ChatScreenProps) => {
             }}
             className={`flex-1 py-1.5 rounded-full items-center ${activeMode === "coach" ? "bg-white shadow-sm" : ""}`}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${activeMode === "coach" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className={`text-xs ${activeMode === "coach" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
               AI Coach
             </Text>
           </Pressable>
@@ -212,7 +212,7 @@ export const ChatScreen = ({ mode = "coach" }: ChatScreenProps) => {
             }}
             className={`flex-1 py-1.5 rounded-full items-center ${activeMode === "advisor" ? "bg-white shadow-sm" : ""}`}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${activeMode === "advisor" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
+            <Text style={{ fontFamily: "Inter_600SemiBold" }} className={`text-xs ${activeMode === "advisor" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
               AI Advisor
             </Text>
           </Pressable>
@@ -259,10 +259,10 @@ export const ChatScreen = ({ mode = "coach" }: ChatScreenProps) => {
                     className="bg-white border border-outline-variant/30 p-4 rounded-2xl shadow-sm w-[85%] mt-2"
                   >
                     <View className="flex-row justify-between items-center mb-3">
-                      <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-slate-800">
+                      <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-slate-800">
                         {c.card.title}
                       </Text>
-                      <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xs text-ob-primary">
+                      <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xs text-ob-primary">
                         ₹{c.card.saved.toLocaleString("en-IN")} / ₹{c.card.target.toLocaleString("en-IN")}
                       </Text>
                     </View>
@@ -289,7 +289,7 @@ export const ChatScreen = ({ mode = "coach" }: ChatScreenProps) => {
                         <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-slate-400 uppercase tracking-wider">
                           Top Pick
                         </Text>
-                        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-slate-800">
+                        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-slate-800">
                           {c.investmentCard.fundName}
                         </Text>
                       </View>
@@ -305,7 +305,7 @@ export const ChatScreen = ({ mode = "coach" }: ChatScreenProps) => {
                         <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[10px] text-slate-500">
                           Expected Return
                         </Text>
-                        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-emerald-600">
+                        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-emerald-600">
                           {c.investmentCard.returnRate}
                         </Text>
                       </View>

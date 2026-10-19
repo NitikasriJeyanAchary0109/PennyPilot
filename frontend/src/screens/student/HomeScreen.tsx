@@ -202,7 +202,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
         className="bg-primary-fixed border border-primary-fixed-dim p-4 rounded-2xl mb-6 flex-row justify-between items-center"
       >
         <View className="flex-1 pr-2">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-ob-primary text-sm">🤔 Thinking of buying something?</Text>
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-ob-primary text-sm">🤔 Thinking of buying something?</Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-on-primary-fixed-variant text-xs mt-1">Let Penny Pilot evaluate the delay it will cause to your savings goals.</Text>
         </View>
         <MaterialIcons name="chevron-right" size={20} color="#005bbf" />
@@ -210,7 +210,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
 
       {/* Log Transaction Section */}
       <Card className="mb-6">
-        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-on-surface text-lg mb-4">Simulate card swipe / purchase</Text>
+        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-on-surface text-lg mb-4">Simulate card swipe / purchase</Text>
         
         <View className="flex-row gap-x-4 mb-3">
           <View className="flex-1">

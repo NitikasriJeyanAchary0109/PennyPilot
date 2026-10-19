@@ -97,7 +97,7 @@ export const GoalsScreen = () => {
               style={{ width: "100%", height: "100%", resizeMode: "cover" }}
             />
           </View>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-ob-primary">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-ob-primary">
             Penny Pilot
           </Text>
         </View>
@@ -119,7 +119,7 @@ export const GoalsScreen = () => {
       >
         {/* Welcome Section */}
         <View className="mb-6">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface mb-1">
+          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface mb-1">
             Dream Engine
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant">
@@ -134,7 +134,7 @@ export const GoalsScreen = () => {
             <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-on-surface-variant uppercase tracking-wider">
               Total Saved
             </Text>
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-on-surface mt-1">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface mt-1">
               ₹12,500
             </Text>
           </View>
@@ -154,7 +154,7 @@ export const GoalsScreen = () => {
             <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-on-surface-variant uppercase tracking-wider">
               Subscriptions
             </Text>
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-on-surface mt-1">
+            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface mt-1">
               ₹1,200/mo
             </Text>
           </Pressable>
@@ -199,7 +199,7 @@ export const GoalsScreen = () => {
                       />
                     </View>
                     <View>
-                      <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-on-surface">
+                      <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-on-surface">
                         {g.goal_name}
                       </Text>
                       <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant">

@@ -42,7 +42,7 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator color={variant === "outline" ? "#005bbf" : "#FFF"} size="small" />
       ) : (
-        <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={textStyle}>{title}</Text>
+        <Text style={{ fontFamily: "Inter_600SemiBold" }} className={textStyle}>{title}</Text>
       )}
     </TouchableOpacity>
   );
