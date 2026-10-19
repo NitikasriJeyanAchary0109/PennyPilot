@@ -116,7 +116,7 @@ async def get_goal_forecast(
     goal: Optional[Goal] = (
         db.query(Goal)
         .filter(
-            Goal.goal_id == goal_id,
+            Goal.id == goal_id,
             Goal.user_id == uid,  # enforces ownership — 404 on mismatch
         )
         .first()
@@ -127,8 +127,8 @@ async def get_goal_forecast(
             detail="Goal not found.",  # intentionally generic — no existence leak
         )
 
-    target = Decimal(str(goal.target))
-    current = Decimal(str(goal.saved))
+    target = Decimal(str(goal.target_amount))
+    current = Decimal(str(goal.current_amount))
 
     logger.info(
         "dream.forecast | user_id=%d goal_id=%d target=₹%s saved=₹%s",
@@ -142,7 +142,7 @@ async def get_goal_forecast(
     recent_savings = (
         db.query(Savings)
         .filter(Savings.user_id == uid)
-        .order_by(Savings.date.desc())  # type: ignore[attr-defined]
+        .order_by(Savings.created_at.desc())
         .limit(_VELOCITY_LOOKBACK_SAVINGS)
         .all()
     )
@@ -168,7 +168,7 @@ async def get_goal_forecast(
 
     # ── 4. Build prompt ──────────────────────────────────────────────────
     prompt = dream_engine_prompt(
-        goal_name=goal.goal_name,
+        goal_name=goal.title,
         target_amount=target,
         current_amount=current,
         forecast_date=raw_forecast,  # pass raw sentinel — prompts.py handles it
@@ -205,8 +205,8 @@ async def get_goal_forecast(
 
     # ── 6. Return ─────────────────────────────────────────────────────────
     return ForecastResponse(
-        goal_id=goal.goal_id,
-        goal_name=goal.goal_name,
+        goal_id=goal.id,
+        goal_name=goal.title,
         target_amount=target,
         current_amount=current,
         forecast_date=forecast_date,

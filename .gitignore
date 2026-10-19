@@ -43,6 +43,8 @@ coverage.xml
 htmlcov/
 .pytest_cache/
 pytest_run.log
+.hypothesis/
+.worktrees/
 
 # Type checking & Linters
 .mypy_cache/

@@ -326,7 +326,6 @@ async def evaluate_purchase(
         rec_type="negotiator",
         content=advice,
         input_context=input_dict,
-        created_at=datetime.datetime.utcnow(),
     )
     db.add(rec_entry)
     db.commit()
