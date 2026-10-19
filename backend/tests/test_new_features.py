@@ -132,6 +132,62 @@ def test_auth_google():
     assert data["role"] == "student"
 
 
+def test_google_callback_html_onboarding_states():
+    from unittest.mock import AsyncMock, patch
+
+    # 1. Test new user (has_completed_onboarding=False)
+    mock_token_new = {
+        "userinfo": {
+            "email": "new_oauth_user@test.com",
+            "name": "New OAuth User",
+        }
+    }
+    with patch(
+        "app.routers.auth.oauth.google.authorize_access_token",
+        new=AsyncMock(return_value=mock_token_new),
+    ):
+        response_new = client.get("/api/auth/google/callback")
+        assert response_new.status_code == 200
+        assert "text/html" in response_new.headers["content-type"]
+        html_new = response_new.text
+        # Assert onboardingComplete evaluates to "false" with NO "$"
+        assert 'const onboardingComplete = "false";' in html_new
+        assert "has_completed_onboarding=false" in html_new
+        assert "$false" not in html_new
+        assert "$true" not in html_new
+
+    # 2. Test existing onboarded user (has_completed_onboarding=True)
+    db = TestingSessionLocal()
+    user_onboarded = User(
+        full_name="Onboarded User",
+        email="onboarded_oauth_user@test.com",
+        role="student",
+        has_completed_onboarding=True,
+    )
+    db.add(user_onboarded)
+    db.commit()
+    db.close()
+
+    mock_token_onboarded = {
+        "userinfo": {
+            "email": "onboarded_oauth_user@test.com",
+            "name": "Onboarded User",
+        }
+    }
+    with patch(
+        "app.routers.auth.oauth.google.authorize_access_token",
+        new=AsyncMock(return_value=mock_token_onboarded),
+    ):
+        response_onboarded = client.get("/api/auth/google/callback")
+        assert response_onboarded.status_code == 200
+        html_onboarded = response_onboarded.text
+        # Assert onboardingComplete evaluates to "true" with NO "$"
+        assert 'const onboardingComplete = "true";' in html_onboarded
+        assert "has_completed_onboarding=true" in html_onboarded
+        assert "$true" not in html_onboarded
+        assert "$false" not in html_onboarded
+
+
 def test_wellness_and_stress():
     # Test GET /api/wellness/score
     response = client.get("/api/wellness/score")

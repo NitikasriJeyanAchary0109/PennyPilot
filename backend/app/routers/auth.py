@@ -231,7 +231,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
           const token = "{access_token}";
           const role = "{user.role}";
           // Deep link redirects
-          const onboardingComplete = "${str(user.has_completed_onboarding).lower()}";
+          const onboardingComplete = "{str(user.has_completed_onboarding).lower()}";
           const url = "pennypilot://oauth?token=" + token + "&role=" + role + "&has_completed_onboarding=" + onboardingComplete;
           const expoUrl = "exp://127.0.0.1:8081/--/oauth?token=" + token + "&role=" + role;
 
