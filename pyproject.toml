@@ -13,6 +13,7 @@ target-version = "py39"
 exclude = [
     ".git",
     ".venv",
+    ".worktrees",
     "venv",
     "backend/venv",
     "backend/alembic",
@@ -38,6 +39,7 @@ exclude = '''
 /(
     \.git
   | \.venv
+  | \.worktrees
   | venv
   | backend/alembic
   | frontend
@@ -55,6 +57,7 @@ disallow_untyped_defs = false
 exclude = [
     "backend/alembic",
     ".venv",
+    ".worktrees",
     "venv",
     "frontend",
 ]
