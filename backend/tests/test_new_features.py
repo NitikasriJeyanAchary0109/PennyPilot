@@ -301,15 +301,19 @@ def test_educator_overview_trends():
 
 
 def test_legacy_bcrypt_hash_backward_compatibility():
-    """Verify passwords hashed prior to direct bcrypt change (e.g. via passlib) still verify."""
+    """Verify passwords hashed prior to direct bcrypt change (generated with passlib==1.7.4 / bcrypt==3.2.2)."""
     from app.utils.security import verify_password
 
-    # Legacy passlib standard $2b$12$ hash for password "OldPasslibPassword2024!"
-    legacy_hash_2b = "$2b$12$ILiNStOnDYxIg51NuCH.PO4.T.a6GZ4/9CWJTjht5S7I1ucIHgPAu"
-    assert verify_password("OldPasslibPassword2024!", legacy_hash_2b) is True
-    assert verify_password("WrongPassword!", legacy_hash_2b) is False
+    # Standard password (<=72 bytes) hashed with passlib==1.7.4 & bcrypt==3.2.2
+    pwd_standard = "OldPasslibPassword2024!"
+    legacy_hash_standard = (
+        "$2b$12$H/7tbWgEWV442BfOd.Co3ujUzro7qyiG6VbmaSH98FgjEOelfr6Yy"
+    )
+    assert verify_password(pwd_standard, legacy_hash_standard) is True
+    assert verify_password("WrongPassword!", legacy_hash_standard) is False
 
-    # Legacy passlib standard $2a$12$ hash for password "OldPasslibPassword2024!"
-    legacy_hash_2a = "$2a$12$vq8LUgAg6ZhlLw6tM7.z2.4C68ghNJu3cnTqjFEX/rjDhff72RTh."
-    assert verify_password("OldPasslibPassword2024!", legacy_hash_2a) is True
-    assert verify_password("WrongPassword!", legacy_hash_2a) is False
+    # Long password (>72 bytes: 87 chars) hashed with passlib==1.7.4 & bcrypt==3.2.2
+    pwd_long = "OldPasslibPassword2024!ThisIsAVeryLongPasswordOver72BytesLongForTestingTruncation123456789"
+    legacy_hash_long = "$2b$12$wp/01e92dlC40lmgh.9OXOYGeyd8nfUUydSv4MZQbptqOc6NRMZ92"
+    assert verify_password(pwd_long, legacy_hash_long) is True
+    assert verify_password("WrongPassword!", legacy_hash_long) is False
