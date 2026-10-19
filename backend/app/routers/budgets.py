@@ -1,36 +1,48 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from decimal import Decimal
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from decimal import Decimal
+from typing import List, Optional
 
 from app.database import get_db
-from app.models.models import Budget, Transaction, User, AuditLog
-from app.schemas.schemas import BudgetCreate, BudgetResponse, BudgetUpdate
 from app.middleware.auth_middleware import require_student
+from app.models.models import AuditLog, Budget, Transaction, User
+from app.schemas.schemas import BudgetCreate, BudgetResponse, BudgetUpdate
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/budgets", tags=["Budgets"])
 
 
 def _get_period_bounds(period: str, start_date: Optional[datetime] = None):
     if period not in {"weekly", "monthly"}:
-        raise HTTPException(status_code=400, detail="period must be either weekly or monthly")
+        raise HTTPException(
+            status_code=400, detail="period must be either weekly or monthly"
+        )
 
     if start_date is None:
         start_date = datetime.utcnow()
 
     if period == "weekly":
         start = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + timedelta(days=6, hours=23, minutes=59, seconds=59, microseconds=999999)
+        end = start + timedelta(
+            days=6, hours=23, minutes=59, seconds=59, microseconds=999999
+        )
     else:
         start = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = (start.replace(year=start.year + (start.month // 12), month=((start.month % 12) + 1), day=1) - timedelta(microseconds=1))
+        end = start.replace(
+            year=start.year + (start.month // 12), month=((start.month % 12) + 1), day=1
+        ) - timedelta(microseconds=1)
 
     return start, end
 
 
-def calculate_spent_amount(db: Session, user_id: int, category: str, period: str, start_date: Optional[datetime] = None) -> Decimal:
+def calculate_spent_amount(
+    db: Session,
+    user_id: int,
+    category: str,
+    period: str,
+    start_date: Optional[datetime] = None,
+) -> Decimal:
     start, end = _get_period_bounds(period, start_date)
     spent_amount = (
         db.query(Transaction.amount)
@@ -54,7 +66,9 @@ def calculate_spent_amount(db: Session, user_id: int, category: str, period: str
 
 def _serialize_budget(budget: Budget, db: Session) -> dict:
     start_date = budget.start_date or datetime.utcnow()
-    spent_total = calculate_spent_amount(db, budget.user_id, budget.category, budget.period, start_date)
+    spent_total = calculate_spent_amount(
+        db, budget.user_id, budget.category, budget.period, start_date
+    )
 
     remaining_amount = Decimal(str(budget.limit_amount)) - spent_total
     is_over_limit = spent_total > Decimal(str(budget.limit_amount))
@@ -84,7 +98,9 @@ def create_budget(
     db: Session = Depends(get_db),
 ):
     if Decimal(str(budget_data.limit_amount)) <= 0:
-        raise HTTPException(status_code=400, detail="limit_amount must be greater than 0")
+        raise HTTPException(
+            status_code=400, detail="limit_amount must be greater than 0"
+        )
 
     existing = (
         db.query(Budget)
@@ -97,7 +113,10 @@ def create_budget(
         .first()
     )
     if existing:
-        raise HTTPException(status_code=409, detail="Duplicate active budget for this user, category, and period")
+        raise HTTPException(
+            status_code=409,
+            detail="Duplicate active budget for this user, category, and period",
+        )
 
     db_budget = Budget(
         user_id=current_user.user_id,
@@ -117,7 +136,7 @@ def create_budget(
         entity_type="budget",
         entity_id=db_budget.id,
         performed_by=f"user_{current_user.user_id}",
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
     )
     db.add(audit)
     db.commit()
@@ -191,7 +210,11 @@ def get_budget(
 ):
     budget = (
         db.query(Budget)
-        .filter(Budget.id == budget_id, Budget.user_id == current_user.user_id, Budget.is_deleted == False)
+        .filter(
+            Budget.id == budget_id,
+            Budget.user_id == current_user.user_id,
+            Budget.is_deleted == False,
+        )
         .first()
     )
     if not budget:
@@ -208,7 +231,11 @@ def update_budget(
 ):
     budget = (
         db.query(Budget)
-        .filter(Budget.id == budget_id, Budget.user_id == current_user.user_id, Budget.is_deleted == False)
+        .filter(
+            Budget.id == budget_id,
+            Budget.user_id == current_user.user_id,
+            Budget.is_deleted == False,
+        )
         .first()
     )
     if not budget:
@@ -216,7 +243,9 @@ def update_budget(
 
     if budget_update.limit_amount is not None:
         if Decimal(str(budget_update.limit_amount)) <= 0:
-            raise HTTPException(status_code=400, detail="limit_amount must be greater than 0")
+            raise HTTPException(
+                status_code=400, detail="limit_amount must be greater than 0"
+            )
         budget.limit_amount = budget_update.limit_amount
 
     if budget_update.period is not None:
@@ -232,7 +261,7 @@ def update_budget(
         entity_type="budget",
         entity_id=budget.id,
         performed_by=f"user_{current_user.user_id}",
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
     )
     db.add(audit)
     db.commit()
@@ -248,7 +277,11 @@ def delete_budget(
 ):
     budget = (
         db.query(Budget)
-        .filter(Budget.id == budget_id, Budget.user_id == current_user.user_id, Budget.is_deleted == False)
+        .filter(
+            Budget.id == budget_id,
+            Budget.user_id == current_user.user_id,
+            Budget.is_deleted == False,
+        )
         .first()
     )
     if not budget:
@@ -264,7 +297,7 @@ def delete_budget(
         entity_type="budget",
         entity_id=budget.id,
         performed_by=f"user_{current_user.user_id}",
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
     )
     db.add(audit)
     db.commit()

@@ -1,4 +1,5 @@
 import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,9 +7,7 @@ class Settings(BaseSettings):
     # ==========================
     # Database Configuration
     # ==========================
-    DATABASE_URL: str = (
-        "postgresql://postgres:password123@db:5432/sparechange"
-    )
+    DATABASE_URL: str = "postgresql://postgres:password123@db:5432/sparechange"
 
     # ==========================
     # JWT Configuration

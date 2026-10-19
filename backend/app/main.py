@@ -1,34 +1,33 @@
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.config import settings
-from app.database import engine, Base, get_db
+from app.database import Base, engine, get_db
 from app.routers import (
     auth,
-    transactions,
-    goals,
-    roundups,
-    chat,
-    negotiator,
-    forecast,
-    wellness,
-    educator,
-    savings,
     budgets,
     calculations,
-    coach,          # feat-aimodel: AI Coach router
+    chat,
+    coach,
     dream,
+    educator,
+    forecast,
+    goals,
+    negotiator,
     notifications,
-    dream,          # feat-aimodel: Dream Engine (goal forecast)
-    wellness,       # feat-aimodel: Financial Wellness (stress score)
+    roundups,
+    savings,
+    transactions,
     users,
+    wellness,
 )
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from starlette.middleware.sessions import SessionMiddleware
+
+
 # ==========================
 # Startup / Shutdown
 # ==========================
@@ -77,6 +76,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ==========================
 # Health Check
 # ==========================
@@ -100,31 +100,25 @@ async def healthcheck(db: Session = Depends(get_db)):
     }
 
 
-
 # ==========================
 # Routers
 # ==========================
-app.include_router(auth.router,         prefix="/api")
+app.include_router(auth.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
-app.include_router(goals.router,        prefix="/api")
-app.include_router(roundups.router,     prefix="/api")
-app.include_router(chat.router,         prefix="/api")
-app.include_router(negotiator.router,   prefix="/api")
-app.include_router(forecast.router,     prefix="/api")
-app.include_router(wellness.router,     prefix="/api")
-app.include_router(educator.router,     prefix="/api")
-app.include_router(savings.router,      prefix="/api")
-app.include_router(budgets.router,      prefix="/api")
+app.include_router(goals.router, prefix="/api")
+app.include_router(roundups.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(negotiator.router, prefix="/api")
+app.include_router(forecast.router, prefix="/api")
+app.include_router(wellness.router, prefix="/api")
+app.include_router(educator.router, prefix="/api")
+app.include_router(savings.router, prefix="/api")
+app.include_router(budgets.router, prefix="/api")
 app.include_router(calculations.router, prefix="/api")
-app.include_router(coach.router,        prefix="/api")
-app.include_router(dream.router,        prefix="/api")
+app.include_router(coach.router, prefix="/api")
+app.include_router(dream.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
-app.include_router(savings.router,      prefix="/api")   # from main
-app.include_router(coach.router,        prefix="/api")   # from feat-aimodel
-app.include_router(dream.router,        prefix="/api")   # from feat-aimodel
-app.include_router(wellness.router,     prefix="/api")   # from feat-aimodel
-
-app.include_router(users.router,         prefix="/api")
+app.include_router(users.router, prefix="/api")
 
 # ==========================
 # Run Server

@@ -30,10 +30,10 @@ import datetime
 from decimal import Decimal
 from typing import Optional
 
-
 # ===========================================================================
 # 1. FINANCIAL COACH
 # ===========================================================================
+
 
 def coach_system_prompt() -> str:
     """
@@ -113,7 +113,7 @@ def coach_user_prompt(
         budget_block = "Budget status: No budgets configured."
 
     return (
-        f"Student's message: \"{message}\"\n\n"
+        f'Student\'s message: "{message}"\n\n'
         f"{tx_block}\n\n"
         f"{goal_block}\n\n"
         f"{budget_block}\n\n"
@@ -126,6 +126,7 @@ def coach_user_prompt(
 # ===========================================================================
 # 2. PURCHASE NEGOTIATOR
 # ===========================================================================
+
 
 def negotiator_prompt(
     price: Decimal,
@@ -153,8 +154,8 @@ def negotiator_prompt(
         Single prompt string combining context and the negotiation question.
     """
     status_note = {
-        "safe":     "their budget is currently healthy",
-        "warning":  "they are approaching their budget limit",
+        "safe": "their budget is currently healthy",
+        "warning": "they are approaching their budget limit",
         "exceeded": "they have already exceeded their budget this period",
     }.get(budget_status, f"budget status is {budget_status!r}")
 
@@ -172,6 +173,7 @@ def negotiator_prompt(
 # ===========================================================================
 # 3. DREAM ENGINE (Goal Forecast)
 # ===========================================================================
+
 
 def dream_engine_prompt(
     goal_name: str,
@@ -200,13 +202,7 @@ def dream_engine_prompt(
     """
     remaining = target_amount - current_amount
 
-    # Handle the "unreachable" sentinel (velocity == 0)
-    unreachable = (
-        forecast_date is None
-        or forecast_date >= datetime.date(9999, 1, 1)
-    )
-
-    if unreachable:
+    if forecast_date is None or forecast_date >= datetime.date(9999, 1, 1):
         timeline_line = (
             "At their current savings rate of ₹0/month, "
             "the goal has no projected completion date."
@@ -234,6 +230,7 @@ def dream_engine_prompt(
 # ===========================================================================
 # 4. FINANCIAL WELLNESS (Stress Score)
 # ===========================================================================
+
 
 def wellness_prompt(
     stress_score: int,
@@ -276,11 +273,17 @@ def wellness_prompt(
     # Compact context lines from suggestions_context (caller-supplied, optional keys)
     ctx_lines = []
     if "monthly_savings" in suggestions_context:
-        ctx_lines.append(f"Current monthly savings: ₹{suggestions_context['monthly_savings']:.0f}")
+        ctx_lines.append(
+            f"Current monthly savings: ₹{suggestions_context['monthly_savings']:.0f}"
+        )
     if "top_overspend" in suggestions_context:
-        ctx_lines.append(f"Highest overspend category: {suggestions_context['top_overspend']}")
+        ctx_lines.append(
+            f"Highest overspend category: {suggestions_context['top_overspend']}"
+        )
     if "budget_overruns" in suggestions_context:
-        ctx_lines.append(f"Budget categories exceeded: {suggestions_context['budget_overruns']}")
+        ctx_lines.append(
+            f"Budget categories exceeded: {suggestions_context['budget_overruns']}"
+        )
     ctx_block = "\n".join(ctx_lines) if ctx_lines else ""
 
     return (

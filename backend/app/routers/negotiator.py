@@ -27,33 +27,31 @@ so it cannot be written directly by user_id alone without a prior Budget row.
 from __future__ import annotations
 
 import datetime
-import json
 import logging
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.models import (
+    AIRecommendation,
     Budget,
-    ChatHistory,
-    FinancialHealth,
     Goal,
     Savings,
     User,
-    AIRecommendation,
 )
 from app.services.ai_engine import AIEngineError, call_llama
 from app.services.rule_engine import (
     budget_status as compute_budget_status,
+)
+from app.services.rule_engine import (
     goal_forecast,
     savings_velocity,
 )
 from app.utils.prompts import negotiator_prompt
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger("sparechange_ai.negotiator")
 
@@ -62,6 +60,7 @@ router = APIRouter(prefix="/negotiator", tags=["AI Negotiator"])
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
+
 
 class EvaluateRequest(BaseModel):
     """Request body for POST /negotiator/evaluate."""
@@ -88,14 +87,15 @@ class EvaluateRequest(BaseModel):
 class EvaluateResponse(BaseModel):
     """Response for POST /negotiator/evaluate."""
 
-    advice:        str   = Field(..., description="LLM-generated purchase advice.")
-    budget_status: str   = Field(..., description="'safe' | 'warning' | 'exceeded'")
-    goal_impact:   str   = Field(..., description="Plain-text estimate of goal delay.")
+    advice: str = Field(..., description="LLM-generated purchase advice.")
+    budget_status: str = Field(..., description="'safe' | 'warning' | 'exceeded'")
+    goal_impact: str = Field(..., description="Plain-text estimate of goal delay.")
 
 
 # ---------------------------------------------------------------------------
 # Helper — compute goal impact string (pure, called before AI)
 # ---------------------------------------------------------------------------
+
 
 def _compute_goal_impact(
     price: Decimal,
@@ -111,9 +111,7 @@ def _compute_goal_impact(
     """
     # Fetch primary goal (highest progress ratio — most emotionally salient)
     goals = (
-        db.query(Goal)
-        .filter(Goal.user_id == user_id, Goal.status == "active")
-        .all()
+        db.query(Goal).filter(Goal.user_id == user_id, Goal.status == "active").all()
     )
     if not goals:
         return "no active savings goals set"
@@ -132,7 +130,7 @@ def _compute_goal_impact(
     past_amounts = [Decimal(str(s.amount)) for s in recent_savings_rows]
     velocity = savings_velocity(past_amounts, period_days=30)
 
-    target  = Decimal(str(primary_goal.target_amount))
+    target = Decimal(str(primary_goal.target_amount))
     current = Decimal(str(primary_goal.current_amount))
 
     # Current forecast
@@ -171,6 +169,7 @@ def _compute_goal_impact(
 # Helper — compute budget status for the purchase category
 # ---------------------------------------------------------------------------
 
+
 def _compute_budget_status(
     price: Decimal,
     category: str,
@@ -186,21 +185,23 @@ def _compute_budget_status(
     budget_row: Optional[Budget] = (
         db.query(Budget)
         .filter(
-            Budget.user_id   == user_id,
-            Budget.category  == category,
-            Budget.is_deleted == False
+            Budget.user_id == user_id,
+            Budget.category == category,
+            Budget.is_deleted == False,
         )
         .first()
     )
     if not budget_row:
-        return "safe"   # category not budgeted
+        return "safe"  # category not budgeted
 
     from app.routers.budgets import calculate_spent_amount
 
     # Simulate adding the purchase to current spend
-    spent = calculate_spent_amount(db, user_id, category, budget_row.period, budget_row.start_date)
+    spent = calculate_spent_amount(
+        db, user_id, category, budget_row.period, budget_row.start_date
+    )
     projected_spent = spent + price
-    limit           = Decimal(str(budget_row.limit_amount))
+    limit = Decimal(str(budget_row.limit_amount))
 
     return compute_budget_status(limit, projected_spent)
 
@@ -208,6 +209,7 @@ def _compute_budget_status(
 # ---------------------------------------------------------------------------
 # POST /api/negotiator/evaluate
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/evaluate",
@@ -239,7 +241,10 @@ async def evaluate_purchase(
     uid = current_user.user_id
     logger.info(
         "negotiator.evaluate | user_id=%d price=₹%s category=%r description=%r",
-        uid, request.price, request.category, request.description,
+        uid,
+        request.price,
+        request.category,
+        request.description,
     )
 
     # ── 1 & 2: Rule Engine computations (no LLM) ──────────────────────────
@@ -257,7 +262,9 @@ async def evaluate_purchase(
 
     logger.info(
         "negotiator.evaluate | user_id=%d budget_status=%r goal_impact=%r",
-        uid, bstatus, gimpact,
+        uid,
+        bstatus,
+        gimpact,
     )
 
     # ── 3: Build prompt ───────────────────────────────────────────────────
@@ -281,7 +288,8 @@ async def evaluate_purchase(
     except AIEngineError as exc:
         logger.error(
             "negotiator.evaluate | user_id=%d | AIEngineError: %s",
-            uid, exc.message,
+            uid,
+            exc.message,
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -293,11 +301,11 @@ async def evaluate_purchase(
 
     # ── 5: Persist recommendation ─────────────────────────────────────────
     input_dict = {
-        "price":         str(request.price),
-        "category":      request.category,
-        "description":   request.description,
+        "price": str(request.price),
+        "category": request.category,
+        "description": request.description,
         "budget_status": bstatus,
-        "goal_impact":   gimpact,
+        "goal_impact": gimpact,
     }
 
     # Find matching budget if exists
@@ -306,7 +314,7 @@ async def evaluate_purchase(
         .filter(
             Budget.user_id == uid,
             Budget.category == request.category,
-            Budget.is_deleted == False
+            Budget.is_deleted == False,
         )
         .first()
     )
@@ -326,7 +334,8 @@ async def evaluate_purchase(
 
     logger.info(
         "negotiator.evaluate | user_id=%d rec_id=%d — saved",
-        uid, rec_entry.rec_id,
+        uid,
+        rec_entry.rec_id,
     )
 
     # ── 6: Return structured response ────────────────────────────────────

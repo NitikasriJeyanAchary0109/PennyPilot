@@ -2,19 +2,15 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
 
+from app.config import settings
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-
-from app.config import settings
 
 # =====================================
 # Password Hashing
 # =====================================
 
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
-)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def get_password_hash(password: str) -> str:
@@ -22,20 +18,15 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def verify_password(
-    plain_password: str,
-    hashed_password: str
-) -> bool:
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify bcrypt hash."""
-    return pwd_context.verify(
-        plain_password,
-        hashed_password
-    )
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 # =====================================
 # Access Token
 # =====================================
+
 
 def create_access_token(
     data: dict,
@@ -46,10 +37,7 @@ def create_access_token(
     expire = (
         datetime.utcnow() + expires_delta
         if expires_delta
-        else datetime.utcnow()
-        + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        else datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
     payload.update(
@@ -71,12 +59,11 @@ def create_access_token(
 # Refresh Token
 # =====================================
 
+
 def create_refresh_token(data: dict):
     payload = data.copy()
 
-    expire = datetime.utcnow() + timedelta(
-        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-    )
+    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     payload.update(
         {
@@ -96,6 +83,7 @@ def create_refresh_token(data: dict):
 # =====================================
 # Decode JWT
 # =====================================
+
 
 def decode_token(token: str):
     """
@@ -147,6 +135,7 @@ def decode_refresh_token(token: str):
 # =====================================
 # Token Validation
 # =====================================
+
 
 def is_access_token(payload: dict):
     return payload.get("type") == "access"

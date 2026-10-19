@@ -14,22 +14,21 @@ Architecture contract
 from __future__ import annotations
 
 import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Optional
-import math
 
 # ---------------------------------------------------------------------------
 # Budget-status thresholds (adjust here; reflected everywhere automatically)
 # ---------------------------------------------------------------------------
-BUDGET_WARNING_THRESHOLD = Decimal("0.70")   # 70 % spent  → warning
+BUDGET_WARNING_THRESHOLD = Decimal("0.70")  # 70 % spent  → warning
 BUDGET_EXCEEDED_THRESHOLD = Decimal("1.00")  # 100 % spent → exceeded
 
 # ---------------------------------------------------------------------------
 # Stress-score weights (must sum to 1.0 conceptually; see stress_score docs)
 # ---------------------------------------------------------------------------
-STRESS_WEIGHT_SAVINGS_RATE  = Decimal("0.40")  # 40 % — how much you're saving
-STRESS_WEIGHT_SPEND_VELOCITY = Decimal("0.40") # 40 % — how fast you're spending
-STRESS_WEIGHT_OVERRUNS       = Decimal("0.20") # 20 % — how often you bust a budget
+STRESS_WEIGHT_SAVINGS_RATE = Decimal("0.40")  # 40 % — how much you're saving
+STRESS_WEIGHT_SPEND_VELOCITY = Decimal("0.40")  # 40 % — how fast you're spending
+STRESS_WEIGHT_OVERRUNS = Decimal("0.20")  # 20 % — how often you bust a budget
 
 # Sentinel date returned when goal completion cannot be predicted (velocity == 0)
 GOAL_UNREACHABLE_DATE = datetime.date(9999, 12, 31)
@@ -41,6 +40,7 @@ DEFAULT_ROUNDUP_THRESHOLD = Decimal("20.00")
 # ===========================================================================
 # 1. ROUNDUP LOGIC
 # ===========================================================================
+
 
 def calculate_roundup(amount: Decimal) -> Decimal:
     """
@@ -75,7 +75,7 @@ def calculate_roundup(amount: Decimal) -> Decimal:
 
     # Separate rupees and paise
     rupees = int(amount)
-    paise  = amount - Decimal(rupees)
+    paise = amount - Decimal(rupees)
 
     if paise > Decimal("0"):
         # Tier 1: round up to next whole rupee
@@ -126,6 +126,7 @@ def process_transaction(transaction_amount: Decimal) -> Decimal:
 # ===========================================================================
 # 2. BUDGET LOGIC
 # ===========================================================================
+
 
 def remaining_budget(budget: Decimal, spent: Decimal) -> Decimal:
     """
@@ -180,6 +181,7 @@ def budget_status(
 # 3. SAVINGS VELOCITY
 # ===========================================================================
 
+
 def savings_velocity(
     past_savings: list[Decimal],
     period_days: int,
@@ -208,21 +210,23 @@ def savings_velocity(
     monthly_rate = daily_rate * Decimal("30")
     return monthly_rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+
 def savings_summary(savings_list) -> dict:
     import datetime
+
     now = datetime.datetime.utcnow()
     this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
+
     total = Decimal("0.00")
     this_month_total = Decimal("0.00")
     roundup_total = Decimal("0.00")
     manual_total = Decimal("0.00")
-    
+
     for s in savings_list:
         total += s.amount
-        if getattr(s, 'created_at', None) and s.created_at >= this_month:
+        if getattr(s, "created_at", None) and s.created_at >= this_month:
             this_month_total += s.amount
-            
+
         if s.source == "round_up":
             roundup_total += s.amount
         elif s.source == "manual":
@@ -232,13 +236,14 @@ def savings_summary(savings_list) -> dict:
         "total_saved": total,
         "saved_this_month": this_month_total,
         "saved_via_roundup": roundup_total,
-        "saved_via_manual": manual_total
+        "saved_via_manual": manual_total,
     }
 
 
 # ===========================================================================
 # 4. GOAL FORECAST
 # ===========================================================================
+
 
 def goal_forecast(
     target_amount: Decimal,
@@ -274,8 +279,8 @@ def goal_forecast(
     if velocity <= Decimal("0"):
         return GOAL_UNREACHABLE_DATE
 
-    months_needed  = remaining / velocity
-    days_needed    = int(months_needed * Decimal("30"))
+    months_needed = remaining / velocity
+    days_needed = int(months_needed * Decimal("30"))
     projected_date = datetime.date.today() + datetime.timedelta(days=days_needed)
     return projected_date
 
@@ -283,6 +288,7 @@ def goal_forecast(
 # ===========================================================================
 # 5. STRESS SCORE
 # ===========================================================================
+
 
 def stress_score(
     savings_rate: Decimal,
@@ -322,20 +328,24 @@ def stress_score(
         Integer stress score in range [0, 100].
     """
     # --- Benchmarks (tweak these to recalibrate without touching the formula) ---
-    HEALTHY_MONTHLY_SAVINGS = Decimal("3000")   # ₹3 000/month = low-stress savings
-    COMFORTABLE_SPEND_CAP   = Decimal("15000")  # ₹15 000/month = low-stress spend
+    HEALTHY_MONTHLY_SAVINGS = Decimal("3000")  # ₹3 000/month = low-stress savings
+    COMFORTABLE_SPEND_CAP = Decimal("15000")  # ₹15 000/month = low-stress spend
 
     # A: Savings deficit — inverse of savings rate relative to healthy benchmark
     if savings_rate >= HEALTHY_MONTHLY_SAVINGS:
         score_a = Decimal("0")
     else:
-        score_a = (Decimal("1") - savings_rate / HEALTHY_MONTHLY_SAVINGS) * Decimal("100")
+        score_a = (Decimal("1") - savings_rate / HEALTHY_MONTHLY_SAVINGS) * Decimal(
+            "100"
+        )
 
     # B: Spend velocity — proportional to comfortable cap
     if spend_velocity <= Decimal("0"):
         score_b = Decimal("0")
     else:
-        score_b = min(spend_velocity / COMFORTABLE_SPEND_CAP * Decimal("100"), Decimal("100"))
+        score_b = min(
+            spend_velocity / COMFORTABLE_SPEND_CAP * Decimal("100"), Decimal("100")
+        )
 
     # C: Budget overruns — 20 pts each, capped at 100
     score_c = min(Decimal(budget_overruns) * Decimal("20"), Decimal("100"))
@@ -361,6 +371,7 @@ def stress_score(
 
 try:
     from sqlalchemy.orm import Session  # noqa: F401  (kept for type hints below)
+
     # Models are imported lazily inside the function to avoid circular imports
     # if rule_engine is imported before the ORM is initialised.
     _SQLALCHEMY_AVAILABLE = True
@@ -459,9 +470,9 @@ if __name__ == "__main__":
         ("₹145.00", Decimal("145.00")),
         ("₹140.00", Decimal("140.00")),
         ("₹150.00", Decimal("150.00")),
-        ("₹99.01",  Decimal("99.01")),
-        ("₹0.00",   Decimal("0.00")),
-        ("₹10.00",  Decimal("10.00")),
+        ("₹99.01", Decimal("99.01")),
+        ("₹0.00", Decimal("0.00")),
+        ("₹10.00", Decimal("10.00")),
     ]
     for label, val in cases:
         print(f"  {label:>12}  →  roundup = ₹{calculate_roundup(val)}")
@@ -486,19 +497,27 @@ if __name__ == "__main__":
 
     # --- goal_forecast ---
     print("\n[goal_forecast]")
-    print(f"  target=₹10000, saved=₹2000, velocity=₹{vel}/month  →  {goal_forecast(Decimal('10000'), Decimal('2000'), vel)}")
-    print(f"  velocity=₹0 (unreachable)  →  {goal_forecast(Decimal('10000'), Decimal('0'), Decimal('0'))}")
-    print(f"  already met               →  {goal_forecast(Decimal('500'), Decimal('600'), Decimal('300'))}")
+    print(
+        f"  target=₹10000, saved=₹2000, velocity=₹{vel}/month  →  {goal_forecast(Decimal('10000'), Decimal('2000'), vel)}"
+    )
+    print(
+        f"  velocity=₹0 (unreachable)  →  {goal_forecast(Decimal('10000'), Decimal('0'), Decimal('0'))}"
+    )
+    print(
+        f"  already met               →  {goal_forecast(Decimal('500'), Decimal('600'), Decimal('300'))}"
+    )
 
     # --- stress_score ---
     print("\n[stress_score]")
     scenarios = [
-        ("Low stress",    Decimal("4000"), Decimal("8000"),  0),
+        ("Low stress", Decimal("4000"), Decimal("8000"), 0),
         ("Medium stress", Decimal("1500"), Decimal("12000"), 2),
-        ("High stress",   Decimal("0"),    Decimal("18000"), 5),
+        ("High stress", Decimal("0"), Decimal("18000"), 5),
     ]
     for label, sv, sp, ovr in scenarios:
         score = stress_score(sv, sp, ovr)
-        print(f"  {label:>14}: savings=₹{sv}/mo, spend=₹{sp}/mo, overruns={ovr}  →  stress={score}/100")
+        print(
+            f"  {label:>14}: savings=₹{sv}/mo, spend=₹{sp}/mo, overruns={ovr}  →  stress={score}/100"
+        )
 
     print("\n✅  All checks complete.")

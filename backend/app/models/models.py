@@ -1,25 +1,23 @@
 import datetime
 
+from app.database import Base
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    DateTime,
-    Numeric,
-    ForeignKey,
-    Text,
     JSON,
     Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
 )
-
 from sqlalchemy.orm import relationship
-
-from app.database import Base
-
 
 # ==========================================================
 # USER
 # ==========================================================
+
 
 class User(Base):
     __tablename__ = "users"
@@ -116,6 +114,7 @@ class User(Base):
 # USER SESSION
 # ==========================================================
 
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
@@ -167,6 +166,7 @@ class UserSession(Base):
 # SECURITY EVENTS
 # ==========================================================
 
+
 class SecurityEvent(Base):
     __tablename__ = "security_events"
 
@@ -214,9 +214,12 @@ class SecurityEvent(Base):
         "UserSession",
         back_populates="security_events",
     )
+
+
 # ==========================================================
 # GOALS
 # ==========================================================
+
 
 class Goal(Base):
     __tablename__ = "goals"
@@ -272,6 +275,7 @@ class Goal(Base):
 # SAVINGS
 # ==========================================================
 
+
 class Savings(Base):
     __tablename__ = "savings"
 
@@ -321,6 +325,7 @@ class Savings(Base):
 # NOTIFICATIONS
 # ==========================================================
 
+
 class Notification(Base):
     __tablename__ = "notifications"
 
@@ -364,6 +369,7 @@ class Notification(Base):
 # CHAT HISTORY
 # ==========================================================
 
+
 class ChatHistory(Base):
     __tablename__ = "chat_history"
 
@@ -400,9 +406,12 @@ class ChatHistory(Base):
         "User",
         back_populates="chat_history",
     )
+
+
 # ==========================================================
 # FINANCIAL HEALTH
 # ==========================================================
+
 
 class FinancialHealth(Base):
     __tablename__ = "financial_health"
@@ -435,10 +444,10 @@ class FinancialHealth(Base):
     )
 
 
-
 # ==========================================================
 # TRANSACTIONS
 # ==========================================================
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -510,6 +519,7 @@ class Transaction(Base):
 # BUDGET
 # ==========================================================
 
+
 class Budget(Base):
     __tablename__ = "budgets"
 
@@ -565,6 +575,7 @@ class Budget(Base):
 # AI RECOMMENDATIONS
 # ==========================================================
 
+
 class AIRecommendation(Base):
     __tablename__ = "ai_recommendations"
 
@@ -603,6 +614,7 @@ class AIRecommendation(Base):
 # AUDIT LOGS
 # ==========================================================
 
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
@@ -638,4 +650,4 @@ class AuditLog(Base):
     transaction = relationship(
         "Transaction",
         back_populates="audit_logs",
-    )    
+    )

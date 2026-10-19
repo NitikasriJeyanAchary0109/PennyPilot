@@ -30,7 +30,6 @@ import time
 from typing import Optional
 
 import httpx
-
 from app.config import settings
 
 # ---------------------------------------------------------------------------
@@ -42,8 +41,9 @@ logger = logging.getLogger("sparechange_ai.ai_engine")
 # ---------------------------------------------------------------------------
 # Runtime constants — change here; reflected everywhere automatically.
 # ---------------------------------------------------------------------------
-_REQUEST_TIMEOUT_SECONDS: float = 30.0   # per-attempt wall-clock timeout
-_MAX_RETRIES: int = 1                    # retry once on timeout or 5xx, then raise
+_REQUEST_TIMEOUT_SECONDS: float = 30.0  # per-attempt wall-clock timeout
+_MAX_RETRIES: int = 1  # retry once on timeout or 5xx, then raise
+
 
 # Derive the /api/chat base URL from the configured OLLAMA_URL.
 # settings.OLLAMA_URL may end in /api/generate or /api/chat — we normalise to
@@ -104,6 +104,7 @@ class AIEngineError(Exception):
 # Core LLM caller
 # ---------------------------------------------------------------------------
 
+
 async def call_llama(
     system_prompt: str,
     user_prompt: str,
@@ -147,7 +148,7 @@ async def call_llama(
         "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_prompt},
+            {"role": "user", "content": user_prompt},
         ],
         "stream": False,
     }
@@ -158,7 +159,9 @@ async def call_llama(
         attempt_label = "initial" if attempt == 0 else "retry"
         logger.info(
             "ai_engine.call_llama | attempt=%s model=%s url=%s",
-            attempt_label, model, url,
+            attempt_label,
+            model,
+            url,
         )
         t_start = time.monotonic()
 
@@ -172,7 +175,9 @@ async def call_llama(
             if response.status_code >= 500:
                 logger.error(
                     "ai_engine.call_llama | attempt=%s status=%d latency_ms=%d — 5xx, will %s",
-                    attempt_label, response.status_code, latency_ms,
+                    attempt_label,
+                    response.status_code,
+                    latency_ms,
                     "retry" if attempt < _MAX_RETRIES else "raise",
                 )
                 last_error = AIEngineError(
@@ -189,7 +194,9 @@ async def call_llama(
                 # 4xx — do not retry, raise immediately
                 logger.error(
                     "ai_engine.call_llama | attempt=%s status=%d latency_ms=%d — client error, no retry",
-                    attempt_label, response.status_code, latency_ms,
+                    attempt_label,
+                    response.status_code,
+                    latency_ms,
                 )
                 raise AIEngineError(
                     message=(
@@ -211,7 +218,8 @@ async def call_llama(
             if not content:
                 logger.error(
                     "ai_engine.call_llama | attempt=%s latency_ms=%d — empty content in response",
-                    attempt_label, latency_ms,
+                    attempt_label,
+                    latency_ms,
                 )
                 raise AIEngineError(
                     message="Ollama returned a 200 but the response content was empty.",
@@ -221,7 +229,10 @@ async def call_llama(
 
             logger.info(
                 "ai_engine.call_llama | attempt=%s model=%s latency_ms=%d response_chars=%d — success",
-                attempt_label, model, latency_ms, len(content),
+                attempt_label,
+                model,
+                latency_ms,
+                len(content),
             )
             return content
 
@@ -229,7 +240,9 @@ async def call_llama(
             latency_ms = int((time.monotonic() - t_start) * 1000)
             logger.error(
                 "ai_engine.call_llama | attempt=%s latency_ms=%d — timeout (%s), will %s",
-                attempt_label, latency_ms, type(exc).__name__,
+                attempt_label,
+                latency_ms,
+                type(exc).__name__,
                 "retry" if attempt < _MAX_RETRIES else "raise",
             )
             last_error = AIEngineError(
@@ -246,7 +259,9 @@ async def call_llama(
             latency_ms = int((time.monotonic() - t_start) * 1000)
             logger.error(
                 "ai_engine.call_llama | attempt=%s latency_ms=%d — network error: %s",
-                attempt_label, latency_ms, type(exc).__name__,
+                attempt_label,
+                latency_ms,
+                type(exc).__name__,
             )
             raise AIEngineError(
                 message=(
@@ -269,6 +284,7 @@ async def call_llama(
 # Health check
 # ---------------------------------------------------------------------------
 
+
 async def health_check() -> bool:
     """
     Ping the Ollama service to verify it is reachable and responding.
@@ -290,12 +306,14 @@ async def health_check() -> bool:
         else:
             logger.warning(
                 "ai_engine.health_check | ollama=unexpected_status status=%d url=%s",
-                response.status_code, url,
+                response.status_code,
+                url,
             )
         return is_up
     except (httpx.RequestError, httpx.TimeoutException) as exc:
         logger.warning(
             "ai_engine.health_check | ollama=unreachable error=%s url=%s",
-            type(exc).__name__, url,
+            type(exc).__name__,
+            url,
         )
         return False
