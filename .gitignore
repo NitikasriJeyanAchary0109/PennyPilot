@@ -4,6 +4,11 @@ backend/node_modules/
 
 .env
 .env.*
+backend/.env
+
+__pycache__/
+*.pyc
+.venv/
 
 dist/
 build/
