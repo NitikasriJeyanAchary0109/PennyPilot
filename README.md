@@ -106,3 +106,11 @@ To run active code changes locally without provisioning a remote VM, you can run
    ```bash
    npm run start
    ```
+
+---
+
+## Security & Authentication
+
+- **Password Hashing**: Passwords are authenticated and stored using standard `bcrypt` with a work factor of 12 rounds.
+- **Password Length Limit (72 Bytes)**: In accordance with the standard bcrypt algorithm specification, passwords are truncated to the first 72 UTF-8 bytes upon registration and verification. Passphrases exceeding 72 bytes are evaluated on their initial 72 bytes.
+- **OAuth 2.0 Integration**: Google OAuth uses OpenID Connect with redirect handling via FastAPI (`/api/auth/google/callback`) and native deep-link routing (`pennypilot://oauth`).
