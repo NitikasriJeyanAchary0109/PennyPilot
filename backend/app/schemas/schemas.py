@@ -1,7 +1,9 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Literal
+from datetime import date, datetime
 from decimal import Decimal
-from datetime import datetime, date
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 
 # ==========================================
 # AUTH SCHEMAS
@@ -12,12 +14,15 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     role: str = Field(default="student", description="Role: student or educator")
 
+
 class UserCreate(UserBase):
     password: Optional[str] = None  # Optional for Google OAuth users
+
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
 
 class UserResponse(UserBase):
     user_id: int
@@ -25,14 +30,15 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str
     role: str
     has_completed_onboarding: bool
+
 
 class TokenData(BaseModel):
     email: Optional[str] = None
@@ -51,8 +57,8 @@ class UserSessionResponse(BaseModel):
     login_at: datetime
     logout_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class SecurityEventResponse(BaseModel):
     event_id: int
@@ -61,8 +67,7 @@ class SecurityEventResponse(BaseModel):
     severity: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -74,16 +79,19 @@ class GoalBase(BaseModel):
     current_amount: Decimal = Decimal("0.00")
     target_date: Optional[datetime] = None
 
+
 class GoalCreate(BaseModel):
     title: str
     target_amount: Decimal
     target_date: Optional[datetime] = None
+
 
 class GoalUpdate(BaseModel):
     title: Optional[str] = None
     target_amount: Optional[Decimal] = None
     current_amount: Optional[Decimal] = None
     target_date: Optional[datetime] = None
+
 
 class GoalResponse(GoalBase):
     id: int
@@ -92,13 +100,12 @@ class GoalResponse(GoalBase):
     created_at: datetime
     is_deleted: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class GoalDetailResponse(GoalResponse):
     progress_percentage: float
     projected_completion_date: Optional[date] = None
-
 
 
 # ==========================================
@@ -106,16 +113,19 @@ class GoalDetailResponse(GoalResponse):
 # ==========================================
 class SavingsBase(BaseModel):
     amount: Decimal
-    source: Literal["round_up", "manual", "transfer"]
+    source: Literal["round_up", "manual", "transfer", "roundup"]
     goal_id: Optional[int] = None
+
 
 class SavingsCreate(SavingsBase):
     pass
 
+
 class SavingsUpdate(BaseModel):
     amount: Optional[Decimal] = None
-    source: Optional[Literal["round_up", "manual", "transfer"]] = None
+    source: Optional[Literal["round_up", "manual", "transfer", "roundup"]] = None
     goal_id: Optional[int] = None
+
 
 class SavingsResponse(SavingsBase):
     id: int
@@ -123,8 +133,8 @@ class SavingsResponse(SavingsBase):
     created_at: datetime
     triggered_by_transaction_id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class SavingsSummaryResponse(BaseModel):
     total_saved: Decimal
@@ -144,8 +154,7 @@ class NotificationResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -154,6 +163,7 @@ class NotificationResponse(BaseModel):
 class ChatRequest(BaseModel):
     message: str
 
+
 class ChatHistoryResponse(BaseModel):
     chat_id: int
     user_id: int
@@ -161,8 +171,7 @@ class ChatHistoryResponse(BaseModel):
     response: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -176,8 +185,7 @@ class FinancialHealthResponse(BaseModel):
     ai_summary: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -191,13 +199,16 @@ class TransactionBase(BaseModel):
     transaction_date: Optional[datetime] = None
     description: Optional[str] = None
 
+
 class TransactionCreate(TransactionBase):
     pass
+
 
 class TransactionUpdate(BaseModel):
     merchant: Optional[str] = None
     category: Optional[str] = None
     amount: Optional[Decimal] = None
+
 
 class TransactionResponse(TransactionBase):
     id: int
@@ -208,8 +219,7 @@ class TransactionResponse(TransactionBase):
     created_at: datetime
     is_deleted: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -221,12 +231,15 @@ class BudgetBase(BaseModel):
     period: Literal["weekly", "monthly"] = "monthly"
     start_date: Optional[datetime] = None
 
+
 class BudgetCreate(BudgetBase):
     pass
+
 
 class BudgetUpdate(BaseModel):
     limit_amount: Optional[Decimal] = None
     period: Optional[Literal["weekly", "monthly"]] = None
+
 
 class BudgetResponse(BudgetBase):
     id: int
@@ -237,8 +250,7 @@ class BudgetResponse(BudgetBase):
     remaining_amount: Decimal = Decimal("0.00")
     is_over_limit: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -250,17 +262,19 @@ class AIRecommendationResponse(BaseModel):
     rec_type: str
     content: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class NegotiateRequest(BaseModel):
     item_name: str
     item_price: Decimal
     category: str
 
+
 class ForecastRequest(BaseModel):
     goal_id: int
     monthly_contribution: Decimal
+
 
 class StressRequest(BaseModel):
     timeframe_days: int = 30
@@ -276,8 +290,7 @@ class AuditLogResponse(BaseModel):
     performed_by: str
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================

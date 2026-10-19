@@ -1,14 +1,14 @@
 from app.models.models import (
-    User,
-    UserSession,
-    SecurityEvent,
-    Goal,
-    Savings,
-    Notification,
+    AIRecommendation,
+    AuditLog,
+    Budget,
     ChatHistory,
     FinancialHealth,
+    Goal,
+    Notification,
+    Savings,
+    SecurityEvent,
     Transaction,
-    Budget,
-    AIRecommendation,
-    AuditLog
+    User,
+    UserSession,
 )

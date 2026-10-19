@@ -1,20 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import datetime
+
+from app.config import settings
+from app.database import get_db
+from app.middleware.auth_middleware import get_current_user
+from app.models.models import SecurityEvent, User, UserSession
+from app.schemas.schemas import Token, UserCreate, UserLogin, UserResponse
+from app.utils.security import create_access_token, get_password_hash, verify_password
+from authlib.integrations.starlette_client import OAuth
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-import datetime
-from typing import Optional
 from pydantic import BaseModel
-
-from authlib.integrations.starlette_client import OAuth
-from starlette.middleware.sessions import SessionMiddleware
-
-from app.database import get_db
-from app.models.models import User, UserSession, SecurityEvent
-from app.schemas.schemas import UserCreate, UserResponse, UserLogin, Token
-from app.utils.security import get_password_hash, verify_password, create_access_token
-from app.middleware.auth_middleware import get_current_user
-from app.config import settings
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -25,41 +22,42 @@ oauth.register(
     client_id=settings.GOOGLE_CLIENT_ID,
     client_secret=settings.GOOGLE_CLIENT_SECRET,
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={
-        "scope": "openid email profile"
-    }
+    client_kwargs={"scope": "openid email profile"},
 )
+
 
 def log_login_session(db: Session, user: User, request: Request) -> UserSession:
     """Logs the session and security events upon successful login."""
     client_host = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
-    
+
     # 1. Create session record
     session = UserSession(
         user_id=user.user_id,
         ip_address=client_host,
         device=user_agent,
-        login_at=datetime.datetime.utcnow()
+        login_at=datetime.datetime.utcnow(),
     )
     db.add(session)
     db.commit()
     db.refresh(session)
-    
+
     # 2. Log security event for successful login
     sec_event = SecurityEvent(
         session_id=session.session_id,
         event_type="login",
         severity="low",
-        created_at=datetime.datetime.utcnow()
+        created_at=datetime.datetime.utcnow(),
     )
     db.add(sec_event)
     db.commit()
-    
+
     return session
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Registers a new student or educator (email/password)."""
     # Check if user already exists
@@ -67,14 +65,14 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A user with this email address already exists."
+            detail="A user with this email address already exists.",
         )
 
     # Validate role
     if user_data.role not in ["student", "educator"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid role. Must be 'student' or 'educator'."
+            detail="Invalid role. Must be 'student' or 'educator'.",
         )
 
     # Hash password and create user
@@ -86,9 +84,9 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         phone=user_data.phone,
         role=user_data.role,
         created_at=datetime.datetime.utcnow(),
-        updated_at=datetime.datetime.utcnow()
+        updated_at=datetime.datetime.utcnow(),
     )
-    
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -99,17 +97,21 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """OAuth2 compatible token login, returns access_token."""
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not user.password_hash or not verify_password(form_data.password, user.password_hash):
+    if (
+        not user
+        or not user.password_hash
+        or not verify_password(form_data.password, user.password_hash)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     # Log session and event
     log_login_session(db, user, request)
 
@@ -125,19 +127,19 @@ def login_for_access_token(
 
 
 @router.post("/login/json", response_model=Token)
-def login_json(
-    request: Request,
-    user_data: UserLogin,
-    db: Session = Depends(get_db)
-):
+def login_json(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """JSON-body login endpoint for easy API clients (like mobile axios)."""
     user = db.query(User).filter(User.email == user_data.email).first()
-    if not user or not user.password_hash or not verify_password(user_data.password, user.password_hash):
+    if (
+        not user
+        or not user.password_hash
+        or not verify_password(user_data.password, user.password_hash)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail="Incorrect email or password",
         )
-        
+
     # Log session and event
     log_login_session(db, user, request)
 
@@ -162,7 +164,7 @@ async def google_login(request: Request):
     redirect_uri = request.url_for("google_callback")
     # For HTTPS cloud deployments or proxies, adapt the redirect scheme if needed
     if "https" in str(request.base_url) or settings.ENVIRONMENT == "production":
-        redirect_uri = redirect_uri.replace("http://", "https://")
+        redirect_uri = redirect_uri.replace(scheme="https")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
@@ -174,23 +176,26 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Google authentication failed: {str(e)}"
+            detail=f"Google authentication failed: {str(e)}",
         )
-        
+
     user_info = token.get("userinfo")
     if not user_info:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Could not retrieve user info from Google."
+            detail="Could not retrieve user info from Google.",
         )
 
     email = user_info.get("email")
-    full_name = user_info.get("name") or f"{user_info.get('given_name', '')} {user_info.get('family_name', '')}".strip()
-    
+    full_name = (
+        user_info.get("name")
+        or f"{user_info.get('given_name', '')} {user_info.get('family_name', '')}".strip()
+    )
+
     if not email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google account must have an email address."
+            detail="Google account must have an email address.",
         )
 
     # Check if user already exists
@@ -201,9 +206,9 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             full_name=full_name,
             email=email,
             password_hash=None,  # No password for OAuth users
-            role="student",      # Default signup role
+            role="student",  # Default signup role
             created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow()
+            updated_at=datetime.datetime.utcnow(),
         )
         db.add(user)
         db.commit()
@@ -229,7 +234,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
           const onboardingComplete = "${str(user.has_completed_onboarding).lower()}";
           const url = "sparechange://oauth?token=" + token + "&role=" + role + "&has_completed_onboarding=" + onboardingComplete;
           const expoUrl = "exp://127.0.0.1:8081/--/oauth?token=" + token + "&role=" + role;
-          
+
           window.location.href = url;
           setTimeout(() => {{
             window.location.href = expoUrl;
@@ -262,15 +267,13 @@ class GoogleAuthRequest(BaseModel):
 
 @router.post("/google", response_model=Token)
 def google_auth_post(
-    request: Request,
-    auth_data: GoogleAuthRequest,
-    db: Session = Depends(get_db)
+    request: Request, auth_data: GoogleAuthRequest, db: Session = Depends(get_db)
 ):
     """Exchanges Google OAuth profile data for a backend JWT token."""
     email = auth_data.email
     full_name = auth_data.full_name
     oauth_id = auth_data.oauth_id
-    
+
     # Check if user already exists
     user = db.query(User).filter(User.email == email).first()
     if not user:
@@ -279,11 +282,11 @@ def google_auth_post(
             full_name=full_name,
             email=email,
             password_hash=None,  # No password for OAuth users
-            role="student",      # Default signup role
+            role="student",  # Default signup role
             oauth_provider="google",
             oauth_id=oauth_id,
             created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow()
+            updated_at=datetime.datetime.utcnow(),
         )
         db.add(user)
         db.commit()

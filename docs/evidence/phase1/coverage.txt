@@ -1,0 +1,113 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/python3
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /Users/nitikasri/ConsumerLiterarcyTrack-1/.worktrees/phase-1-tests-ci
+configfile: pyproject.toml
+testpaths: backend/tests
+plugins: anyio-4.12.1, cov-7.1.0, hypothesis-6.141.1
+collecting ... collected 63 items
+
+backend/tests/test_ai_engine.py::test_call_llama_success[asyncio] PASSED [  1%]
+backend/tests/test_ai_engine.py::test_call_llama_fallback_response_key[asyncio] PASSED [  3%]
+backend/tests/test_ai_engine.py::test_call_llama_timeout_and_retry_exhaustion[asyncio] PASSED [  4%]
+backend/tests/test_ai_engine.py::test_call_llama_5xx_retry_and_success[asyncio] PASSED [  6%]
+backend/tests/test_ai_engine.py::test_call_llama_5xx_retries_exhausted[asyncio] PASSED [  7%]
+backend/tests/test_ai_engine.py::test_call_llama_4xx_no_retry[asyncio] PASSED [  9%]
+backend/tests/test_ai_engine.py::test_call_llama_empty_response[asyncio] PASSED [ 11%]
+backend/tests/test_ai_engine.py::test_call_llama_network_error[asyncio] PASSED [ 12%]
+backend/tests/test_ai_engine.py::test_check_ollama_health_status[asyncio] PASSED [ 14%]
+backend/tests/test_ai_engine.py::test_router_returns_503_when_call_llama_fails[asyncio] PASSED [ 15%]
+backend/tests/test_budgets.py::test_create_and_list_budgets_with_spending_summary PASSED [ 17%]
+backend/tests/test_budgets.py::test_duplicate_active_budget_returns_conflict PASSED [ 19%]
+backend/tests/test_budgets.py::test_get_single_budget_and_update_and_delete_soft_delete PASSED [ 20%]
+backend/tests/test_calculations.py::test_net_savings_rate_and_stress_score_endpoints PASSED [ 22%]
+backend/tests/test_calculations.py::test_round_up_projection_and_goal_feasibility_endpoints PASSED [ 23%]
+backend/tests/test_new_features.py::test_auth_google PASSED              [ 25%]
+backend/tests/test_new_features.py::test_wellness_and_stress PASSED      [ 26%]
+backend/tests/test_new_features.py::test_goals_patch_and_forecast PASSED [ 28%]
+backend/tests/test_new_features.py::test_budgets_status PASSED           [ 30%]
+backend/tests/test_new_features.py::test_savings_manual_and_audit PASSED [ 31%]
+backend/tests/test_new_features.py::test_notifications PASSED            [ 33%]
+backend/tests/test_new_features.py::test_educator_overview_trends PASSED [ 34%]
+backend/tests/test_phase1_coverage.py::test_csv_parser_valid_data PASSED [ 36%]
+backend/tests/test_phase1_coverage.py::test_csv_parser_missing_required_columns PASSED [ 38%]
+backend/tests/test_phase1_coverage.py::test_csv_parser_malformed_csv PASSED [ 39%]
+backend/tests/test_phase1_coverage.py::test_csv_parser_row_errors PASSED [ 41%]
+backend/tests/test_phase1_coverage.py::test_security_password_hashing PASSED [ 42%]
+backend/tests/test_phase1_coverage.py::test_jwt_tokens_lifecycle PASSED  [ 44%]
+backend/tests/test_phase1_coverage.py::test_prompts_all_branches PASSED  [ 46%]
+backend/tests/test_phase1_coverage.py::test_auth_register_and_login_flow PASSED [ 47%]
+backend/tests/test_phase1_coverage.py::test_chat_router_endpoint[asyncio] PASSED [ 49%]
+backend/tests/test_phase1_coverage.py::test_forecast_router_endpoint[asyncio] PASSED [ 50%]
+backend/tests/test_phase1_coverage.py::test_dream_forecast_endpoint[asyncio] PASSED [ 52%]
+backend/tests/test_phase1_coverage.py::test_chat_router_error_handling[asyncio] PASSED [ 53%]
+backend/tests/test_phase1_coverage.py::test_forecast_and_dream_error_and_404[asyncio] PASSED [ 55%]
+backend/tests/test_phase1_coverage.py::test_negotiator_evaluate_endpoint[asyncio] PASSED [ 57%]
+backend/tests/test_phase1_coverage.py::test_savings_endpoints PASSED     [ 58%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_roundups_never_negative PASSED [ 60%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_roundup_milestone_alignment PASSED [ 61%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_process_transaction_equals_calculate_roundup PASSED [ 63%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_budget_ceilings_respected PASSED [ 65%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_budget_delta_consistency PASSED [ 66%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_forecast_velocity_monotonicity PASSED [ 68%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_savings_velocity_scaling PASSED [ 69%]
+backend/tests/test_rule_engine_hypothesis.py::test_property_stress_score_bounds PASSED [ 71%]
+backend/tests/test_rule_engine_units.py::test_calculate_roundup_paise_tier1 PASSED [ 73%]
+backend/tests/test_rule_engine_units.py::test_calculate_roundup_whole_rupee_tier2 PASSED [ 74%]
+backend/tests/test_rule_engine_units.py::test_calculate_roundup_zero_and_negative PASSED [ 76%]
+backend/tests/test_rule_engine_units.py::test_is_eligible_for_roundup PASSED [ 77%]
+backend/tests/test_rule_engine_units.py::test_process_transaction PASSED [ 79%]
+backend/tests/test_rule_engine_units.py::test_remaining_budget_and_status PASSED [ 80%]
+backend/tests/test_rule_engine_units.py::test_savings_velocity_and_summary PASSED [ 82%]
+backend/tests/test_rule_engine_units.py::test_goal_forecast PASSED       [ 84%]
+backend/tests/test_rule_engine_units.py::test_stress_score_scenarios PASSED [ 85%]
+backend/tests/test_rule_engine_units.py::test_apply_roundup_if_eligible_cases PASSED [ 87%]
+backend/tests/test_transactions.py::test_create_transaction_with_roundup PASSED [ 88%]
+backend/tests/test_transactions.py::test_create_transaction_no_roundup_needed PASSED [ 90%]
+backend/tests/test_transactions.py::test_get_transactions_pagination_and_filtering PASSED [ 92%]
+backend/tests/test_transactions.py::test_get_transaction_by_id PASSED    [ 93%]
+backend/tests/test_transactions.py::test_get_transaction_404_not_owned PASSED [ 95%]
+backend/tests/test_transactions.py::test_update_transaction_success PASSED [ 96%]
+backend/tests/test_transactions.py::test_update_transaction_amount_conflict PASSED [ 98%]
+backend/tests/test_transactions.py::test_delete_transaction_soft_delete_and_reverse_roundup PASSED [100%]
+
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.9.6-final-0 ________________
+
+Name                                        Stmts   Miss  Cover   Missing
+-------------------------------------------------------------------------
+backend/app/config.py                          18      0   100%
+backend/app/database.py                        12      4    67%   39-43
+backend/app/main.py                            44      7    84%   86-93, 128
+backend/app/middleware/auth_middleware.py      33      4    88%   31, 38, 44, 60
+backend/app/models/__init__.py                  1      0   100%
+backend/app/models/models.py                  152      0   100%
+backend/app/routers/__init__.py                 0      0   100%
+backend/app/routers/auth.py                   111     32    71%   73, 109, 164-168, 174-253, 296-300
+backend/app/routers/budgets.py                115      8    93%   18, 23, 62, 101, 192, 242, 246, 288
+backend/app/routers/calculations.py            86     15    83%   31, 33, 48, 50, 58-61, 97, 184, 187, 198, 207, 214, 217, 219
+backend/app/routers/chat.py                    25      0   100%
+backend/app/routers/coach.py                   71     14    80%   155-156, 241-258, 293-310
+backend/app/routers/dream.py                   50      4    92%   159, 190-197
+backend/app/routers/educator.py                47      7    85%   25-66
+backend/app/routers/forecast.py                31      2    94%   61-62
+backend/app/routers/goals.py                  120     43    64%   26-31, 41-76, 86, 123-138, 160, 165, 171, 207-256, 297, 336-337
+backend/app/routers/negotiator.py              81     25    69%   120-165, 195, 288-294
+backend/app/routers/notifications.py           23      1    96%   44
+backend/app/routers/roundups.py                19      5    74%   23, 38-54
+backend/app/routers/savings.py                 94      6    94%   39, 100, 139, 168, 200, 222
+backend/app/routers/transactions.py           141     41    71%   52-53, 112, 222, 266, 295, 327-404
+backend/app/routers/users.py                   13      0   100%
+backend/app/routers/wellness.py                74     19    74%   64-77, 87-88, 91, 96, 103, 138-140, 213-224
+backend/app/schemas/__init__.py                 1      0   100%
+backend/app/schemas/schemas.py                183      0   100%
+backend/app/services/ai_engine.py              81      1    99%   307
+backend/app/services/csv_parser.py             55      1    98%   116
+backend/app/services/rule_engine.py           131     31    76%   378-379, 462-523
+backend/app/utils/prompts.py                   47      0   100%
+backend/app/utils/security.py                  49      2    96%   115, 131
+-------------------------------------------------------------------------
+TOTAL                                        1908    272    86%
+Coverage JSON written to file docs/evidence/phase1/coverage.json
+============================= 63 passed in 12.43s ==============================

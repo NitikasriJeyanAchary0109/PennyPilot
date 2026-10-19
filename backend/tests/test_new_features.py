@@ -1,14 +1,22 @@
+import datetime
+
 import pytest
+from app.database import Base, get_db
+from app.main import app
+from app.middleware.auth_middleware import require_educator, require_student
+from app.models.models import (
+    AuditLog,
+    Budget,
+    ChatHistory,
+    Goal,
+    Notification,
+    Savings,
+    Transaction,
+    User,
+)
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from decimal import Decimal
-import datetime
-
-from app.main import app
-from app.database import Base, get_db
-from app.models.models import User, Goal, Budget, Savings, Notification, ChatHistory, Transaction, AuditLog
-from app.middleware.auth_middleware import require_student, require_educator
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_new_features.db"
 engine = create_engine(
@@ -77,6 +85,7 @@ client = TestClient(app)
 def mock_ai(monkeypatch):
     async def mock_call_llama(system_prompt, user_prompt):
         return "Mocked AI Response: Keep saving and limit unnecessary expenditures."
+
     # Patch module level imports
     monkeypatch.setattr("app.routers.wellness.call_llama", mock_call_llama)
     monkeypatch.setattr("app.routers.forecast.call_llama", mock_call_llama)
@@ -92,7 +101,7 @@ def setup_database():
     app.dependency_overrides[get_db] = get_testing_db
     app.dependency_overrides[require_student] = override_require_student
     app.dependency_overrides[require_educator] = override_require_educator
-    
+
     db = TestingSessionLocal()
     # Clean tables
     db.query(AuditLog).delete()
@@ -114,8 +123,8 @@ def test_auth_google():
         json={
             "email": "googleuser@test.com",
             "full_name": "Google User",
-            "oauth_id": "123456789"
-        }
+            "oauth_id": "123456789",
+        },
     )
     assert response.status_code == 200
     data = response.json()
@@ -152,7 +161,7 @@ def test_goals_patch_and_forecast():
         title="Emergency Fund",
         target_amount=1000.00,
         current_amount=200.00,
-        status="active"
+        status="active",
     )
     db.add(db_goal)
     db.commit()
@@ -181,7 +190,7 @@ def test_budgets_status():
         category="Food",
         limit_amount=500.00,
         period="monthly",
-        is_deleted=False
+        is_deleted=False,
     )
     db.add(db_budget)
     db.commit()
@@ -203,7 +212,7 @@ def test_savings_manual_and_audit():
         title="Laptop Fund",
         target_amount=1500.00,
         current_amount=300.00,
-        status="active"
+        status="active",
     )
     db.add(db_goal)
     db.commit()
@@ -213,11 +222,7 @@ def test_savings_manual_and_audit():
     # Test POST /api/savings/manual
     response = client.post(
         "/api/savings/manual",
-        json={
-            "amount": 150.00,
-            "goal_id": goal_id,
-            "source": "manual"
-        }
+        json={"amount": 150.00, "goal_id": goal_id, "source": "manual"},
     )
     assert response.status_code == 201
     assert float(response.json()["amount"]) == 150.00
@@ -241,7 +246,7 @@ def test_notifications():
         title="Alert",
         message="Your budget is over limit",
         status="unread",
-        created_at=datetime.datetime.utcnow()
+        created_at=datetime.datetime.utcnow(),
     )
     db.add(db_notif)
     db.commit()
@@ -271,13 +276,13 @@ def test_educator_overview_trends():
             role="student",
         )
         db.add(std)
-    
+
     db_goal = Goal(
         user_id=1,
         title="Holiday",
         target_amount=1000.00,
         current_amount=200.00,
-        status="active"
+        status="active",
     )
     db.add(db_goal)
     db.commit()

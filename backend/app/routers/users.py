@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.models import User
 from app.schemas.schemas import UserResponse
-
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/users", tags=["Users"])
 

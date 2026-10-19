@@ -18,17 +18,22 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from typing import List
 
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
-from app.models.models import Budget, ChatHistory, FinancialHealth, Goal, Transaction, User
+from app.models.models import (
+    Budget,
+    ChatHistory,
+    Goal,
+    Transaction,
+    User,
+)
 from app.services.ai_engine import AIEngineError, call_llama
 from app.utils.prompts import coach_system_prompt, coach_user_prompt
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger("sparechange_ai.coach")
 
@@ -37,17 +42,19 @@ router = APIRouter(prefix="/coach", tags=["AI Coach"])
 # ---------------------------------------------------------------------------
 # Context-loading constants
 # ---------------------------------------------------------------------------
-_MAX_RECENT_TX    = 5   # how many recent transactions to send in context
-_MAX_GOALS        = 5   # goal count cap to keep prompt short
-_MAX_BUDGETS      = 5   # budget count cap to keep prompt short
+_MAX_RECENT_TX = 5  # how many recent transactions to send in context
+_MAX_GOALS = 5  # goal count cap to keep prompt short
+_MAX_BUDGETS = 5  # budget count cap to keep prompt short
 
 
 # ===========================================================================
 # Pydantic schemas (local — extend global schemas.py when Member 1 is ready)
 # ===========================================================================
 
+
 class CoachChatRequest(BaseModel):
     """Request body for POST /coach/chat."""
+
     message: str = Field(
         ...,
         min_length=1,
@@ -58,22 +65,23 @@ class CoachChatRequest(BaseModel):
 
 class CoachChatResponse(BaseModel):
     """Response for a single coach chat turn."""
-    chat_id:    int
-    user_id:    int
-    question:   str
-    response:   str
+
+    chat_id: int
+    user_id: int
+    question: str
+    response: str
     created_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CoachHistoryResponse(BaseModel):
     """Paginated chat history response."""
-    page:       int
-    page_size:  int
-    total:      int
-    items:      List[CoachChatResponse]
+
+    page: int
+    page_size: int
+    total: int
+    items: List[CoachChatResponse]
 
 
 # Resolve forward references for Pydantic v2
@@ -83,6 +91,7 @@ CoachHistoryResponse.model_rebuild()
 # ===========================================================================
 # Helper — load context dicts from DB (read-only)
 # ===========================================================================
+
 
 def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
     """
@@ -106,9 +115,9 @@ def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
     )
     recent_transactions = [
         {
-            "merchant":  t.merchant,
-            "amount":    float(t.amount),
-            "category":  t.category,
+            "merchant": t.merchant,
+            "amount": float(t.amount),
+            "category": t.category,
         }
         for t in tx_rows
     ]
@@ -122,9 +131,9 @@ def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
     )
     goals = [
         {
-            "name":   g.title,
+            "name": g.title,
             "target": float(g.target_amount),
-            "saved":  float(g.current_amount),
+            "saved": float(g.current_amount),
         }
         for g in goal_rows
     ]
@@ -137,20 +146,24 @@ def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
         .all()
     )
     budgets: list = []
-    from app.services.rule_engine import budget_status as _budget_status
-    from app.routers.budgets import calculate_spent_amount
     from decimal import Decimal
+
+    from app.routers.budgets import calculate_spent_amount
+    from app.services.rule_engine import budget_status as _budget_status
+
     for b in budget_rows:
         spent = calculate_spent_amount(db, user_id, b.category, b.period, b.start_date)
-        budgets.append({
-            "category": b.category,
-            "budget":   float(b.limit_amount),
-            "spent":    float(spent),
-            "status":   _budget_status(
-                Decimal(str(b.limit_amount)),
-                Decimal(str(spent)),
-            ),
-        })
+        budgets.append(
+            {
+                "category": b.category,
+                "budget": float(b.limit_amount),
+                "spent": float(spent),
+                "status": _budget_status(
+                    Decimal(str(b.limit_amount)),
+                    Decimal(str(spent)),
+                ),
+            }
+        )
 
     return recent_transactions, goals, budgets
 
@@ -158,6 +171,7 @@ def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
 # ===========================================================================
 # POST /api/coach/chat
 # ===========================================================================
+
 
 @router.post(
     "/chat",
@@ -187,14 +201,15 @@ async def chat_with_coach(
     """
     logger.info(
         "coach.chat | user_id=%d message_len=%d",
-        current_user.user_id, len(request.message),
+        current_user.user_id,
+        len(request.message),
     )
 
     # --- 1. Load context ---
     recent_transactions, goals, budgets = _load_context(current_user.user_id, db)
 
     # --- 2. Build prompts ---
-    sys_prompt  = coach_system_prompt()
+    sys_prompt = coach_system_prompt()
     user_prompt = coach_user_prompt(
         message=request.message,
         recent_transactions=recent_transactions,
@@ -211,7 +226,8 @@ async def chat_with_coach(
     except AIEngineError as exc:
         logger.error(
             "coach.chat | user_id=%d | AIEngineError: %s",
-            current_user.user_id, exc.message,
+            current_user.user_id,
+            exc.message,
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -234,7 +250,8 @@ async def chat_with_coach(
 
     logger.info(
         "coach.chat | user_id=%d chat_id=%d — saved successfully",
-        current_user.user_id, record.chat_id,
+        current_user.user_id,
+        record.chat_id,
     )
 
     # --- 5. Return ---
@@ -244,6 +261,7 @@ async def chat_with_coach(
 # ===========================================================================
 # GET /api/coach/history
 # ===========================================================================
+
 
 @router.get(
     "/history",
@@ -260,7 +278,9 @@ async def get_chat_history(
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1, description="Page number (1-indexed)."),
     page_size: int = Query(
-        default=20, ge=1, le=100,
+        default=20,
+        ge=1,
+        le=100,
         description="Number of records per page (max 100).",
     ),
 ) -> CoachHistoryResponse:
@@ -272,7 +292,9 @@ async def get_chat_history(
     """
     logger.info(
         "coach.history | user_id=%d page=%d page_size=%d",
-        current_user.user_id, page, page_size,
+        current_user.user_id,
+        page,
+        page_size,
     )
 
     base_query = (
@@ -281,9 +303,9 @@ async def get_chat_history(
         .order_by(ChatHistory.created_at.desc())
     )
 
-    total  = base_query.count()
+    total = base_query.count()
     offset = (page - 1) * page_size
-    items  = base_query.offset(offset).limit(page_size).all()
+    items = base_query.offset(offset).limit(page_size).all()
 
     return CoachHistoryResponse(
         page=page,

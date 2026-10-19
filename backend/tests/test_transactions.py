@@ -1,14 +1,14 @@
+import datetime
+from decimal import Decimal
+
 import pytest
+from app.database import Base, get_db
+from app.main import app
+from app.middleware.auth_middleware import require_student
+from app.models.models import AuditLog, Budget, Goal, Savings, Transaction, User
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from decimal import Decimal
-import datetime
-
-from app.main import app
-from app.database import Base, get_db
-from app.models.models import User, Transaction, Goal, Savings, AuditLog, Budget
-from app.middleware.auth_middleware import require_student
 
 # ----------------------------------------------------
 # Setup In-Memory SQLite Database for testing
@@ -28,12 +28,14 @@ Base.metadata.create_all(bind=engine)
 # ----------------------------------------------------
 mock_user = None
 
+
 def get_testing_db():
     db = TestingSessionLocal()
     try:
         yield db
     finally:
         db.close()
+
 
 def override_require_student():
     db = TestingSessionLocal()
@@ -43,10 +45,12 @@ def override_require_student():
     finally:
         db.close()
 
+
 app.dependency_overrides[get_db] = get_testing_db
 app.dependency_overrides[require_student] = override_require_student
 
 client = TestClient(app)
+
 
 @pytest.fixture(autouse=True)
 def setup_database():
@@ -58,11 +62,11 @@ def setup_database():
     db = TestingSessionLocal()
     db.query(AuditLog).delete()
     db.query(Savings).delete()
-    db.query(Budget).delete() if hasattr(Base.metadata.tables, 'budgets') else None
+    db.query(Budget).delete() if hasattr(Base.metadata.tables, "budgets") else None
     db.query(Goal).delete()
     db.query(Transaction).delete()
     db.query(User).delete()
-    
+
     # Create main mock user
     global mock_user
     mock_user = User(
@@ -71,12 +75,12 @@ def setup_database():
         email="student@test.com",
         role="student",
         created_at=datetime.datetime.utcnow(),
-        updated_at=datetime.datetime.utcnow()
+        updated_at=datetime.datetime.utcnow(),
     )
     db.add(mock_user)
     db.commit()
     db.refresh(mock_user)
-    
+
     # Create active goal for the user
     goal = Goal(
         id=1,
@@ -84,7 +88,7 @@ def setup_database():
         title="Emergency Fund",
         target_amount=Decimal("1000.00"),
         current_amount=Decimal("100.00"),
-        status="active"
+        status="active",
     )
     db.add(goal)
     db.commit()
@@ -96,46 +100,58 @@ def setup_database():
 # Test Cases
 # ----------------------------------------------------
 
+
 def test_create_transaction_with_roundup():
     # 1. Post transaction with decimal amount (e.g. 127.60)
     # Expected roundup: 128.00 - 127.60 = 0.40
-    response = client.post("/api/transactions/", json={
-        "amount": "127.60",
-        "category": "Food",
-        "merchant": "Swiggy",
-        "type": "debit",
-        "description": "Lunch order"
-    })
-    
+    response = client.post(
+        "/api/transactions/",
+        json={
+            "amount": "127.60",
+            "category": "Food",
+            "merchant": "Swiggy",
+            "type": "debit",
+            "description": "Lunch order",
+        },
+    )
+
     assert response.status_code == 201
     data = response.json()
-    
+
     # Verify transaction details in response
     tx = data["transaction"]
     assert tx["merchant"] == "Swiggy"
     assert tx["amount"] == "127.60"
     assert tx["is_round_up_applied"] is True
     assert tx["round_up_amount"] == "0.40"
-    
+
     # Verify roundup applied status
     assert data["roundup_applied"] is True
     assert data["roundup_details"]["success"] is True
     assert data["roundup_details"]["roundup_amount"] == "0.40"
-    
+
     # Verify goal saved balance updated in database
     db = TestingSessionLocal()
     goal = db.query(Goal).filter(Goal.id == 1).first()
-    assert goal.current_amount == Decimal("100.40") # 100 + 0.40
-    
+    assert goal.current_amount == Decimal("100.40")  # 100 + 0.40
+
     # Verify linked Savings record created
-    savings = db.query(Savings).filter(Savings.triggered_by_transaction_id == tx["id"]).first()
+    savings = (
+        db.query(Savings)
+        .filter(Savings.triggered_by_transaction_id == tx["id"])
+        .first()
+    )
     assert savings is not None
     assert savings.amount == Decimal("0.40")
     assert savings.source == "round_up"
     assert savings.goal_id == 1
-    
+
     # Verify AuditLog logged
-    audit = db.query(AuditLog).filter(AuditLog.trans_id == tx["id"], AuditLog.action == "create").first()
+    audit = (
+        db.query(AuditLog)
+        .filter(AuditLog.trans_id == tx["id"], AuditLog.action == "create")
+        .first()
+    )
     assert audit is not None
     db.close()
 
@@ -165,36 +181,36 @@ def test_get_transactions_pagination_and_filtering():
             merchant=f"Merchant {i}",
             type="debit",
             transaction_date=base_date + datetime.timedelta(days=i),
-            is_deleted=False
+            is_deleted=False,
         )
         db.add(tx)
     db.commit()
     db.close()
-    
+
     # Test GET list with limit = 2
     response = client.get("/api/transactions/?limit=2&offset=0")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
-    
+
     # Verify descending date order (latest first)
     assert data[0]["merchant"] == "Merchant 4"
     assert data[1]["merchant"] == "Merchant 3"
-    
+
     # Test GET list with offset = 2
     response = client.get("/api/transactions/?limit=2&offset=2")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
     assert data[0]["merchant"] == "Merchant 2"
-    
+
     # Test category filtering
     response = client.get("/api/transactions/?category=Food")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 3
     assert all(d["category"] == "Food" for d in data)
-    
+
     # Test date range filtering
     # start_date: 2026-08-02, end_date: 2026-08-04
     start = "2026-08-02T00:00:00"
@@ -204,7 +220,11 @@ def test_get_transactions_pagination_and_filtering():
     data = response.json()
     # Should include index 1, 2, 3 (Merchant 1, 2, 3)
     assert len(data) == 3
-    assert set(d["merchant"] for d in data) == {"Merchant 1", "Merchant 2", "Merchant 3"}
+    assert set(d["merchant"] for d in data) == {
+        "Merchant 1",
+        "Merchant 2",
+        "Merchant 3",
+    }
 
 
 def test_get_transaction_by_id():
@@ -216,26 +236,26 @@ def test_get_transaction_by_id():
         merchant="Netflix",
         type="debit",
         transaction_date=datetime.datetime.utcnow(),
-        is_deleted=False
+        is_deleted=False,
     )
     db.add(tx)
     db.commit()
     db.refresh(tx)
     tx_id = tx.id
     db.close()
-    
+
     # Fetch owned transaction
     response = client.get(f"/api/transactions/{tx_id}")
     assert response.status_code == 200
     assert response.json()["merchant"] == "Netflix"
-    
+
     # Fetch soft-deleted transaction (should be 404)
     db = TestingSessionLocal()
     tx_to_delete = db.query(Transaction).filter(Transaction.id == tx_id).first()
     tx_to_delete.is_deleted = True
     db.commit()
     db.close()
-    
+
     response = client.get(f"/api/transactions/{tx_id}")
     assert response.status_code == 404
 
@@ -244,20 +264,20 @@ def test_get_transaction_404_not_owned():
     db = TestingSessionLocal()
     # Create transaction for another user
     tx = Transaction(
-        user_id=999, # different user
+        user_id=999,  # different user
         amount=Decimal("20.00"),
         category="Transport",
         merchant="Uber",
         type="debit",
         transaction_date=datetime.datetime.utcnow(),
-        is_deleted=False
+        is_deleted=False,
     )
     db.add(tx)
     db.commit()
     db.refresh(tx)
     tx_id = tx.id
     db.close()
-    
+
     # Try fetching as user_id 1
     response = client.get(f"/api/transactions/{tx_id}")
     assert response.status_code == 404
@@ -273,21 +293,20 @@ def test_update_transaction_success():
         type="debit",
         transaction_date=datetime.datetime.utcnow(),
         is_round_up_applied=False,
-        is_deleted=False
+        is_deleted=False,
     )
     db.add(tx)
     db.commit()
     db.refresh(tx)
     tx_id = tx.id
     db.close()
-    
+
     # Update merchant, category, and amount (allowed since no roundup applied)
-    response = client.put(f"/api/transactions/{tx_id}", json={
-        "merchant": "New Merchant",
-        "category": "Updated",
-        "amount": "60.00"
-    })
-    
+    response = client.put(
+        f"/api/transactions/{tx_id}",
+        json={"merchant": "New Merchant", "category": "Updated", "amount": "60.00"},
+    )
+
     assert response.status_code == 200
     data = response.json()
     assert data["merchant"] == "New Merchant"
@@ -304,28 +323,26 @@ def test_update_transaction_amount_conflict():
         merchant="Amazon",
         type="debit",
         transaction_date=datetime.datetime.utcnow(),
-        is_round_up_applied=True, # roundup already applied!
+        is_round_up_applied=True,  # roundup already applied!
         round_up_amount=Decimal("0.80"),
-        is_deleted=False
+        is_deleted=False,
     )
     db.add(tx)
     db.commit()
     db.refresh(tx)
     tx_id = tx.id
     db.close()
-    
+
     # Try to update amount (should raise 409 Conflict)
-    response = client.put(f"/api/transactions/{tx_id}", json={
-        "amount": "55.00"
-    })
+    response = client.put(f"/api/transactions/{tx_id}", json={"amount": "55.00"})
     assert response.status_code == 409
     assert "Cannot edit amount" in response.json()["detail"]
-    
+
     # Updating merchant/category only should succeed
-    response = client.put(f"/api/transactions/{tx_id}", json={
-        "merchant": "Amazon Updated",
-        "category": "Electronics"
-    })
+    response = client.put(
+        f"/api/transactions/{tx_id}",
+        json={"merchant": "Amazon Updated", "category": "Electronics"},
+    )
     assert response.status_code == 200
     assert response.json()["merchant"] == "Amazon Updated"
     assert response.json()["category"] == "Electronics"
@@ -342,14 +359,14 @@ def test_delete_transaction_soft_delete_and_reverse_roundup():
         type="debit",
         transaction_date=datetime.datetime.utcnow(),
         is_round_up_applied=True,
-        round_up_amount=Decimal("7.50"), # 12.50 rounded to 20
-        is_deleted=False
+        round_up_amount=Decimal("7.50"),  # 12.50 rounded to 20
+        is_deleted=False,
     )
     db.add(tx)
     db.commit()
     db.refresh(tx)
     tx_id = tx.id
-    
+
     # Create linked Savings record
     savings = Savings(
         user_id=1,
@@ -357,37 +374,43 @@ def test_delete_transaction_soft_delete_and_reverse_roundup():
         triggered_by_transaction_id=tx_id,
         amount=Decimal("7.50"),
         source="round_up",
-        created_at=datetime.datetime.utcnow()
+        created_at=datetime.datetime.utcnow(),
     )
     db.add(savings)
-    
+
     # Adjust mock active goal saved amount to reflect the roundup addition
     goal = db.query(Goal).filter(Goal.id == 1).first()
     goal.current_amount = Decimal("107.50")
     db.commit()
     db.close()
-    
+
     # Delete the transaction
     response = client.delete(f"/api/transactions/{tx_id}")
     assert response.status_code == 200
     assert response.json()["success"] is True
-    
+
     db = TestingSessionLocal()
     # Check transaction soft-deleted and roundup flagged off
     deleted_tx = db.query(Transaction).filter(Transaction.id == tx_id).first()
     assert deleted_tx.is_deleted is True
     assert deleted_tx.is_round_up_applied is False
     assert deleted_tx.round_up_amount == Decimal("0.00")
-    
+
     # Check Savings record deleted/reversed
-    reversed_savings = db.query(Savings).filter(Savings.triggered_by_transaction_id == tx_id).first()
+    reversed_savings = (
+        db.query(Savings).filter(Savings.triggered_by_transaction_id == tx_id).first()
+    )
     assert reversed_savings is None
-    
+
     # Check Goal balance decremented/reversed
     goal = db.query(Goal).filter(Goal.id == 1).first()
-    assert goal.current_amount == Decimal("100.00") # 107.50 - 7.50
-    
+    assert goal.current_amount == Decimal("100.00")  # 107.50 - 7.50
+
     # Verify AuditLog logged for delete action
-    audit = db.query(AuditLog).filter(AuditLog.trans_id == tx_id, AuditLog.action == "delete").first()
+    audit = (
+        db.query(AuditLog)
+        .filter(AuditLog.trans_id == tx_id, AuditLog.action == "delete")
+        .first()
+    )
     assert audit is not None
     db.close()

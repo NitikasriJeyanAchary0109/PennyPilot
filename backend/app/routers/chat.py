@@ -1,22 +1,23 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy.orm import Session
 import datetime
 
 from app.database import get_db
-from app.models.models import User, ChatHistory
-from app.schemas.schemas import ChatRequest, ChatHistoryResponse
 from app.middleware.auth_middleware import require_student
-from app.services.ai_engine import call_llama, AIEngineError
-from app.utils.prompts import coach_system_prompt, coach_user_prompt
+from app.models.models import ChatHistory, User
 from app.routers.coach import _load_context
+from app.schemas.schemas import ChatHistoryResponse, ChatRequest
+from app.services.ai_engine import AIEngineError, call_llama
+from app.utils.prompts import coach_system_prompt, coach_user_prompt
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/chat", tags=["AI Coach"])
+
 
 @router.post("/", response_model=ChatHistoryResponse, status_code=status.HTTP_200_OK)
 async def chat_with_coach(
     request: ChatRequest,
     current_user: User = Depends(require_student),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Interacts with the AI Financial Coach.
@@ -27,7 +28,7 @@ async def chat_with_coach(
     recent_transactions, goals, budgets = _load_context(current_user.user_id, db)
 
     # 2. Build prompts
-    sys_prompt  = coach_system_prompt()
+    sys_prompt = coach_system_prompt()
     user_prompt = coach_user_prompt(
         message=request.message,
         recent_transactions=recent_transactions,
@@ -44,7 +45,7 @@ async def chat_with_coach(
     except AIEngineError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The AI coach is temporarily offline. Try again in a moment."
+            detail="The AI coach is temporarily offline. Try again in a moment.",
         ) from exc
 
     # 4. Save to ChatHistory
@@ -52,7 +53,7 @@ async def chat_with_coach(
         user_id=current_user.user_id,
         question=request.message,
         response=ai_reply,
-        created_at=datetime.datetime.utcnow()
+        created_at=datetime.datetime.utcnow(),
     )
     db.add(chat_record)
     db.commit()

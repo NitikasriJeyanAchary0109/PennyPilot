@@ -1,14 +1,97 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+backend/venv/
+backend/.venv/
+frontend/.venv/
+
+# Testing & Coverage
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+htmlcov/
+.pytest_cache/
+pytest_run.log
+.hypothesis/
+.worktrees/
+
+# Type checking & Linters
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# SQLite / Local Databases & Artifacts
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+debug_*.db
+test_*.db
+
+# Node / React Native / Mobile
 node_modules/
 frontend/node_modules/
 backend/node_modules/
+.npm
+.yarn/
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
 
+# Environment variables & secrets (preserve .env.example)
 .env
 .env.*
-backend/.env
+!.env.example
 
-__pycache__/
-*.pyc
-.venv/
-
-dist/
-build/
+# IDEs & OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

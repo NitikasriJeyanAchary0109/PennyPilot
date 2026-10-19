@@ -1,13 +1,13 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from datetime import datetime
 from decimal import Decimal
-from datetime import datetime, timedelta
+from typing import Optional
 
 from app.database import get_db
-from app.models.models import Budget, Goal, Savings, Transaction, User
 from app.middleware.auth_middleware import require_student
+from app.models.models import Budget, Goal, Savings, Transaction, User
 from app.services.rule_engine import calculate_roundup, savings_velocity, stress_score
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/calculations", tags=["Calculations"])
 
@@ -49,7 +49,9 @@ def get_net_savings_rate(
     if end_date:
         savings_query = savings_query.filter(Savings.created_at <= end_date)
     savings_records = savings_query.all()
-    total_saved = sum((Decimal(str(record.amount)) for record in savings_records), Decimal("0.00"))
+    total_saved = sum(
+        (Decimal(str(record.amount)) for record in savings_records), Decimal("0.00")
+    )
 
     if total_income > 0:
         net_savings_rate = total_saved / total_income
@@ -121,15 +123,24 @@ def get_stress_score(
         )
         .all()
     )
-    goals = db.query(Goal).filter(Goal.user_id == current_user.user_id, Goal.is_deleted == False).all()
+    goals = (
+        db.query(Goal)
+        .filter(Goal.user_id == current_user.user_id, Goal.is_deleted == False)
+        .all()
+    )
 
-    savings_records = db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
+    savings_records = (
+        db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
+    )
     monthly_savings = savings_velocity(
         [Decimal(str(record.amount)) for record in savings_records],
         30,
     )
 
-    spend_velocity = sum((Decimal(str(tx.amount)) for tx in transactions if tx.type == "debit"), Decimal("0.00"))
+    spend_velocity = sum(
+        (Decimal(str(tx.amount)) for tx in transactions if tx.type == "debit"),
+        Decimal("0.00"),
+    )
     budget_overruns = 0
     for budget in budgets:
         spent = sum(
@@ -162,7 +173,11 @@ def get_goal_feasibility(
 ):
     goal = (
         db.query(Goal)
-        .filter(Goal.id == goal_id, Goal.user_id == current_user.user_id, Goal.is_deleted == False)
+        .filter(
+            Goal.id == goal_id,
+            Goal.user_id == current_user.user_id,
+            Goal.is_deleted == False,
+        )
         .first()
     )
     if not goal:
@@ -171,8 +186,12 @@ def get_goal_feasibility(
     if not goal.target_date:
         raise HTTPException(status_code=400, detail="Goal target_date is required")
 
-    savings_records = db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
-    monthly_savings = savings_velocity([Decimal(str(record.amount)) for record in savings_records], 30)
+    savings_records = (
+        db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
+    )
+    monthly_savings = savings_velocity(
+        [Decimal(str(record.amount)) for record in savings_records], 30
+    )
 
     remaining = Decimal(str(goal.target_amount)) - Decimal(str(goal.current_amount))
     if remaining <= Decimal("0"):
