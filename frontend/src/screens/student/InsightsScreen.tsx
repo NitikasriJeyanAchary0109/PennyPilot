@@ -80,7 +80,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
             />
           </View>
           <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-ob-primary">
-            SpareChange AI
+            Penny Pilot
           </Text>
         </View>
         <Pressable 

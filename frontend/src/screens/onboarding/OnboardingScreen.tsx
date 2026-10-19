@@ -58,7 +58,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
       {/* Header */}
       <View className="w-full py-4 px-5 flex-row items-center justify-between border-b border-slate-100">
         <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-xl text-[#005bbf]">
-          SpareChange AI
+          Penny Pilot
         </Text>
         <Pressable 
           onPress={() => navigation.navigate("Login")}
@@ -104,7 +104,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
         {/* Typography */}
         <View className="items-center mb-8 px-4">
           <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface text-center mb-2">
-            Welcome to SpareChange AI
+            Welcome to Penny Pilot
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-base text-on-surface-variant text-center px-4">
             Let's build your financial future together.

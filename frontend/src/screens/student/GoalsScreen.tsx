@@ -98,7 +98,7 @@ export const GoalsScreen = () => {
             />
           </View>
           <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-ob-primary">
-            SpareChange AI
+            Penny Pilot
           </Text>
         </View>
         <Pressable 
@@ -254,7 +254,7 @@ export const GoalsScreen = () => {
           <MaterialIcons name="smart-toy" size={24} color="#005bbf" className="mt-0.5" />
           <View className="flex-1 space-y-1">
             <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-primary-fixed leading-5">
-              You're on track to buy the <Text style={{ fontFamily: "WorkSans_500Medium" }} className="font-bold">New Laptop</Text> by October! SpareChange AI moved ₹124 more today.
+              You're on track to buy the <Text style={{ fontFamily: "WorkSans_500Medium" }} className="font-bold">New Laptop</Text> by October! Penny Pilot moved ₹124 more today.
             </Text>
             <Pressable 
               onPress={() => {

@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 # FastAPI App
 # ==========================
 app = FastAPI(
-    title="SpareChange AI API",
+    title="Penny Pilot API",
     description="Backend API services for micro-savings and automated financial advice.",
     version="2.0.0",
     lifespan=lifespan,

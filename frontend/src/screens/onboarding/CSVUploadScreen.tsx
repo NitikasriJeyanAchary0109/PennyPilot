@@ -135,7 +135,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
             <MaterialIcons name="arrow-back" size={24} color="#181c20" />
           </Pressable>
           <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
-            SpareChange AI
+            Penny Pilot
           </Text>
         </View>
         <Pressable 
@@ -157,7 +157,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
             Connect your spending
           </Text>
           <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant">
-            Upload your transaction history to let SpareChange AI find your hidden savings opportunities.
+            Upload your transaction history to let Penny Pilot find your hidden savings opportunities.
           </Text>
         </View>
 

@@ -9,7 +9,7 @@ export default function OnboardingSetupScreen({ navigation }: { navigation: any 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="items-center px-margin-mobile py-stack-md">
-        <Text className="font-jakarta-semibold text-xl text-ob-primary">SpareChange AI</Text>
+        <Text className="font-jakarta-semibold text-xl text-ob-primary">Penny Pilot</Text>
       </View>
       <View className="flex-1 items-center justify-center px-margin-mobile">
         <View className="h-60 w-60 items-center justify-center rounded-full bg-surface-container-low">
@@ -22,7 +22,7 @@ export default function OnboardingSetupScreen({ navigation }: { navigation: any 
           </View>
         </View>
         <View className="mt-stack-xl items-center">
-          <Text className="font-jakarta-bold text-2xl text-on-surface">Welcome to SpareChange AI</Text>
+          <Text className="font-jakarta-bold text-2xl text-on-surface">Welcome to Penny Pilot</Text>
           <Text className="mt-2 max-w-[280px] text-center font-worksans text-base text-on-surface-variant">Let’s build your financial future together.</Text>
         </View>
         <View className="mt-stack-xl w-full gap-4">

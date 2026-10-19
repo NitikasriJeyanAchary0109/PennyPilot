@@ -113,7 +113,7 @@ export const SpendingSetupScreen = ({ navigation }: { navigation: any }) => {
           <MaterialIcons name="arrow-back" size={24} color="#181c20" />
         </Pressable>
         <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-lg text-ob-primary">
-          SpareChange AI
+          Penny Pilot
         </Text>
         <View className="w-6" /> {/* Spacer */}
       </View>

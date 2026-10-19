@@ -31,7 +31,7 @@ export const AnalysisScreen = ({ navigation }: { navigation: any }) => {
       <View className="flex-row justify-between items-center px-margin-mobile py-stack-md border-b border-slate-100 bg-white">
         <View className="flex-row items-center space-x-3">
           <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
-            SpareChange AI
+            Penny Pilot
           </Text>
         </View>
         <Pressable 

@@ -42,7 +42,7 @@ const INITIAL_COACH_MESSAGES: ChatMessage[] = [
   {
     id: "m-1",
     sender: "ai",
-    text: "Hi Alex! 👋 I've been looking at your transactions. You saved ₹1,245 in spare change this week just by rounding up your purchases. That's 15% more than last week!",
+    text: "Hi Alex! 👋 I've been looking at your transactions. You saved ₹1,245 from your round-ups this week just by rounding up your purchases. That's 15% more than last week!",
     time: "9:41 AM"
   },
   {
@@ -172,7 +172,7 @@ export const ChatScreen = ({ mode = "coach" }: ChatScreenProps) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert(
       "Investment Initialized",
-      `Would you like to allocate ₹5,000 into ${fund} directly from your SpareChange savings balance?`,
+      `Would you like to allocate ₹5,000 into ${fund} directly from your Penny Pilot savings balance?`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Confirm Buy", onPress: () => Alert.alert("Success", `Allocated ₹5,000 to ${fund}!`) }

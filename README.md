@@ -1,15 +1,15 @@
-# SpareChange AI
+# Penny Pilot
 
 [![CI](https://github.com/NitikasriJeyanAchary0109/PennyPilot/actions/workflows/ci.yml/badge.svg)](https://github.com/NitikasriJeyanAchary0109/PennyPilot/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/Coverage-Report-blue.svg)](docs/evidence/phase1b/coverage.txt)
 
-SpareChange AI is an automated micro-savings and financial literacy assistant designed for college students, with a companion dashboard for educators/advisors. It automates savings through transaction round-ups and uses a local AI model (Llama3) to explain financial decisions in plain language.
+Penny Pilot is an automated micro-savings and financial literacy assistant designed for college students, with a companion dashboard for educators/advisors. It automates savings through transaction round-ups and uses a local AI model (Llama3) to explain financial decisions in plain language.
 
 ---
 
 ## Production Cloud Deployment (Docker Compose)
 
-To host SpareChange AI in production with automatic HTTPS (SSL) via Let's Encrypt, follow these steps:
+To host Penny Pilot in production with automatic HTTPS (SSL) via Let's Encrypt, follow these steps:
 
 ### 1. Provision a Cloud Virtual Machine
 Ollama running Llama 3 requires a minimum of **8GB RAM** (preferably 16GB) and 2+ vCPUs to perform inference with reasonable latency.

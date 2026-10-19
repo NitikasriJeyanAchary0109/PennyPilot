@@ -53,7 +53,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger("sparechange_ai.negotiator")
+logger = logging.getLogger("pennypilot.negotiator")
 
 router = APIRouter(prefix="/negotiator", tags=["AI Negotiator"])
 
@@ -280,7 +280,7 @@ async def evaluate_purchase(
     try:
         advice = await call_llama(
             system_prompt=(
-                "You are SpareChange AI, a financial coach for college students. "
+                "You are Penny Pilot, a financial coach for college students. "
                 "Give concise, practical, non-preachy purchase advice."
             ),
             user_prompt=prompt,
