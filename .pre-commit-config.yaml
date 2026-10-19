@@ -27,7 +27,6 @@ repos:
         additional_dependencies:
           - pydantic>=2.0.0
           - pydantic-settings>=2.0.0
-          - types-passlib
           - types-python-jose
           - types-PyYAML
         args: [--config-file=pyproject.toml]
