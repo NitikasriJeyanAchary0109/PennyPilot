@@ -95,3 +95,7 @@ Thumbs.db
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# Git worktrees & test caches
+.worktrees/
+.hypothesis/
