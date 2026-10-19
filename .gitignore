@@ -67,7 +67,9 @@ backend/node_modules/
 .npm
 .yarn/
 .expo/
+frontend/.expo/
 .expo-shared/
+frontend/.expo-shared/
 *.jks
 *.p8
 *.p12
