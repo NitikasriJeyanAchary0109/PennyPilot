@@ -4,10 +4,10 @@ module.exports = {
     "./App.{js,jsx,ts,tsx}",
     "./src/**/*.{js,jsx,ts,tsx}"
   ],
+  presets: [require("nativewind/preset")],
   theme: {
     extend: {
       colors: {
-        // ── Existing dark-theme tokens (unchanged) ──
         primary: "#4F46E5",
         secondary: "#10B981",
         background: "#0F172A",
@@ -15,13 +15,11 @@ module.exports = {
         text: "#F8FAFC",
         textMuted: "#94A3B8",
 
-        // ── MD3 Onboarding tokens (conflicting keys prefixed ob-) ──
         "ob-primary": "#005bbf",
         "ob-secondary": "#5c5f60",
         "ob-background": "#f7f9ff",
         "ob-error": "#ba1a1a",
 
-        // ── MD3 Onboarding tokens (non-conflicting) ──
         "primary-fixed": "#d8e2ff",
         "primary-fixed-dim": "#adc7ff",
         "primary-container": "#1a73e8",
@@ -75,15 +73,21 @@ module.exports = {
         "gutter": "16px",
       },
       fontFamily: {
-        "jakarta": ["PlusJakartaSans_400Regular"],
-        "jakarta-medium": ["PlusJakartaSans_500Medium"],
-        "jakarta-semibold": ["PlusJakartaSans_600SemiBold"],
-        "jakarta-bold": ["PlusJakartaSans_700Bold"],
-        "jakarta-extrabold": ["PlusJakartaSans_800ExtraBold"],
-        "worksans": ["WorkSans_400Regular"],
-        "worksans-medium": ["WorkSans_500Medium"],
+        sans: ["Inter_400Regular", "Inter", "system-ui", "sans-serif"],
+        inter: ["Inter_400Regular", "sans-serif"],
+        "inter-medium": ["Inter_500Medium", "sans-serif"],
+        "inter-semibold": ["Inter_600SemiBold", "sans-serif"],
+        "inter-bold": ["Inter_700Bold", "sans-serif"],
+        "jakarta": ["Inter_400Regular", "sans-serif"],
+        "jakarta-medium": ["Inter_500Medium", "sans-serif"],
+        "jakarta-semibold": ["Inter_600SemiBold", "sans-serif"],
+        "jakarta-bold": ["Inter_700Bold", "sans-serif"],
+        "jakarta-extrabold": ["Inter_700Bold", "sans-serif"],
+        "worksans": ["Inter_400Regular", "sans-serif"],
+        "worksans-medium": ["Inter_500Medium", "sans-serif"],
+        "worksans-semibold": ["Inter_600SemiBold", "sans-serif"],
       },
     },
   },
   plugins: [],
-}
+};
