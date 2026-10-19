@@ -230,15 +230,10 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         <script>
           const token = "{access_token}";
           const role = "{user.role}";
-          // Deep link redirects
+          // Deep link redirect
           const onboardingComplete = "{str(user.has_completed_onboarding).lower()}";
           const url = "pennypilot://oauth?token=" + token + "&role=" + role + "&has_completed_onboarding=" + onboardingComplete;
-          const expoUrl = "exp://127.0.0.1:8081/--/oauth?token=" + token + "&role=" + role;
-
           window.location.href = url;
-          setTimeout(() => {{
-            window.location.href = expoUrl;
-          }}, 800);
         </script>
       </head>
       <body style="background-color: #0F172A; color: #F8FAFC; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
