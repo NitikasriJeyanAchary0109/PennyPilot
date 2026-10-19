@@ -298,3 +298,18 @@ def test_educator_overview_trends():
     # Test GET /api/educator/trends
     response = client.get("/api/educator/trends")
     assert response.status_code == 200
+
+
+def test_legacy_bcrypt_hash_backward_compatibility():
+    """Verify passwords hashed prior to direct bcrypt change (e.g. via passlib) still verify."""
+    from app.utils.security import verify_password
+
+    # Legacy passlib standard $2b$12$ hash for password "OldPasslibPassword2024!"
+    legacy_hash_2b = "$2b$12$ILiNStOnDYxIg51NuCH.PO4.T.a6GZ4/9CWJTjht5S7I1ucIHgPAu"
+    assert verify_password("OldPasslibPassword2024!", legacy_hash_2b) is True
+    assert verify_password("WrongPassword!", legacy_hash_2b) is False
+
+    # Legacy passlib standard $2a$12$ hash for password "OldPasslibPassword2024!"
+    legacy_hash_2a = "$2a$12$vq8LUgAg6ZhlLw6tM7.z2.4C68ghNJu3cnTqjFEX/rjDhff72RTh."
+    assert verify_password("OldPasslibPassword2024!", legacy_hash_2a) is True
+    assert verify_password("WrongPassword!", legacy_hash_2a) is False
