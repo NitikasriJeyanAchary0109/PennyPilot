@@ -1,42 +1,53 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
 from app.database import get_db
-from app.models.models import Savings, Goal, User, AuditLog
-from app.schemas.schemas import SavingsCreate, SavingsUpdate, SavingsResponse, SavingsSummaryResponse
 from app.middleware.auth_middleware import require_student
+from app.models.models import AuditLog, Goal, Savings, User
+from app.schemas.schemas import (
+    SavingsCreate,
+    SavingsResponse,
+    SavingsSummaryResponse,
+    SavingsUpdate,
+)
 from app.services.rule_engine import savings_summary
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/savings", tags=["Savings"])
+
 
 @router.post("/", response_model=SavingsResponse, status_code=status.HTTP_201_CREATED)
 def create_savings(
     savings_data: SavingsCreate,
     current_user: User = Depends(require_student),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     if savings_data.goal_id is not None:
-        goal = db.query(Goal).filter(
-            Goal.id == savings_data.goal_id,
-            Goal.user_id == current_user.user_id,
-            Goal.is_deleted == False
-        ).with_for_update().first()
+        goal = (
+            db.query(Goal)
+            .filter(
+                Goal.id == savings_data.goal_id,
+                Goal.user_id == current_user.user_id,
+                Goal.is_deleted == False,
+            )
+            .with_for_update()
+            .first()
+        )
 
         if not goal:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Goal not found or does not belong to the user."
+                detail="Goal not found or does not belong to the user.",
             )
-        
+
         goal.current_amount += savings_data.amount
 
     db_savings = Savings(
         user_id=current_user.user_id,
         goal_id=savings_data.goal_id,
         amount=savings_data.amount,
-        source=savings_data.source
+        source=savings_data.source,
     )
     db.add(db_savings)
     db.commit()
@@ -49,23 +60,24 @@ def get_savings(
     source: Optional[str] = Query(None),
     goal_id: Optional[int] = Query(None),
     current_user: User = Depends(require_student),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     query = db.query(Savings).filter(Savings.user_id == current_user.user_id)
     if source:
         query = query.filter(Savings.source == source)
     if goal_id:
         query = query.filter(Savings.goal_id == goal_id)
-        
+
     return query.all()
 
 
 @router.get("/summary", response_model=SavingsSummaryResponse)
 def get_savings_summary(
-    current_user: User = Depends(require_student),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(require_student), db: Session = Depends(get_db)
 ):
-    savings_list = db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
+    savings_list = (
+        db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
+    )
     summary_dict = savings_summary(savings_list)
     return summary_dict
 
@@ -75,25 +87,26 @@ def update_savings(
     savings_id: int,
     savings_update: SavingsUpdate,
     current_user: User = Depends(require_student),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    savings_record = db.query(Savings).filter(
-        Savings.id == savings_id,
-        Savings.user_id == current_user.user_id
-    ).with_for_update().first()
+    savings_record = (
+        db.query(Savings)
+        .filter(Savings.id == savings_id, Savings.user_id == current_user.user_id)
+        .with_for_update()
+        .first()
+    )
 
     if not savings_record:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Savings record not found."
+            status_code=status.HTTP_404_NOT_FOUND, detail="Savings record not found."
         )
 
     # Calculate what changes
-    update_data = savings_update.dict(exclude_unset=True)
-    
+    update_data = savings_update.model_dump(exclude_unset=True)
+
     old_goal_id = savings_record.goal_id
     new_goal_id = update_data.get("goal_id", old_goal_id)
-    
+
     old_amount = savings_record.amount
     new_amount = update_data.get("amount", old_amount)
 
@@ -101,24 +114,31 @@ def update_savings(
     if old_goal_id != new_goal_id or old_amount != new_amount:
         # Subtract from old goal
         if old_goal_id is not None:
-            old_goal = db.query(Goal).filter(
-                Goal.id == old_goal_id,
-                Goal.user_id == current_user.user_id
-            ).with_for_update().first()
+            old_goal = (
+                db.query(Goal)
+                .filter(Goal.id == old_goal_id, Goal.user_id == current_user.user_id)
+                .with_for_update()
+                .first()
+            )
             if old_goal:
                 old_goal.current_amount -= old_amount
 
         # Add to new goal
         if new_goal_id is not None:
-            new_goal = db.query(Goal).filter(
-                Goal.id == new_goal_id,
-                Goal.user_id == current_user.user_id,
-                Goal.is_deleted == False
-            ).with_for_update().first()
+            new_goal = (
+                db.query(Goal)
+                .filter(
+                    Goal.id == new_goal_id,
+                    Goal.user_id == current_user.user_id,
+                    Goal.is_deleted == False,
+                )
+                .with_for_update()
+                .first()
+            )
             if not new_goal:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="New goal not found or does not belong to the user."
+                    detail="New goal not found or does not belong to the user.",
                 )
             new_goal.current_amount += new_amount
 
@@ -135,24 +155,29 @@ def update_savings(
 def delete_savings(
     savings_id: int,
     current_user: User = Depends(require_student),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    savings_record = db.query(Savings).filter(
-        Savings.id == savings_id,
-        Savings.user_id == current_user.user_id
-    ).with_for_update().first()
+    savings_record = (
+        db.query(Savings)
+        .filter(Savings.id == savings_id, Savings.user_id == current_user.user_id)
+        .with_for_update()
+        .first()
+    )
 
     if not savings_record:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Savings record not found."
+            status_code=status.HTTP_404_NOT_FOUND, detail="Savings record not found."
         )
 
     if savings_record.goal_id is not None:
-        goal = db.query(Goal).filter(
-            Goal.id == savings_record.goal_id,
-            Goal.user_id == current_user.user_id
-        ).with_for_update().first()
+        goal = (
+            db.query(Goal)
+            .filter(
+                Goal.id == savings_record.goal_id, Goal.user_id == current_user.user_id
+            )
+            .with_for_update()
+            .first()
+        )
 
         if goal:
             goal.current_amount -= savings_record.amount
@@ -162,17 +187,19 @@ def delete_savings(
     return None
 
 
-@router.post("/manual", response_model=SavingsResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/manual", response_model=SavingsResponse, status_code=status.HTTP_201_CREATED
+)
 def create_manual_savings(
     savings_data: SavingsCreate,
     current_user: User = Depends(require_student),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Manually add savings towards a goal, logging it in the database and audit logs."""
     if savings_data.amount <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Savings amount must be greater than 0."
+            detail="Savings amount must be greater than 0.",
         )
 
     # Force manual source
@@ -180,18 +207,23 @@ def create_manual_savings(
 
     goal = None
     if savings_data.goal_id is not None:
-        goal = db.query(Goal).filter(
-            Goal.id == savings_data.goal_id,
-            Goal.user_id == current_user.user_id,
-            Goal.is_deleted == False
-        ).with_for_update().first()
+        goal = (
+            db.query(Goal)
+            .filter(
+                Goal.id == savings_data.goal_id,
+                Goal.user_id == current_user.user_id,
+                Goal.is_deleted == False,
+            )
+            .with_for_update()
+            .first()
+        )
 
         if not goal:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Goal not found or access denied."
+                detail="Goal not found or access denied.",
             )
-        
+
         goal.current_amount += savings_data.amount
 
     db_savings = Savings(
@@ -199,7 +231,7 @@ def create_manual_savings(
         goal_id=savings_data.goal_id,
         amount=savings_data.amount,
         source="manual",
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
     db.add(db_savings)
     db.commit()
@@ -212,7 +244,7 @@ def create_manual_savings(
         entity_type="savings",
         entity_id=db_savings.id,
         performed_by=f"user_{current_user.user_id}",
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
     )
     db.add(savings_audit)
 
@@ -225,7 +257,10 @@ def create_manual_savings(
             entity_id=goal.id,
             performed_by=f"user_{current_user.user_id}",
             timestamp=datetime.utcnow(),
-            metadata_json={"amount_added": float(savings_data.amount), "new_total": float(goal.current_amount)}
+            metadata_json={
+                "amount_added": float(savings_data.amount),
+                "new_total": float(goal.current_amount),
+            },
         )
         db.add(goal_audit)
 

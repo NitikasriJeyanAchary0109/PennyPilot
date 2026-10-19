@@ -30,10 +30,10 @@ import datetime
 from decimal import Decimal
 from typing import Optional
 
-
 # ===========================================================================
 # 1. FINANCIAL COACH
 # ===========================================================================
+
 
 def coach_system_prompt() -> str:
     """
@@ -113,7 +113,7 @@ def coach_user_prompt(
         budget_block = "Budget status: No budgets configured."
 
     return (
-        f"Student's message: \"{message}\"\n\n"
+        f'Student\'s message: "{message}"\n\n'
         f"{tx_block}\n\n"
         f"{goal_block}\n\n"
         f"{budget_block}\n\n"
@@ -126,6 +126,7 @@ def coach_user_prompt(
 # ===========================================================================
 # 2. PURCHASE NEGOTIATOR
 # ===========================================================================
+
 
 def negotiator_prompt(
     price: Decimal,
@@ -153,8 +154,8 @@ def negotiator_prompt(
         Single prompt string combining context and the negotiation question.
     """
     status_note = {
-        "safe":     "their budget is currently healthy",
-        "warning":  "they are approaching their budget limit",
+        "safe": "their budget is currently healthy",
+        "warning": "they are approaching their budget limit",
         "exceeded": "they have already exceeded their budget this period",
     }.get(budget_status, f"budget status is {budget_status!r}")
 
@@ -173,12 +174,14 @@ def negotiator_prompt(
 # 3. DREAM ENGINE (Goal Forecast)
 # ===========================================================================
 
+
 def dream_engine_prompt(
     goal_name: str,
     target_amount: Decimal,
     current_amount: Decimal,
     forecast_date: Optional[datetime.date],
     velocity: Decimal,
+    accelerated_options_text: Optional[str] = None,
 ) -> str:
     """
     Build the prompt for the Dream Engine goal-forecast explainer.
@@ -188,25 +191,21 @@ def dream_engine_prompt(
     them into encouraging language for the LLM to narrate.
 
     Args:
-        goal_name:      Student's goal label, e.g. "New Laptop".
-        target_amount:  Total amount needed (INR).
-        current_amount: Amount already saved (INR).
-        forecast_date:  Projected completion date from rule_engine, or None /
-                        date(9999,12,31) if velocity is zero.
-        velocity:       Monthly savings rate in INR from rule_engine.
+        goal_name:                Student's goal label, e.g. "New Laptop".
+        target_amount:            Total amount needed (INR).
+        current_amount:           Amount already saved (INR).
+        forecast_date:            Projected completion date from rule_engine, or None /
+                                  date(9999,12,31) if velocity is zero.
+        velocity:                 Monthly savings rate in INR from rule_engine.
+        accelerated_options_text: Pre-formatted text of deterministic scenario
+                                  options computed by rule_engine.
 
     Returns:
         Prompt string for the AI narration.
     """
     remaining = target_amount - current_amount
 
-    # Handle the "unreachable" sentinel (velocity == 0)
-    unreachable = (
-        forecast_date is None
-        or forecast_date >= datetime.date(9999, 1, 1)
-    )
-
-    if unreachable:
+    if forecast_date is None or forecast_date >= datetime.date(9999, 1, 1):
         timeline_line = (
             "At their current savings rate of ₹0/month, "
             "the goal has no projected completion date."
@@ -218,22 +217,30 @@ def dream_engine_prompt(
             f"{forecast_date.strftime('%B %Y')}."
         )
 
+    options_block = (
+        f"\n\n{accelerated_options_text}" if accelerated_options_text else ""
+    )
+
     return (
         "You are SpareChange AI. Motivate this college student about their savings goal "
-        "in 3 sentences or fewer. Be upbeat and specific — use the numbers provided.\n\n"
+        "in 3 sentences or fewer. Be upbeat and specific — use ONLY the precomputed numbers provided below.\n\n"
         f"Goal: {goal_name}\n"
         f"Target: ₹{target_amount:.0f} | Saved so far: ₹{current_amount:.0f} "
         f"| Remaining: ₹{remaining:.0f}\n"
-        f"{timeline_line}\n\n"
-        "Explain the timeline in plain language, then suggest ONE concrete action "
-        "(e.g. saving an extra ₹X per month) that would bring the date meaningfully "
-        "closer. Keep it specific and encouraging."
+        f"{timeline_line}"
+        f"{options_block}\n\n"
+        "ZERO-ARITHMETIC RULES:\n"
+        "1. Do NOT calculate, estimate, add, subtract, project, or invent ANY numbers or dates.\n"
+        "2. Only restate the precomputed figures provided in the context above.\n"
+        "3. If accelerated options are provided above, you may encourage the student by citing "
+        "ONE of those exact precomputed scenarios verbatim."
     )
 
 
 # ===========================================================================
 # 4. FINANCIAL WELLNESS (Stress Score)
 # ===========================================================================
+
 
 def wellness_prompt(
     stress_score: int,
@@ -276,11 +283,17 @@ def wellness_prompt(
     # Compact context lines from suggestions_context (caller-supplied, optional keys)
     ctx_lines = []
     if "monthly_savings" in suggestions_context:
-        ctx_lines.append(f"Current monthly savings: ₹{suggestions_context['monthly_savings']:.0f}")
+        ctx_lines.append(
+            f"Current monthly savings: ₹{suggestions_context['monthly_savings']:.0f}"
+        )
     if "top_overspend" in suggestions_context:
-        ctx_lines.append(f"Highest overspend category: {suggestions_context['top_overspend']}")
+        ctx_lines.append(
+            f"Highest overspend category: {suggestions_context['top_overspend']}"
+        )
     if "budget_overruns" in suggestions_context:
-        ctx_lines.append(f"Budget categories exceeded: {suggestions_context['budget_overruns']}")
+        ctx_lines.append(
+            f"Budget categories exceeded: {suggestions_context['budget_overruns']}"
+        )
     ctx_block = "\n".join(ctx_lines) if ctx_lines else ""
 
     return (

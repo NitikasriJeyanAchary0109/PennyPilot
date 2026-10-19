@@ -29,16 +29,20 @@ import logging
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.models import Goal, Savings, User
 from app.services.ai_engine import AIEngineError, call_llama
-from app.services.rule_engine import goal_forecast, savings_velocity
+from app.services.rule_engine import (
+    calculate_accelerated_savings_options,
+    format_accelerated_options,
+    goal_forecast,
+    savings_velocity,
+)
 from app.utils.prompts import dream_engine_prompt
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger("sparechange_ai.dream")
 
@@ -53,22 +57,23 @@ _VELOCITY_LOOKBACK_SAVINGS = 60  # max recent Savings rows to read for velocity
 # Pydantic response model
 # ---------------------------------------------------------------------------
 
+
 class ForecastResponse(BaseModel):
     """Response for GET /goal/{goal_id}/forecast."""
 
-    goal_id:        int
-    goal_name:      str
-    target_amount:  Decimal
+    goal_id: int
+    goal_name: str
+    target_amount: Decimal
     current_amount: Decimal
-    forecast_date:  Optional[datetime.date] = Field(
+    forecast_date: Optional[datetime.date] = Field(
         None,
         description="Projected completion date, or null if velocity is zero.",
     )
-    velocity:       Decimal = Field(
+    velocity: Decimal = Field(
         ...,
         description="Current monthly savings rate in INR (last 30 days).",
     )
-    explanation:    str = Field(
+    explanation: str = Field(
         ...,
         description="LLM-generated encouraging forecast explanation.",
     )
@@ -81,6 +86,7 @@ ForecastResponse.model_rebuild()
 # ---------------------------------------------------------------------------
 # GET /api/goal/{goal_id}/forecast
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/{goal_id}/forecast",
@@ -115,30 +121,33 @@ async def get_goal_forecast(
     goal: Optional[Goal] = (
         db.query(Goal)
         .filter(
-            Goal.goal_id == goal_id,
-            Goal.user_id == uid,      # enforces ownership — 404 on mismatch
+            Goal.id == goal_id,
+            Goal.user_id == uid,  # enforces ownership — 404 on mismatch
         )
         .first()
     )
     if goal is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Goal not found.",   # intentionally generic — no existence leak
+            detail="Goal not found.",  # intentionally generic — no existence leak
         )
 
-    target  = Decimal(str(goal.target))
-    current = Decimal(str(goal.saved))
+    target = Decimal(str(goal.target_amount))
+    current = Decimal(str(goal.current_amount))
 
     logger.info(
         "dream.forecast | user_id=%d goal_id=%d target=₹%s saved=₹%s",
-        uid, goal_id, target, current,
+        uid,
+        goal_id,
+        target,
+        current,
     )
 
     # ── 2. Rule Engine — savings velocity ────────────────────────────────
     recent_savings = (
         db.query(Savings)
         .filter(Savings.user_id == uid)
-        .order_by(Savings.date.desc())          # type: ignore[attr-defined]
+        .order_by(Savings.created_at.desc())
         .limit(_VELOCITY_LOOKBACK_SAVINGS)
         .all()
     )
@@ -156,16 +165,23 @@ async def get_goal_forecast(
 
     logger.info(
         "dream.forecast | user_id=%d goal_id=%d velocity=₹%s/month forecast=%s",
-        uid, goal_id, velocity, forecast_date,
+        uid,
+        goal_id,
+        velocity,
+        forecast_date,
     )
 
     # ── 4. Build prompt ──────────────────────────────────────────────────
+    accel_options = calculate_accelerated_savings_options(target, current, velocity)
+    accel_text = format_accelerated_options(accel_options)
+
     prompt = dream_engine_prompt(
-        goal_name=goal.goal_name,
+        goal_name=goal.title,
         target_amount=target,
         current_amount=current,
-        forecast_date=raw_forecast,   # pass raw sentinel — prompts.py handles it
+        forecast_date=raw_forecast,  # pass raw sentinel — prompts.py handles it
         velocity=velocity,
+        accelerated_options_text=accel_text,
     )
 
     # ── 5. LLM call ──────────────────────────────────────────────────────
@@ -174,8 +190,9 @@ async def get_goal_forecast(
             system_prompt=(
                 "You are SpareChange AI. You motivate college students about "
                 "their savings goals in plain, upbeat language. Be specific — "
-                "use the numbers provided. Suggest exactly one concrete action "
-                "to reach the goal sooner (e.g. saving an extra ₹X/month). "
+                "use ONLY the precomputed numbers provided. If suggesting an action, "
+                "cite one of the precomputed accelerated savings scenarios verbatim. "
+                "Never calculate, estimate, project, or invent any numbers or dates. "
                 "Keep your reply to 3 sentences or fewer."
             ),
             user_prompt=prompt,
@@ -183,7 +200,9 @@ async def get_goal_forecast(
     except AIEngineError as exc:
         logger.error(
             "dream.forecast | user_id=%d goal_id=%d | AIEngineError: %s",
-            uid, goal_id, exc.message,
+            uid,
+            goal_id,
+            exc.message,
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -196,8 +215,8 @@ async def get_goal_forecast(
 
     # ── 6. Return ─────────────────────────────────────────────────────────
     return ForecastResponse(
-        goal_id=goal.goal_id,
-        goal_name=goal.goal_name,
+        goal_id=goal.id,
+        goal_name=goal.title,
         target_amount=target,
         current_amount=current,
         forecast_date=forecast_date,

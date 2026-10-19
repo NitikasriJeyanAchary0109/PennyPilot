@@ -1,14 +1,14 @@
+import datetime
+from decimal import Decimal
+
 import pytest
+from app.database import Base, get_db
+from app.main import app
+from app.middleware.auth_middleware import require_student
+from app.models.models import Budget, Transaction, User
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from decimal import Decimal
-import datetime
-
-from app.main import app
-from app.database import Base, get_db
-from app.models.models import User, Transaction, Budget
-from app.middleware.auth_middleware import require_student
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_budgets.db"
 engine = create_engine(
@@ -18,6 +18,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
+
 
 def get_testing_db():
     db = TestingSessionLocal()
