@@ -232,7 +232,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
           const role = "{user.role}";
           // Deep link redirects
           const onboardingComplete = "${str(user.has_completed_onboarding).lower()}";
-          const url = "sparechange://oauth?token=" + token + "&role=" + role + "&has_completed_onboarding=" + onboardingComplete;
+          const url = "pennypilot://oauth?token=" + token + "&role=" + role + "&has_completed_onboarding=" + onboardingComplete;
           const expoUrl = "exp://127.0.0.1:8081/--/oauth?token=" + token + "&role=" + role;
 
           window.location.href = url;
@@ -245,7 +245,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         <div style="text-align: center; padding: 30px; border: 1px solid #334155; border-radius: 20px; background-color: #1E293B; max-width: 400px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);">
           <h2 style="color: #10B981; margin-bottom: 10px;">Login Successful!</h2>
           <p style="font-size: 14px; margin-bottom: 20px;">We've authenticated your Google account. Redirecting you back to Penny Pilot...</p>
-          <p style="font-size: 11px; color: #94A3B8;">If you are not redirected automatically, <a href="sparechange://oauth?token={access_token}&role={user.role}&has_completed_onboarding={str(user.has_completed_onboarding).lower()}" style="color: #6366F1; font-weight: bold; text-decoration: none;">click here to resume</a>.</p>
+          <p style="font-size: 11px; color: #94A3B8;">If you are not redirected automatically, <a href="pennypilot://oauth?token={access_token}&role={user.role}&has_completed_onboarding={str(user.has_completed_onboarding).lower()}" style="color: #6366F1; font-weight: bold; text-decoration: none;">click here to resume</a>.</p>
         </div>
       </body>
     </html>

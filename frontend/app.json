@@ -1,9 +1,16 @@
 {
   "expo": {
     "name": "Penny Pilot",
-    "slug": "sparechange-ai",
+    "slug": "penny-pilot",
+    "scheme": "pennypilot",
     "version": "1.0.0",
     "orientation": "portrait",
+    "ios": {
+      "bundleIdentifier": "com.pennypilot.app"
+    },
+    "android": {
+      "package": "com.pennypilot.app"
+    },
     "platforms": [
       "android",
       "ios",
