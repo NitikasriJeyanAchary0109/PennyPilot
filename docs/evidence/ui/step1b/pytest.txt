@@ -29,4 +29,4 @@ backend/tests/test_transactions.py::test_update_transaction_success PASSED [ 90%
 backend/tests/test_transactions.py::test_update_transaction_amount_conflict PASSED [ 95%]
 backend/tests/test_transactions.py::test_delete_transaction_soft_delete_and_reverse_roundup PASSED [100%]
 
-============================== 21 passed in 4.74s ==============================
+============================== 21 passed in 3.67s ==============================
