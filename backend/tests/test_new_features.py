@@ -155,6 +155,8 @@ def test_google_callback_html_onboarding_states():
         assert "has_completed_onboarding=false" in html_new
         assert "$false" not in html_new
         assert "$true" not in html_new
+        assert "exp://" not in html_new
+        assert "127.0.0.1" not in html_new
 
     # 2. Test existing onboarded user (has_completed_onboarding=True)
     db = TestingSessionLocal()
@@ -186,6 +188,8 @@ def test_google_callback_html_onboarding_states():
         assert "has_completed_onboarding=true" in html_onboarded
         assert "$true" not in html_onboarded
         assert "$false" not in html_onboarded
+        assert "exp://" not in html_onboarded
+        assert "127.0.0.1" not in html_onboarded
 
 
 def test_wellness_and_stress():
