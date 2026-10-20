@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useAuth } from "../hooks/useAuth";
+import { Home, Target, LineChart, MessageSquare, User } from "lucide-react-native";
 
 // Authentication Screens
 import LoginScreen from "../screens/auth/LoginScreen";
@@ -36,6 +37,30 @@ import LiteracyScreen from "../screens/educator/LiteracyScreen";
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const studentScreenOptions = {
+  headerStyle: {
+    backgroundColor: "#fbf7ee",
+  },
+  headerTintColor: "#144a32",
+  headerTitleStyle: {
+    fontWeight: "bold" as const,
+    color: "#144a32",
+  },
+  tabBarStyle: {
+    backgroundColor: "#ffffff",
+    borderTopColor: "#e8e4d9",
+    paddingBottom: 6,
+    paddingTop: 6,
+    height: 62,
+  },
+  tabBarActiveTintColor: "#144a32",
+  tabBarInactiveTintColor: "#666e69",
+  tabBarLabelStyle: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
+};
+
 const screenOptions = {
   headerStyle: {
     backgroundColor: "#ffffff",
@@ -60,21 +85,40 @@ const screenOptions = {
 // ==========================
 function StudentTabs() {
   return (
-    <Tab.Navigator screenOptions={screenOptions}>
+    <Tab.Navigator screenOptions={studentScreenOptions}>
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: "Home", tabBarLabel: "Home" }}
+        options={{
+          title: "Home",
+          tabBarLabel: "Home",
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Home size={size || 22} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Goals"
         component={GoalsDashboardScreen}
-        options={{ title: "Goals", tabBarLabel: "Goals" }}
+        options={{
+          title: "Goals",
+          tabBarLabel: "Goals",
+          tabBarIcon: ({ color, size }) => (
+            <Target size={size || 22} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Insights"
         component={InsightsScreen}
-        options={{ title: "Insights", tabBarLabel: "Insights" }}
+        options={{
+          title: "Insights",
+          tabBarLabel: "Insights",
+          tabBarIcon: ({ color, size }) => (
+            <LineChart size={size || 22} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Chat"
@@ -83,6 +127,9 @@ function StudentTabs() {
           title: "AI Chat",
           tabBarLabel: "Chat",
           headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <MessageSquare size={size || 22} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -92,6 +139,9 @@ function StudentTabs() {
           title: "Profile",
           tabBarLabel: "Profile",
           headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <User size={size || 22} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
