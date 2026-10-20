@@ -56,4 +56,4 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: false
-          tags: sparechange-backend:ci
+          tags: pennypilot-backend:ci
