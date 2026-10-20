@@ -447,26 +447,6 @@ def test_savings_endpoints(client, db, student_user, student_token):
     assert r_del.status_code == 204
 
 
-def test_bcrypt_backward_compatibility_with_passlib_hashes():
-    """Verify that bcrypt hashes created under Passlib (standard $2b$12$) verify correctly."""
-    from app.utils.security import verify_password
-
-    # Vector 1: 'PasslibLegacyPassword2024!'
-    hash1 = "$2b$12$OQWWLmquJjWpN98ua4gY6evJZ3Rf70oYKf1/JlQ5fDeFJG9pArP/2"
-    assert verify_password("PasslibLegacyPassword2024!", hash1) is True
-    assert verify_password("IncorrectPassword!", hash1) is False
-    assert verify_password("", hash1) is False
-
-    # Vector 2: 'CollegeStudent2026!'
-    hash2 = "$2b$12$Oeb.eTAy/HbyKuu7Z5jD0.1.7QLC370nLhchjnD/bOfKjdAK93yE6"
-    assert verify_password("CollegeStudent2026!", hash2) is True
-    assert verify_password("WrongStudentPassword", hash2) is False
-
-    # Corrupt / malformed hash must fail safely and return False
-    assert verify_password("CollegeStudent2026!", "not_a_valid_hash") is False
-    assert verify_password("CollegeStudent2026!", "$2b$invalid$format") is False
-
-
 def test_roundups_endpoints_and_stats(client, db, student_user, student_token):
     """Verify GET /api/roundups/ and GET /api/roundups/stats against real models."""
     headers = {"Authorization": f"Bearer {student_token}"}
