@@ -470,7 +470,7 @@ def test_roundups_endpoints_and_stats(client, db, student_user, student_token):
     s2 = Savings(
         user_id=student_user.user_id,
         amount=Decimal("15.50"),
-        source="roundup",
+        source="round_up",
         created_at=now + datetime.timedelta(seconds=1),
     )
     s_other_user = Savings(
@@ -509,3 +509,33 @@ def test_roundups_endpoints_and_stats(client, db, student_user, student_token):
     # 3. Unauthenticated access blocked
     r_unauth = client.get("/api/roundups/stats")
     assert r_unauth.status_code == 401
+
+def test_alembic_migration_006_normalizes_existing_roundup_rows(db, student_user):
+    """Verify that Alembic migration 006 converts existing 'roundup' rows to 'round_up'."""
+    from sqlalchemy import text
+
+    # Raw insert simulating legacy un-normalized row
+    db.execute(
+        text(
+            "INSERT INTO savings (user_id, amount, source, created_at) "
+            "VALUES (:user_id, :amount, 'roundup', :created_at)"
+        ),
+        {"user_id": student_user.user_id, "amount": 12.50, "created_at": datetime.datetime.utcnow()},
+    )
+    db.commit()
+
+    # Verify inserted as 'roundup'
+    row = db.execute(text("SELECT source FROM savings WHERE source = 'roundup'")).fetchone()
+    assert row is not None
+    assert row[0] == "roundup"
+
+    # Execute migration SQL (identical to 006_normalize_savings_source.upgrade)
+    db.execute(text("UPDATE savings SET source = 'round_up' WHERE source = 'roundup'"))
+    db.commit()
+
+    # Verify normalized
+    remaining = db.execute(text("SELECT count(*) FROM savings WHERE source = 'roundup'")).scalar()
+    assert remaining == 0
+    updated = db.execute(text("SELECT count(*) FROM savings WHERE source = 'round_up' AND amount = 12.50")).scalar()
+    assert updated >= 1
+

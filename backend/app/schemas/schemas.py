@@ -1,8 +1,8 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 # ==========================================
@@ -113,8 +113,15 @@ class GoalDetailResponse(GoalResponse):
 # ==========================================
 class SavingsBase(BaseModel):
     amount: Decimal
-    source: Literal["round_up", "manual", "transfer", "roundup"]
+    source: Literal["round_up", "manual", "transfer"]
     goal_id: Optional[int] = None
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def normalize_source(cls, v: Any) -> Any:
+        if v == "roundup":
+            return "round_up"
+        return v
 
 
 class SavingsCreate(SavingsBase):
@@ -123,8 +130,15 @@ class SavingsCreate(SavingsBase):
 
 class SavingsUpdate(BaseModel):
     amount: Optional[Decimal] = None
-    source: Optional[Literal["round_up", "manual", "transfer", "roundup"]] = None
+    source: Optional[Literal["round_up", "manual", "transfer"]] = None
     goal_id: Optional[int] = None
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def normalize_source(cls, v: Any) -> Any:
+        if v == "roundup":
+            return "round_up"
+        return v
 
 
 class SavingsResponse(SavingsBase):

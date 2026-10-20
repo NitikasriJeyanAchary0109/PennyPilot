@@ -1,3 +1,7 @@
+// Accepts both canonical 'round_up' and legacy 'roundup'
+export const isRoundupSource = (source?: string): boolean =>
+  source === "round_up" || source === "roundup";
+
 import React, { useState, useEffect } from "react";
 import { 
   View, 
