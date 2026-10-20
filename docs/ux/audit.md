@@ -99,16 +99,21 @@ Before-screenshots of all reachable screens were captured at phone viewport dime
 - **Proposed Fix**: Replace `Amount ($)` with `Amount (₹)`; harmonize input fields using light surface tokens (`bg-surface-container`, `border-outline-variant`); expand category chips to 44pt tap targets; display real total savings from `GET /api/savings/summary`.
 - **Target Backend Endpoint**: `GET /api/savings/summary`, `GET /api/transactions/`, `POST /api/transactions/`.
 
-#### `frontend/src/screens/student/GoalsDashboardScreen.tsx` & `GoalsScreen.tsx`
+#### `frontend/src/screens/student/GoalsDashboardScreen.tsx` & `GoalsScreen.tsx` (Merge Candidate)
 - **Purpose**: Display the student's dream engine (savings goals), progress toward deadlines, and funding priority.
 - **Primary Action**: "Start a new dream" / Floating action button (`+`) to open `CreateGoalScreen`.
+- **Merge Candidate Evaluation**:
+  - Two competing implementations currently exist in the codebase: `GoalsDashboardScreen.tsx` (active in `RootNavigator`) and `GoalsScreen.tsx` (inactive/orphaned).
+  - `GoalsScreen.tsx` has rich category icons and styling but falls back to hardcoded `mockGoals` ("New Laptop", "Goa Trip", "Sony A7 IV").
+  - `GoalsDashboardScreen.tsx` connects to `apiService.getGoals()` but performs client-side percentage math and remaining balance math.
+  - **Remediation**: Consolidate these two files into a single canonical `GoalsScreen.tsx`. Retire the duplicate, remove all `mockGoals`, and drive the UI entirely from backend responses.
 - **Problems**:
-  - *Dual Screen Ambiguity*: Two separate components exist: `GoalsDashboardScreen.tsx` and `GoalsScreen.tsx`. `RootNavigator` points to `GoalsDashboardScreen`, leaving `GoalsScreen.tsx` orphaned.
+  - *Dual Screen Ambiguity*: Redundant maintenance overhead across two divergent files.
   - *Zero-Arithmetic Violations*: `GoalsDashboardScreen.tsx` line 8 calculates percentage client-side: `Math.round(g.saved/g.target*100)` and remaining balance: `Math.max(0, g.target-g.saved)`.
-  - *Mock Fallback*: `GoalsScreen.tsx` lines 81-86 populates `mockGoals` ("New Laptop", "Goa Trip", "Sony A7 IV") when `GET /api/goals/` returns empty, concealing the true zero state from students.
+  - *Mock Fallback*: `GoalsScreen.tsx` lines 81-86 populates `mockGoals` when `GET /api/goals/` returns empty, concealing the true zero state from students.
   - *Hardcoded Classes*: Uses obsolete `font-jakarta-bold` and `font-worksans` font classes.
   - *Empty State*: No motivational zero-state illustration or onboarding prompt when a user has zero goals.
-- **Proposed Fix**: Consolidate into a single canonical `GoalsScreen`; request `percentage_completed` and `amount_remaining` from the backend endpoint; replace `mockGoals` with an encouraging empty state component (`"No goals set yet. Pick a dream to start micro-saving!"`).
+- **Proposed Fix**: Merge into single canonical `GoalsScreen`; request `percentage_completed` and `amount_remaining` from backend; replace `mockGoals` with an encouraging empty state component (`"No goals set yet. Pick a dream to start micro-saving!"`).
 - **Target Backend Endpoint**: `GET /api/goals/`, `POST /api/goals/`.
 
 #### `frontend/src/screens/student/GoalDetailScreen.tsx`
@@ -189,11 +194,11 @@ Before-screenshots of all reachable screens were captured at phone viewport dime
 - **Purpose**: Allow students to withdraw money from a savings goal for urgent needs without punitive friction.
 - **Primary Action**: "Confirm Emergency Withdrawal" (`POST /api/goals/{id}/withdraw`).
 - **Problems**:
+  - *Zero-Arithmetic Violation (Hardcoded Business Constraints)*: Line 46-47 hardcodes `val <= 0` and the alert string `"Please enter an amount between ₹1 and ₹..."`. Minimum withdrawal limits and maximum liquidity caps are domain financial business rules. In accordance with the Zero-Arithmetic Rule, the frontend must not invent or hardcode domain validation figures; `min_withdrawal_amount` and `max_withdrawal_amount` must be supplied directly by the backend response (`GET /api/goals/{id}`).
   - *Hardcoded Assumptions*: Falls back to `balance = 12500` and `goalName = "Laptop Goal"` if opened without route parameters.
-  - *Domain Rule Hardcoding*: Hardcodes `₹1` minimum withdrawal constraint in error messages and client logic.
   - *Emotional Tone*: Reason selection ("Medical", "Food", "Rent") feels interrogative if not paired with reassuring copy.
   - *Accessibility*: Modal picker lacks proper focus traps on web and accessibility labels on radio items.
-- **Proposed Fix**: Require real goal balance from `GET /api/goals/{id}`; display compassionate copy ("Life happens. Your savings are here to protect you."); validate against server constraints; expand reason buttons to 48pt tap targets.
+- **Proposed Fix**: Require real goal balance and server-provided withdrawal bounds from `GET /api/goals/{id}`; display compassionate copy ("Life happens. Your savings are here to protect you."); validate against server constraints; expand reason buttons to 48pt tap targets.
 - **Target Backend Endpoint**: `GET /api/goals/{id}`, `POST /api/goals/{id}/withdraw`.
 
 ---
@@ -281,9 +286,9 @@ Before-screenshots of all reachable screens were captured at phone viewport dime
 - **Purpose**: Present AI-extracted income, spending categories, and savings potential after CSV processing.
 - **Primary Action**: "Confirm & Continue".
 - **Problems**:
-  - *Severe Zero-Arithmetic Violations*: Lines 67-184 hardcode all income (`₹45,000`), expenses (`₹33,750`), allocations (`₹11,250`, `₹13,500`, `₹9,000`), and SVG donut arc calculations.
-  - *No Real API Wiring*: Screen is completely detached from the CSV upload response.
-- **Proposed Fix**: Wire directly to the output of `POST /api/transactions/upload-csv` and `GET /api/calculations/analysis`; render donut segments dynamically from server response percentages; eliminate all static monetary numbers.
+  - *Severe Zero-Arithmetic Violations*: Lines 67-184 hardcode all income (`₹45,000`), expenses (`₹33,750`), category allocations (`₹11,250` savings, `₹13,500` rent, `₹11,250` food, `₹9,000` fun), client-side percentages (`75% spent`, `25% savings`), and SVG donut circle stroke offsets (`-80`, `-55`, `-25`, `0`). The screen fabricates financial results on the client without invoking backend calculation services.
+  - *No Real API Wiring*: The screen is completely detached from the CSV upload response and `rule_engine.py`.
+- **Proposed Fix**: Wire directly to the output of `POST /api/transactions/upload-csv` and `GET /api/calculations/analysis`; render donut segments dynamically using server-supplied percentages and category values; eliminate all static monetary numbers.
 - **Target Backend Endpoint**: `POST /api/transactions/upload-csv`, `GET /api/calculations/analysis`.
 
 ---
@@ -406,10 +411,10 @@ flowchart TD
 | **P0** | **Mock Data Stripping & Empty States** (`GoalsScreen`, `NotificationsScreen`) | High | Med | **Rule Enforcement**: Delete `mockGoals` and `mockNotifications` arrays; build clean zero-state views. |
 | **P1** | **HomeScreen Polish & Input Harmonization** (`HomeScreen.tsx`) | High | Med | Remove dark-slate input styling; expand category chips to 44pt; display real round-up metrics. |
 | **P1** | **AI Chat Real History & Error Retry** (`ChatScreen.tsx`) | High | High | Remove fake seed chats; wire to `GET /api/chat/history`; add friendly 503 retry and AI disclaimer. |
-| **P1** | **Goals Screen Consolidation & Zero-Arithmetic** (`GoalsDashboardScreen.tsx`) | High | Med | Consolidate duplicate goal screens; delegate progress % and remaining balance to backend. |
-| **P2** | **Onboarding Streamlining** (`ManualIncomeExpenseScreen.tsx`, `AnalysisScreen.tsx`) | Med | High | Connect `AnalysisScreen` to real CSV upload response; allow editable expense amounts. |
+| **P1** | **Goals Screen Consolidation & Merge** (`GoalsScreen.tsx` & `GoalsDashboardScreen.tsx`) | High | Med | **Merge Candidate**: Consolidate duplicate goal screens into a single canonical `GoalsScreen.tsx`; eliminate `mockGoals`; delegate progress % and remaining balance to backend. |
+| **P2** | **Onboarding & Analysis Zero-Arithmetic** (`ManualIncomeExpenseScreen.tsx`, `AnalysisScreen.tsx`) | Med | High | Connect `AnalysisScreen` to real CSV upload response; eliminate hardcoded ₹45k/₹33k figures; allow editable expense amounts. |
 | **P2** | **Insights & Empathy Overhaul** (`InsightsScreen.tsx`) | Med | Med | Rename "Regret Meter" to "Impulse Monitor"; bind user name to profile; add accessible labels. |
-| **P2** | **Budgets & Emergency Withdrawal** (`BudgetsScreen.tsx`, `EmergencyWithdrawalScreen.tsx`) | Med | Med | Fix modal keyboard behavior; enforce 44pt tap targets; sanitize validation strings. |
+| **P2** | **Budgets & Emergency Withdrawal Bounds** (`BudgetsScreen.tsx`, `EmergencyWithdrawalScreen.tsx`) | Med | Med | Fetch backend withdrawal limits (`min_withdrawal_amount`) instead of hardcoded ₹1; fix modal keyboard behavior; enforce 44pt tap targets. |
 | **P3** | **Profile & Settings Polish** (`ProfileScreen.tsx`) | Low | Low | Bind user profile data; relocate floating `__DEV__` badge to avoid obscuring tab bar. |
 | **P3** | **Educator Oversight Suite** (`TrendsScreen.tsx`, `LiteracyScreen.tsx`) | Low | Med | Polish charts with accessible summaries; add search/filters to oversight logs. |
 
@@ -496,3 +501,15 @@ To strictly maintain the **Zero-Arithmetic Rule** without breaking API contracts
   ]
   ```
 - **Rationale**: Eliminates hardcoded `INITIAL_COACH_MESSAGES` and preserves student conversation across app restarts.
+
+### 6. Goal Withdrawal Constraints API (`GET /api/goals/{id}`)
+- **Current Behavior**: Frontend hardcodes domain rules (`val <= 0` and error string `Please enter an amount between ₹1 and ₹...`).
+- **Requested Field Additions**:
+  ```json
+  {
+    "min_withdrawal_amount": 1.0,
+    "max_withdrawal_amount": 34000.0,
+    "withdrawal_cooldown_hours": 0
+  }
+  ```
+- **Rationale**: Enforces the Zero-Arithmetic Rule by sourcing business limits and transaction constraints from the backend rather than client-side hardcoding.
