@@ -125,7 +125,8 @@ def test_jwt_tokens_lifecycle():
 def test_prompts_all_branches():
     # coach_system_prompt
     sys_prompt = coach_system_prompt()
-    assert "Penny Pilot" in sys_prompt or "SpareChange AI" in sys_prompt
+    assert "Penny Pilot" in sys_prompt
+    assert "SpareChange AI" not in sys_prompt
 
     # coach_user_prompt with data
     txs = [{"amount": 120.50, "merchant": "Cafe", "category": "Food"}]
@@ -510,6 +511,7 @@ def test_roundups_endpoints_and_stats(client, db, student_user, student_token):
     r_unauth = client.get("/api/roundups/stats")
     assert r_unauth.status_code == 401
 
+
 def test_alembic_migration_006_normalizes_existing_roundup_rows(db, student_user):
     """Verify that Alembic migration 006 converts existing 'roundup' rows to 'round_up'."""
     from sqlalchemy import text
@@ -520,12 +522,18 @@ def test_alembic_migration_006_normalizes_existing_roundup_rows(db, student_user
             "INSERT INTO savings (user_id, amount, source, created_at) "
             "VALUES (:user_id, :amount, 'roundup', :created_at)"
         ),
-        {"user_id": student_user.user_id, "amount": 12.50, "created_at": datetime.datetime.utcnow()},
+        {
+            "user_id": student_user.user_id,
+            "amount": 12.50,
+            "created_at": datetime.datetime.utcnow(),
+        },
     )
     db.commit()
 
     # Verify inserted as 'roundup'
-    row = db.execute(text("SELECT source FROM savings WHERE source = 'roundup'")).fetchone()
+    row = db.execute(
+        text("SELECT source FROM savings WHERE source = 'roundup'")
+    ).fetchone()
     assert row is not None
     assert row[0] == "roundup"
 
@@ -534,8 +542,107 @@ def test_alembic_migration_006_normalizes_existing_roundup_rows(db, student_user
     db.commit()
 
     # Verify normalized
-    remaining = db.execute(text("SELECT count(*) FROM savings WHERE source = 'roundup'")).scalar()
+    remaining = db.execute(
+        text("SELECT count(*) FROM savings WHERE source = 'roundup'")
+    ).scalar()
     assert remaining == 0
-    updated = db.execute(text("SELECT count(*) FROM savings WHERE source = 'round_up' AND amount = 12.50")).scalar()
+    updated = db.execute(
+        text(
+            "SELECT count(*) FROM savings WHERE source = 'round_up' AND amount = 12.50"
+        )
+    ).scalar()
     assert updated >= 1
 
+
+def test_savings_source_before_validator():
+    """Verify that SavingsCreate and SavingsUpdate before-validator normalizes 'roundup' to 'round_up'."""
+    import pytest
+    from app.schemas.schemas import SavingsCreate, SavingsUpdate
+    from pydantic import ValidationError
+
+    # SavingsCreate with legacy 'roundup' -> normalized to 'round_up'
+    s1 = SavingsCreate(amount=Decimal("25.00"), source="roundup")
+    assert s1.source == "round_up"
+
+    # SavingsCreate with standard sources
+    s2 = SavingsCreate(amount=Decimal("10.00"), source="round_up")
+    assert s2.source == "round_up"
+    s3 = SavingsCreate(amount=Decimal("10.00"), source="manual")
+    assert s3.source == "manual"
+    s4 = SavingsCreate(amount=Decimal("10.00"), source="transfer")
+    assert s4.source == "transfer"
+
+    # Invalid source raises ValidationError
+    with pytest.raises(ValidationError):
+        SavingsCreate(amount=Decimal("10.00"), source="invalid_source")
+
+    # SavingsUpdate with legacy 'roundup' -> normalized to 'round_up'
+    u1 = SavingsUpdate(source="roundup")
+    assert u1.source == "round_up"
+
+    # SavingsUpdate with None
+    u2 = SavingsUpdate()
+    assert u2.source is None
+
+
+def test_migration_006_upgrade_module_with_legacy_roundup_row(
+    client, db, student_user, student_token
+):
+    """Verify that migration 006's upgrade() function converts legacy 'roundup' row and updates stats."""
+    import importlib.util
+    import os
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import text
+
+    headers = {"Authorization": f"Bearer {student_token}"}
+
+    # 1. Insert a legacy row with source='roundup'
+    legacy_amt = 33.25
+    db.execute(
+        text(
+            "INSERT INTO savings (user_id, amount, source, created_at) "
+            "VALUES (:uid, :amt, 'roundup', :now)"
+        ),
+        {
+            "uid": student_user.user_id,
+            "amt": legacy_amt,
+            "now": datetime.datetime.utcnow(),
+        },
+    )
+    db.commit()
+
+    # Verify legacy row is present in DB
+    row = db.execute(
+        text("SELECT source FROM savings WHERE amount = :amt"), {"amt": legacy_amt}
+    ).fetchone()
+    assert row is not None and row[0] == "roundup"
+
+    # 2. Execute migration 006 module's upgrade()
+    spec = importlib.util.spec_from_file_location(
+        "migration_006",
+        os.path.join(
+            os.path.dirname(__file__),
+            "../alembic/versions/006_normalize_savings_source.py",
+        ),
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    ctx = MigrationContext.configure(db.connection())
+    with Operations.context(ctx):
+        mod.upgrade()
+    db.commit()
+
+    # 3. Verify legacy row was converted to 'round_up'
+    migrated_row = db.execute(
+        text("SELECT source FROM savings WHERE amount = :amt"), {"amt": legacy_amt}
+    ).fetchone()
+    assert migrated_row is not None and migrated_row[0] == "round_up"
+
+    # 4. Verify roundups stats endpoint counts it as round_up savings
+    r_stats = client.get("/api/roundups/stats", headers=headers)
+    assert r_stats.status_code == 200
+    stats = r_stats.json()
+    assert Decimal(str(stats["total_saved"])) >= Decimal("33.25")
