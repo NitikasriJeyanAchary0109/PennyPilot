@@ -5,6 +5,12 @@ import { apiService } from "../../services/api";
 import { Card } from "../../components/Card";
 import { EducatorAnalytics } from "../../types";
 
+const formatCurrency = (val: string | number | null | undefined): string => {
+  if (val === null || val === undefined) return "0.00";
+  const num = typeof val === "number" ? val : parseFloat(String(val));
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
 export const OverviewScreen = () => {
   const { logout } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -64,24 +70,24 @@ export const OverviewScreen = () => {
           {/* Main Indicators */}
           <Card className="items-center py-6 mb-4">
             <Text className="text-on-surface-variant text-xs font-semibold mb-1 uppercase tracking-wider">Total Micro-Savings (All Students)</Text>
-            <Text className="text-tertiary text-4xl font-black">₹{data?.total_savings.toFixed(2) || "0.00"}</Text>
+            <Text className="text-tertiary text-4xl font-black">₹{formatCurrency(data?.total_savings)}</Text>
           </Card>
 
           <View className="flex-row gap-x-4 mb-4">
             <Card className="flex-1 my-0 py-4 items-center">
               <Text className="text-on-surface-variant text-xs font-semibold mb-1">Active Students</Text>
-              <Text className="text-ob-primary text-2xl font-black">{data?.total_students || 0}</Text>
+              <Text className="text-ob-primary text-2xl font-black">{data?.total_students ?? 0}</Text>
             </Card>
 
             <Card className="flex-1 my-0 py-4 items-center">
               <Text className="text-on-surface-variant text-xs font-semibold mb-1">Average Savings</Text>
-              <Text className="text-tertiary text-2xl font-black">₹{data?.average_savings_per_student.toFixed(2) || "0.00"}</Text>
+              <Text className="text-tertiary text-2xl font-black">₹{formatCurrency(data?.average_savings_per_student)}</Text>
             </Card>
           </View>
 
           <Card className="items-center py-4 mb-6">
             <Text className="text-on-surface-variant text-xs font-semibold mb-1">Card Swipes Processed</Text>
-            <Text className="text-on-surface text-xl font-bold">{data?.total_transactions_processed || 0} Swipes</Text>
+            <Text className="text-on-surface text-xl font-bold">{data?.total_transactions_processed ?? 0} Swipes</Text>
           </Card>
 
           {/* Quick Info Box */}

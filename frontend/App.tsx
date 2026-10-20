@@ -11,6 +11,7 @@ import {
   Inter_800ExtraBold,
 } from "@expo-google-fonts/inter";
 import { AuthProvider } from "./src/context/AuthContext";
+import ErrorBoundary from "./src/components/ErrorBoundary";
 import RootNavigator from "./src/navigation/RootNavigator";
 import TestStyleScreen from "./src/screens/TestStyleScreen";
 
@@ -39,11 +40,13 @@ export default function App() {
         {__DEV__ && showTestScreen ? (
           <TestStyleScreen onDismiss={() => setShowTestScreen(false)} />
         ) : (
-          <AuthProvider>
-            <NavigationContainer>
-              <RootNavigator />
-            </NavigationContainer>
-          </AuthProvider>
+          <ErrorBoundary>
+            <AuthProvider>
+              <NavigationContainer>
+                <RootNavigator />
+              </NavigationContainer>
+            </AuthProvider>
+          </ErrorBoundary>
         )}
 
         {/* Floating Test Mode Pill for Step 0 styling verification (DEV only) */}
