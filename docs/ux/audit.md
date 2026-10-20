@@ -66,8 +66,7 @@ Before-screenshots of all reachable screens were captured at phone viewport dime
   - *Copywriting & Tone*: "Sign in to your account" is cold and institutional.
   - *Accessibility*: Text inputs lack explicit `accessibilityLabel`, `accessibilityHint`, and proper `autoComplete` tags (`email`, `current-password`).
   - *Hardcoded Styles*: Inline colors `#005bbf`, `#f7f9ff`, and hardcoded border colors instead of Tailwind color tokens.
-  - *Google Login Limitations*: Uses custom scheme `pennypilot://oauth` which fails in Expo Go on physical devices.
-- **Proposed Fix**: Redesign card with responsive vertical padding; add password visibility toggle; expand tap target on helper links to 44pt; add `accessibilityLabel` attributes; style using semantic color tokens `bg-surface`, `text-primary`.
+  - *Google Login Architecture & Limitations*: In the Google OAuth flow, Google redirects to the FastAPI backend callback (`GET /api/auth/google/callback`). The backend verifies credentials, mints a JWT, and returns an HTML page with JavaScript that opens the deep link `pennypilot://oauth?token=...`. On a physical phone running Expo Go, this fails because Expo Go only handles `exp://` schemes and does not register the custom `pennypilot://` scheme in the mobile OS. Completing Google login on a physical device requires either a custom development build (`npx expo run:android` / `npx expo run:ios`) or a public HTTPS tunnel. Email/password authentication functions across all environments.
 - **Target Backend Endpoint**: `POST /api/auth/token`, `GET /api/auth/google/url`.
 
 #### `frontend/src/screens/auth/RegisterScreen.tsx`
