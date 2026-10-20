@@ -1,0 +1,65 @@
+=== Alembic Migration Test: SQLite and PostgreSQL ===
+
+--- SQLite: upgrade head ---
+CMD: /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/alembic upgrade head (DATABASE_URL=sqlite:////Users/nitikasri/pp-integrate/backend/test_sqlite_alembic.db)
+EXIT CODE: 0
+OUTPUT:
+13:04:59 INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+13:04:59 INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+13:04:59 INFO  [alembic.runtime.migration] Running upgrade  -> 001_initial_schema, initial schema 11 tables
+13:04:59 INFO  [alembic.runtime.migration] Running upgrade 001_initial_schema -> 002_modify_transactions, modify transactions table schema
+13:04:59 INFO  [alembic.runtime.migration] Running upgrade 002_modify_transactions -> 003_modify_goals, modify goals
+13:04:59 INFO  [alembic.runtime.migration] Running upgrade 003_modify_goals -> 004_modify_savings, modify savings
+13:04:59 INFO  [alembic.runtime.migration] Running upgrade 004_modify_savings -> 005_add_onboarding_completion, add onboarding completion flag
+13:04:59 INFO  [alembic.runtime.migration] Running upgrade 005_add_onboarding_completion -> 006_normalize_savings_source, normalize savings source from roundup to round_up
+
+
+--- SQLite: downgrade -1 ---
+CMD: /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/alembic downgrade -1 (DATABASE_URL=sqlite:////Users/nitikasri/pp-integrate/backend/test_sqlite_alembic.db)
+EXIT CODE: 0
+OUTPUT:
+13:05:01 INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+13:05:01 INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+13:05:01 INFO  [alembic.runtime.migration] Running downgrade 006_normalize_savings_source -> 005_add_onboarding_completion, normalize savings source from roundup to round_up
+
+
+--- SQLite: upgrade head ---
+CMD: /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/alembic upgrade head (DATABASE_URL=sqlite:////Users/nitikasri/pp-integrate/backend/test_sqlite_alembic.db)
+EXIT CODE: 0
+OUTPUT:
+13:05:03 INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+13:05:03 INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+13:05:03 INFO  [alembic.runtime.migration] Running upgrade 005_add_onboarding_completion -> 006_normalize_savings_source, normalize savings source from roundup to round_up
+
+
+--- PostgreSQL: upgrade head ---
+CMD: /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/alembic upgrade head (DATABASE_URL=postgresql://postgres:password123@localhost:5433/sparechange)
+EXIT CODE: 0
+OUTPUT:
+13:05:06 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+13:05:06 INFO  [alembic.runtime.migration] Will assume transactional DDL.
+13:05:06 INFO  [alembic.runtime.migration] Running upgrade  -> 001_initial_schema, initial schema 11 tables
+13:05:07 INFO  [alembic.runtime.migration] Running upgrade 001_initial_schema -> 002_modify_transactions, modify transactions table schema
+13:05:07 INFO  [alembic.runtime.migration] Running upgrade 002_modify_transactions -> 003_modify_goals, modify goals
+13:05:07 INFO  [alembic.runtime.migration] Running upgrade 003_modify_goals -> 004_modify_savings, modify savings
+13:05:07 INFO  [alembic.runtime.migration] Running upgrade 004_modify_savings -> 005_add_onboarding_completion, add onboarding completion flag
+13:05:07 INFO  [alembic.runtime.migration] Running upgrade 005_add_onboarding_completion -> 006_normalize_savings_source, normalize savings source from roundup to round_up
+
+
+--- PostgreSQL: downgrade -1 ---
+CMD: /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/alembic downgrade -1 (DATABASE_URL=postgresql://postgres:password123@localhost:5433/sparechange)
+EXIT CODE: 0
+OUTPUT:
+13:05:09 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+13:05:09 INFO  [alembic.runtime.migration] Will assume transactional DDL.
+13:05:09 INFO  [alembic.runtime.migration] Running downgrade 006_normalize_savings_source -> 005_add_onboarding_completion, normalize savings source from roundup to round_up
+
+
+--- PostgreSQL: upgrade head ---
+CMD: /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/alembic upgrade head (DATABASE_URL=postgresql://postgres:password123@localhost:5433/sparechange)
+EXIT CODE: 0
+OUTPUT:
+13:05:11 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+13:05:11 INFO  [alembic.runtime.migration] Will assume transactional DDL.
+13:05:11 INFO  [alembic.runtime.migration] Running upgrade 005_add_onboarding_completion -> 006_normalize_savings_source, normalize savings source from roundup to round_up
+

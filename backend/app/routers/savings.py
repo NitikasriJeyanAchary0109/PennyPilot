@@ -64,7 +64,8 @@ def get_savings(
 ):
     query = db.query(Savings).filter(Savings.user_id == current_user.user_id)
     if source:
-        query = query.filter(Savings.source == source)
+        norm_source = "round_up" if source == "roundup" else source
+        query = query.filter(Savings.source == norm_source)
     if goal_id:
         query = query.filter(Savings.goal_id == goal_id)
 

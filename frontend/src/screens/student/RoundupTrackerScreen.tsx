@@ -1,3 +1,7 @@
+// Accepts both canonical 'round_up' and legacy 'roundup'
+export const isRoundupSource = (source?: string): boolean =>
+  source === "round_up" || source === "roundup";
+
 import React, { useState, useEffect } from "react";
 import { 
   View, 
@@ -100,7 +104,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
       const todayStr = new Date().toDateString();
 
       const mapped: TransactionActivity[] = txs
-        .filter((t: any) => Number(t.round_up_amount) > 0)
+        .filter((t: any) => Number(t.round_up_amount) > 0 || isRoundupSource(t.source) || isRoundupSource(t.savings_source))
         .map((t: any) => {
           const rUp = Number(t.round_up_amount) || 0;
           total += rUp;

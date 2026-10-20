@@ -14,7 +14,7 @@ from jose import JWTError, jwt
 def get_password_hash(password: str) -> str:
     """Generate bcrypt hash."""
     pwd_bytes = password.encode("utf-8")[:72]
-    salt = bcrypt.gensalt()
+    salt = bcrypt.gensalt(rounds=12)
     return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
 

@@ -18,13 +18,13 @@ def get_roundup_history(
 ):
     """
     Returns the student's complete automated micro-savings history.
-    This reads from the Savings table where source is 'roundup'.
+    This reads from the Savings table where source is 'round_up'.
     """
     return (
         db.query(Savings)
         .filter(
             Savings.user_id == current_user.user_id,
-            Savings.source.in_(["round_up", "roundup"]),
+            Savings.source == "round_up",
         )
         .order_by(Savings.created_at.desc())
         .all()
@@ -45,7 +45,7 @@ def get_roundup_stats(
         )
         .filter(
             Savings.user_id == current_user.user_id,
-            Savings.source.in_(["round_up", "roundup"]),
+            Savings.source == "round_up",
         )
         .first()
     )

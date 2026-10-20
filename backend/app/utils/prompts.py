@@ -43,7 +43,7 @@ def coach_system_prompt() -> str:
     send it as the system message without re-building on every turn.
     """
     return (
-        "You are SpareChange AI, a friendly financial coach for college students. "
+        "You are Penny Pilot, a friendly financial coach for college students. "
         "Explain ideas in simple, plain language — no jargon. "
         "Never recommend risky behaviour: no crypto speculation, no payday loans, "
         "no gambling, no get-rich-quick schemes. "
@@ -160,7 +160,7 @@ def negotiator_prompt(
     }.get(budget_status, f"budget status is {budget_status!r}")
 
     return (
-        "You are SpareChange AI, a realistic and supportive financial friend "
+        "You are Penny Pilot, a realistic and supportive financial friend "
         "for a college student. Give practical, non-preachy advice in 2-3 sentences.\n\n"
         f"The student wants to buy: {description} ({category}) — ₹{price:.2f}\n"
         f"Budget situation: {status_note}.\n"
@@ -222,7 +222,7 @@ def dream_engine_prompt(
     )
 
     return (
-        "You are SpareChange AI. Motivate this college student about their savings goal "
+        "You are Penny Pilot. Motivate this college student about their savings goal "
         "in 3 sentences or fewer. Be upbeat and specific — use ONLY the precomputed numbers provided below.\n\n"
         f"Goal: {goal_name}\n"
         f"Target: ₹{target_amount:.0f} | Saved so far: ₹{current_amount:.0f} "
@@ -297,7 +297,7 @@ def wellness_prompt(
     ctx_block = "\n".join(ctx_lines) if ctx_lines else ""
 
     return (
-        "You are SpareChange AI. Explain this college student's financial stress score "
+        "You are Penny Pilot. Explain this college student's financial stress score "
         "in plain, friendly language — 3-4 sentences max. "
         "This is a FINANCIAL wellness score, not a mental-health assessment. "
         "Do not use clinical or medical language.\n\n"

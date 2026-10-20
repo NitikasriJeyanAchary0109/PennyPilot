@@ -34,7 +34,7 @@ Update the production variables inside `.env`:
 - Provide your production Google Client OAuth keys: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 - Set `ENVIRONMENT` to `production`.
 
-Also edit your [Caddyfile](file:///Users/nitikasri/Desktop/PennyPilot/Caddyfile) on the VM and replace `yourapp.duckdns.org` with your actual domain name.
+Also edit your [Caddyfile](./Caddyfile) on the VM and replace `yourapp.duckdns.org` with your actual domain name.
 
 ### 4. Build and Start the Containers
 Run Docker Compose in detached mode to compile the multi-stage FastAPI container and spin up Caddy, PostgreSQL, and Ollama:

@@ -1,43 +1,7 @@
-Mutation Testing Report for rule_engine.py
-Date: 2026-10-19
-Branch: phase-1b-zero-arithmetic
+NOTE: The earlier hand-written mutation testing evidence file was removed because it did not match the real code (it referenced monthly_rate = daily_rate * 31 in savings_velocity, whereas the actual codebase implements goal_forecast).
 
-Mutation 1: Negative Roundup
-----------------------------
-File: backend/app/services/rule_engine.py:88
-Mutation: `roundup = -(next_milestone - amount)` instead of `roundup = next_milestone - amount`
-Expected Behavior: Mutation should be caught by non-negativity checks and unit calculations.
-Actual Result: KILLED (0 survivors)
-Killing Tests:
-  - backend/tests/test_rule_engine_units.py::test_calculate_roundup_paise_tier1 (FAILED: assert Decimal('-0.40') == Decimal('0.40'))
-  - backend/tests/test_rule_engine_units.py::test_calculate_roundup_whole_rupee_tier2 (FAILED: assert Decimal('-5.00') == Decimal('5.00'))
-  - backend/tests/test_rule_engine_units.py::test_apply_roundup_if_eligible_cases (FAILED: assert Decimal('-0.50') == Decimal('0.50'))
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_roundups_never_negative (FAILED: Negative roundup -0.99 for amount 0.01)
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_roundup_milestone_alignment (FAILED: 4 sub-exceptions on milestone and positivity)
-  - backend/tests/test_transactions.py::test_create_transaction_with_roundup (FAILED: assert '-0.40' == '0.40')
+The updated, reproducible mutation test harness is located at backend/scripts/run_mutations.py and evaluates hand-picked mutants with strict test assertion verification (requiring actual pytest test failures, not collection/import errors). Results are reported as "N of M hand-picked mutants killed" rather than a generalized mutation score.
 
-Mutation 2: Wrong Budget Delta
-------------------------------
-File: backend/app/services/rule_engine.py:142
-Mutation: `return budget + spent` instead of `return budget - spent`
-Expected Behavior: Mutation should be caught by headroom calculation and property-based delta consistency tests.
-Actual Result: KILLED (0 survivors)
-Killing Tests:
-  - backend/tests/test_rule_engine_units.py::test_remaining_budget_and_status (FAILED: assert Decimal('7000') == Decimal('3000'))
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_budget_ceilings_respected (FAILED: headroom != budget - spent)
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_budget_delta_consistency (FAILED: shifting spend did not shift remaining by -delta)
-
-Mutation 3: Off-by-one in Velocity
-----------------------------------
-File: backend/app/services/rule_engine.py:210
-Mutation: `monthly_rate = daily_rate * Decimal("31")` instead of `Decimal("30")`
-Expected Behavior: Mutation should be caught by unit tests asserting deterministic monthly scaling.
-Actual Result: KILLED (0 survivors)
-Killing Tests:
-  - backend/tests/test_rule_engine_units.py::test_savings_velocity_and_summary (FAILED: assert Decimal('620.00') == Decimal('600.00'))
-
-Summary:
-- Total Mutations: 3
-- Mutations Killed: 3
-- Mutations Survived: 0
-- Mutation Kill Rate: 100%
+Official evidence files:
+- docs/evidence/phase1b/mutation_testing_results.txt: Raw execution output of backend/scripts/run_mutations.py
+- docs/evidence/integration/mutmut.txt: Raw execution output of mutmut run
