@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 RULE_ENGINE = Path("backend/app/services/rule_engine.py")
 
@@ -109,7 +110,7 @@ def main():
         f"Baseline tests passed cleanly: exit 0 ({passed_count} passed). Proceeding to mutants.\n"
     )
 
-    results = []
+    results: list[dict[str, Any]] = []
 
     try:
         for m in MUTATIONS:
@@ -205,12 +206,13 @@ def main():
     )
 
     for r in results:
-        m = r["mutation"]
+        m = cast(dict[str, str], r["mutation"])
         print(f"[{r['status']}] {m['id']}: {m['name']}")
         print(f"       Target:      {m['target']}")
         print(f"       Replacement: {m['replacement']}")
-        if r["failing"]:
-            print(f"       Caught by:   {r['failing'][0]}")
+        failing = cast(list[str], r["failing"])
+        if failing:
+            print(f"       Caught by:   {failing[0]}")
 
     if survived_count > 0:
         sys.exit(1)
