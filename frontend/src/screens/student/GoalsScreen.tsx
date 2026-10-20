@@ -1,43 +1,88 @@
-import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  SafeAreaView, 
-  StyleSheet, 
-  ActivityIndicator, 
-  RefreshControl,
-  Alert,
-  Image
-} from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { MaterialIcons } from "@expo/vector-icons";
+import React, { useState, useCallback } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import { Target, Plus, ChevronRight, Calendar } from "lucide-react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { apiService } from "../../services/api";
-import { Goal } from "../../types";
+import {
+  ScreenContainer,
+  Header,
+  Card,
+  ProgressBar,
+  Skeleton,
+  EmptyState,
+  Button,
+} from "../../components/ui";
+
+interface GoalItem {
+  goal_id: number;
+  goal_name: string;
+  saved: number;
+  target: number;
+  deadline?: string;
+  progress_percentage?: number;
+}
 
 export const GoalsScreen = () => {
   const navigation = useNavigation<any>();
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [goals, setGoals] = useState<GoalItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
   };
 
-  const loadGoals = async () => {
+  const loadGoals = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiService.getGoals();
-      setGoals(res);
+      const rawGoals = await apiService.getGoals();
+      if (Array.isArray(rawGoals) && rawGoals.length > 0) {
+        // Fetch detailed stats including backend-calculated progress_percentage for each
+        const detailed = await Promise.all(
+          rawGoals.map(async (g) => {
+            try {
+              const d = await apiService.getGoalById(g.goal_id);
+              return {
+                goal_id: g.goal_id,
+                goal_name: g.goal_name,
+                saved: g.saved,
+                target: g.target,
+                deadline: g.deadline,
+                progress_percentage: d.progress_percentage,
+              };
+            } catch {
+              return {
+                goal_id: g.goal_id,
+                goal_name: g.goal_name,
+                saved: g.saved,
+                target: g.target,
+                deadline: g.deadline,
+              };
+            }
+          })
+        );
+        setGoals(detailed);
+      } else {
+        setGoals([]);
+      }
     } catch (e: any) {
-      console.warn("Failed to load goals:", e.message);
+      console.warn("Failed to load goals:", e?.message);
+      setGoals([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadGoals();
+    }, [loadGoals])
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -45,294 +90,157 @@ export const GoalsScreen = () => {
     setRefreshing(false);
   };
 
-  useEffect(() => {
-    loadGoals();
-  }, []);
-
-  // Map category emoji labels to MaterialIcons
-  const getGoalIcon = (name: string): keyof typeof MaterialIcons.glyphMap => {
-    const n = name.toLowerCase();
-    if (n.includes("laptop") || n.includes("mac") || n.includes("tech") || n.includes("computer")) return "laptop-mac";
-    if (n.includes("goa") || n.includes("trip") || n.includes("travel") || n.includes("flight")) return "flight-takeoff";
-    if (n.includes("camera") || n.includes("sony") || n.includes("photo")) return "photo-camera";
-    if (n.includes("home") || n.includes("house") || n.includes("rent")) return "home";
-    if (n.includes("car") || n.includes("vehicle")) return "directions-car";
-    if (n.includes("school") || n.includes("tuition") || n.includes("education")) return "school";
-    return "track-changes";
+  const formatINR = (val: number): string => {
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(val);
   };
-
-  const getIconBgColor = (name: string): string => {
-    const n = name.toLowerCase();
-    if (n.includes("laptop") || n.includes("mac") || n.includes("tech")) return "#d8e2ff"; // primary-fixed
-    if (n.includes("goa") || n.includes("trip") || n.includes("travel")) return "#8ffa9b"; // tertiary-fixed
-    if (n.includes("camera") || n.includes("sony") || n.includes("photo")) return "#e1e3e4"; // secondary-fixed
-    return "#d8e2ff";
-  };
-
-  const getIconColor = (name: string): string => {
-    const n = name.toLowerCase();
-    if (n.includes("laptop") || n.includes("mac") || n.includes("tech")) return "#005bbf"; // primary
-    if (n.includes("goa") || n.includes("trip") || n.includes("travel")) return "#00531e"; // tertiary
-    if (n.includes("camera") || n.includes("sony") || n.includes("photo")) return "#5c5f60"; // secondary
-    return "#005bbf";
-  };
-
-  // Mock static data to populate if empty, matching the Stitch mockup design
-  const mockGoals = [
-    { goal_id: "mock-1", goal_name: "New Laptop", target: 50000, saved: 12000, isPriority: true },
-    { goal_id: "mock-2", goal_name: "Goa Trip", target: 15000, saved: 8500, isPriority: false },
-    { goal_id: "mock-3", goal_name: "Sony A7 IV", target: 210000, saved: 4500, isPriority: false },
-  ];
-
-  const displayedGoals = goals.length > 0 ? goals : mockGoals;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f7f9ff]">
-      {/* Header Banner */}
-      <View className="flex-row justify-between items-center px-margin-mobile py-stack-md bg-white border-b border-slate-100">
-        <View className="flex-row items-center space-x-3">
-          <View className="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
-            <Image 
-              source={{ uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuCr4f6j5TOnM6olaPKu21SzVM04BxNin0s7kvSA3Ll-cqO_hDom2VXB_5UngwMBAe7ES_8DiG4VYhKq-nXLZckYLKtzeUTOmAdam-gLDnbvKtKqQjzkQ0hVHZqycl3XGwhY22pRFKbhg53AipNsBO-9Y7agi0FwrC5ZEhrEuRvocfrbjapAxiRJ0TZi5je1E4JN_zNUQz6y6iqMlrGiVjWX7f1MIQrUufMDUHSMjxIK5v1c4Xmb1ISO" }}
-              style={{ width: "100%", height: "100%", resizeMode: "cover" }}
-            />
-          </View>
-          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-ob-primary">
-            Penny Pilot
-          </Text>
-        </View>
-        <Pressable 
-          onPress={triggerHaptic}
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 border border-slate-100"
-        >
-          <MaterialIcons name="settings" size={20} color="#181c20" />
-        </Pressable>
-      </View>
-
-      <ScrollView 
-        className="flex-grow" 
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 100 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#005bbf" />
-        }
-      >
-        {/* Welcome Section */}
-        <View className="mb-6">
-          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface mb-1">
-            Dream Engine
-          </Text>
-          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant">
-            Your automated savings roadmap
-          </Text>
-        </View>
-
-        {/* Bento Grid cards (Saved + Subscriptions) */}
-        <View className="flex-row space-x-4 mb-6">
-          <View style={styles.card} className="flex-1 bg-white p-4 rounded-2xl border border-outline-variant/30 shadow-sm">
-            <MaterialIcons name="savings" size={24} color="#005bc0" className="mb-2" />
-            <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-on-surface-variant uppercase tracking-wider">
-              Total Saved
-            </Text>
-            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface mt-1">
-              ₹12,500
-            </Text>
-          </View>
-
-          <Pressable
-            onPress={() => {
-              triggerHaptic();
-              navigation.navigate("SubscriptionNegotiator");
-            }}
-            style={({ pressed }) => [
-              styles.card,
-              { transform: [{ scale: pressed ? 0.98 : 1 }] }
-            ]}
-            className="flex-1 bg-white p-4 rounded-2xl border border-outline-variant/30 shadow-sm"
-          >
-            <MaterialIcons name="subscriptions" size={24} color="#16893a" className="mb-2" />
-            <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-on-surface-variant uppercase tracking-wider">
-              Subscriptions
-            </Text>
-            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface mt-1">
-              ₹1,200/mo
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Dynamic Goals List */}
-        <View className="space-y-4">
-          {loading && goals.length === 0 ? (
-            <ActivityIndicator size="large" color="#005bbf" className="py-8" />
-          ) : (
-            displayedGoals.map((g: any) => {
-              const targetAmount = Number(g.target) || 1;
-              const savedAmount = Number(g.saved) || 0;
-              const percent = Math.min(Math.round((savedAmount / targetAmount) * 100), 100);
-              const left = Math.max(targetAmount - savedAmount, 0);
-              const isPriority = g.isPriority || false;
-
-              return (
-                <View 
-                  key={g.goal_id}
-                  style={styles.card} 
-                  className="bg-white rounded-2xl p-4 border border-outline-variant/30 relative overflow-hidden"
-                >
-                  {isPriority && (
-                    <View className="absolute top-3 right-3 bg-amber-100 px-3 py-1 rounded-full border border-amber-200">
-                      <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] font-semibold text-amber-800 uppercase">
-                        Priority
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Icon and metadata */}
-                  <View className="flex-row items-center space-x-4 mb-4">
-                    <View 
-                      style={{ backgroundColor: getIconBgColor(g.goal_name) }}
-                      className="w-12 h-12 rounded-full items-center justify-center"
-                    >
-                      <MaterialIcons 
-                        name={getGoalIcon(g.goal_name)} 
-                        size={24} 
-                        color={getIconColor(g.goal_name)} 
-                      />
-                    </View>
-                    <View>
-                      <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-on-surface">
-                        {g.goal_name}
-                      </Text>
-                      <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant">
-                        ₹{savedAmount.toLocaleString("en-IN")} of ₹{targetAmount.toLocaleString("en-IN")} saved
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Progress Line */}
-                  <View className="w-full space-y-2">
-                    <View className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <View 
-                        style={{ width: `${percent}%` }}
-                        className="h-full bg-primary-container rounded-full"
-                      />
-                    </View>
-                    <View className="flex-row justify-between">
-                      <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                        {percent}% Complete
-                      </Text>
-                      <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                        ₹{left.toLocaleString("en-IN")} left
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-
-          {/* Add New Goal Card (Dashed) */}
-          <Pressable 
+    <ScreenContainer
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      className="pt-2"
+    >
+      {/* Brand Header */}
+      <Header
+        title="Dream Engine"
+        subtitle="Your automated savings roadmap"
+        showLogo
+        showNotification={false}
+        rightAction={
+          <TouchableOpacity
             onPress={() => {
               triggerHaptic();
               navigation.navigate("GoalCreation");
             }}
-            style={({ pressed }) => [
-              styles.dashedCard,
-              { transform: [{ scale: pressed ? 0.98 : 1 }] }
-            ]}
-            className="w-full h-32 rounded-2xl border-2 border-dashed border-outline-variant flex flex-col items-center justify-center space-y-2 bg-slate-50/50"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            className="w-10 h-10 rounded-full bg-primary items-center justify-center shadow-button"
+            accessibilityRole="button"
+            accessibilityLabel="Create a new savings goal"
           >
-            <MaterialIcons name="add-circle" size={32} color="#727785" />
-            <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-sm text-on-surface-variant">
-              Start a new dream
-            </Text>
-          </Pressable>
-        </View>
+            <Plus size={20} color="#ffffff" />
+          </TouchableOpacity>
+        }
+        className="px-0 mb-3"
+      />
 
-        {/* AI Insight Box */}
-        <View className="mt-8 p-4 bg-primary-fixed/20 rounded-2xl border border-primary-fixed flex-row space-x-4 items-start">
-          <MaterialIcons name="smart-toy" size={24} color="#005bbf" className="mt-0.5" />
-          <View className="flex-1 space-y-1">
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-primary-fixed leading-5">
-              You're on track to buy the <Text style={{ fontFamily: "WorkSans_500Medium" }} className="font-bold">New Laptop</Text> by October! Penny Pilot moved ₹124 more today.
-            </Text>
-            <Pressable 
-              onPress={() => {
-                triggerHaptic();
-                Alert.alert(
-                  "AI Saving Strategy",
-                  "We increased round-ups from 5% to 8% on weekends, matching your low-spending trend to secure the laptop faster!"
-                );
-              }}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-              className="py-1"
-            >
-              <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-ob-primary font-bold">
-                View AI Strategy
-              </Text>
-            </Pressable>
-          </View>
+      {loading && goals.length === 0 ? (
+        <View className="py-4 space-y-4">
+          <Skeleton width="100%" height={120} className="rounded-card mb-3" />
+          <Skeleton width="100%" height={120} className="rounded-card mb-3" />
+          <Skeleton width="100%" height={120} className="rounded-card" />
         </View>
-      </ScrollView>
+      ) : goals.length === 0 ? (
+        <Card variant="default" padding="lg" className="my-6 shadow-card">
+          <EmptyState
+            title="No dreams set yet"
+            description="Set your first savings goal and Penny Pilot will automatically route spare change toward it."
+            actionTitle="Start a new dream →"
+            onAction={() => {
+              triggerHaptic();
+              navigation.navigate("GoalCreation");
+            }}
+            icon={<Target size={32} color="#144a32" />}
+          />
+        </Card>
+      ) : (
+        <View className="mb-6 space-y-3.5">
+          {goals.map((goal, idx) => {
+            const deadlineStr = goal.deadline
+              ? new Date(goal.deadline).toLocaleDateString("en-IN", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : null;
 
-      {/* FAB for Quick Save */}
-      <Pressable 
-        onPress={() => {
-          triggerHaptic();
-          Alert.alert("Quick Save", "Save ₹500 instantly into your priority goal?", [
-            { text: "Cancel", style: "cancel" },
-            { 
-              text: "Save Now", 
-              onPress: async () => {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                Alert.alert("Success", "Deposited ₹500 into New Laptop savings!");
-                loadGoals();
-              } 
-            }
-          ]);
-        }}
-        style={({ pressed }) => [
-          styles.fab,
-          { transform: [{ scale: pressed ? 0.92 : 1 }] }
-        ]}
-        className="fixed bg-primary shadow-lg rounded-2xl flex items-center justify-center"
-      >
-        <MaterialIcons name="add" size={28} color="#ffffff" />
-      </Pressable>
-    </SafeAreaView>
+            return (
+              <TouchableOpacity
+                key={goal.goal_id || idx}
+                onPress={() => {
+                  triggerHaptic();
+                  navigation.navigate("GoalDetail", { goal });
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`${goal.goal_name}, saved ₹${formatINR(goal.saved)} of ₹${formatINR(goal.target)}`}
+                className="mb-3.5"
+              >
+                <Card variant="default" padding="md" className="shadow-card">
+                  {/* Top Row: Icon, Title & Target */}
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View className="flex-row items-center flex-1 mr-2">
+                      <View className="w-10 h-10 rounded-full bg-sage-light items-center justify-center mr-3 border border-border">
+                        <Target size={18} color="#144a32" />
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className="text-base font-bold text-text-primary font-sans"
+                          numberOfLines={1}
+                        >
+                          {goal.goal_name}
+                        </Text>
+                        {deadlineStr && (
+                          <View className="flex-row items-center mt-0.5">
+                            <Calendar size={11} color="#666e69" />
+                            <Text className="text-[11px] text-text-muted ml-1 font-sans">
+                              Target: {deadlineStr}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    <ChevronRight size={18} color="#707773" />
+                  </View>
+
+                  {/* Progress Bar (zero arithmetic, uses backend percentage) */}
+                  {goal.progress_percentage !== undefined ? (
+                    <View className="mt-1">
+                      <ProgressBar
+                        progress={goal.progress_percentage}
+                        height={7}
+                        fillColor="bg-primary"
+                        trackColor="bg-cream"
+                      />
+                      <View className="flex-row justify-between items-center mt-1.5">
+                        <Text className="text-xs font-semibold text-text-secondary font-sans">
+                          ₹{formatINR(goal.saved)} saved
+                        </Text>
+                        <Text className="text-xs font-bold text-primary font-sans">
+                          {Math.round(goal.progress_percentage)}% • Target ₹{formatINR(goal.target)}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View className="flex-row justify-between items-center mt-2">
+                      <Text className="text-xs font-semibold text-text-secondary font-sans">
+                        ₹{formatINR(goal.saved)} saved
+                      </Text>
+                      <Text className="text-xs font-bold text-text-primary font-sans">
+                        Target: ₹{formatINR(goal.target)}
+                      </Text>
+                    </View>
+                  )}
+                </Card>
+              </TouchableOpacity>
+            );
+          })}
+
+          <Button
+            title="+ Start another dream"
+            variant="secondary"
+            onPress={() => {
+              triggerHaptic();
+              navigation.navigate("GoalCreation");
+            }}
+            className="mt-2"
+          />
+        </View>
+      )}
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  dashedCard: {
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: "#c1c6d6",
-  },
-  fab: {
-    position: "absolute",
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 20,
-    backgroundColor: "#005bc0",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-    zIndex: 99,
-  }
-});
 
 export default GoalsScreen;

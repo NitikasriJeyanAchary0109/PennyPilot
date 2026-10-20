@@ -76,7 +76,7 @@ export const TrendsScreen = () => {
             <Card className="flex-1 my-0 py-4 items-center">
               <Text className="text-slate-400 text-xs font-semibold mb-1">Avg Round-up</Text>
               <Text className="text-emerald-400 text-2xl font-black">
-                ${Number(data?.average_round_up_amount ?? 0).toFixed(2)}
+                ₹{Number(data?.average_round_up_amount ?? 0).toFixed(2)}
               </Text>
             </Card>
           </View>

@@ -10,7 +10,7 @@ import {
 export interface ButtonProps extends TouchableOpacityProps {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "ghost" | "nudge";
+  variant?: "primary" | "secondary" | "ghost" | "nudge" | "danger";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
   disabled?: boolean;
@@ -76,6 +76,11 @@ export const Button: React.FC<ButtonProps> = ({
       ? "bg-nudge-peach/50 border border-nudge-border/50 "
       : "bg-nudge-peach border border-nudge-border active:opacity-90 ";
     textStyles += "text-nudge-text font-bold ";
+  } else if (variant === "danger") {
+    containerStyles += isDisabled
+      ? "bg-danger/50 "
+      : "bg-danger active:opacity-90 shadow-button ";
+    textStyles += "text-white ";
   } else {
     // ghost
     containerStyles += isDisabled
@@ -100,7 +105,7 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === "primary" ? "#ffffff" : "#144a32"}
+          color={variant === "primary" || variant === "danger" ? "#ffffff" : "#144a32"}
         />
       ) : (
         <View className="flex-row items-center justify-center">

@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   },
   testBadge: {
     position: "absolute",
-    bottom: 12,
+    top: 12,
     right: 12,
     backgroundColor: "rgba(15, 23, 42, 0.85)",
     borderWidth: 1,

@@ -1,199 +1,323 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, Pressable, SafeAreaView, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import {
+  ArrowLeft,
+  Target,
+  Calendar,
+  Sparkles,
+  ShieldAlert,
+  Clock,
+} from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { apiService } from "../../services/api";
+import {
+  ScreenContainer,
+  Card,
+  ProgressBar,
+  Button,
+  Skeleton,
+  EmptyState,
+} from "../../components/ui";
+
+interface GoalDetailData {
+  goal_id: number;
+  user_id?: number;
+  goal_name: string;
+  saved: number;
+  target: number;
+  deadline?: string;
+  progress_percentage?: number;
+  projected_completion_date?: string;
+}
 
 export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation: any }) => {
-  const goal = route?.params?.goal || { goal_name: "🏠 Home", target: 50000, saved: 34000, deadline: new Date().toISOString() };
+  const paramGoal = route?.params?.goal;
+  const goalId = paramGoal?.goal_id || paramGoal?.id || route?.params?.goalId;
+
+  const [goal, setGoal] = useState<GoalDetailData | null>(paramGoal || null);
   const [forecast, setForecast] = useState<any>(null);
+  const [loading, setLoading] = useState(!paramGoal);
   const [loadingForecast, setLoadingForecast] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
   };
 
-  const goalId = goal.goal_id || goal.id || 1;
+  const loadData = useCallback(async () => {
+    if (!goalId) {
+      setLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    const fetchForecast = async () => {
+    try {
+      setLoading(true);
+      const goalData = await apiService.getGoalById(goalId);
+      setGoal(goalData);
+
+      setLoadingForecast(true);
       try {
-        setLoadingForecast(true);
-        const res = await apiService.getGoalForecast(goalId);
-        setForecast(res);
-      } catch (e) {
-        console.warn("Failed to fetch goal forecast:", e);
+        const forecastData = await apiService.getGoalForecast(goalId);
+        setForecast(forecastData);
+      } catch (err) {
+        console.warn("Forecast fetch error:", err);
       } finally {
         setLoadingForecast(false);
       }
-    };
-    fetchForecast();
+    } catch (err: any) {
+      console.warn("Failed to load goal details:", err?.message);
+    } finally {
+      setLoading(false);
+    }
   }, [goalId]);
 
-  const target = Number(goal.target) || 1;
-  const saved = Number(goal.saved) || 0;
-  const percent = Math.min(Math.round((saved / target) * 100), 100);
-  const left = Math.max(target - saved, 0);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const formattedDeadline = goal.deadline
-    ? new Date(goal.deadline).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-    : "No deadline set";
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
 
-  const remainingDays = goal.deadline
-    ? Math.max(0, Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+  const formatINR = (val: number): string => {
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(val);
+  };
+
+  if (!goalId && !goal) {
+    return (
+      <ScreenContainer className="pt-4">
+        <EmptyState
+          title="No Goal Selected"
+          description="Please select a savings goal from your Dream Engine roadmap."
+          actionTitle="View Goals"
+          onAction={() => navigation.navigate("Goals")}
+          icon={<Target size={32} color="#144a32" />}
+        />
+      </ScreenContainer>
+    );
+  }
+
+  const formattedDeadline = goal?.deadline
+    ? new Date(goal.deadline).toLocaleDateString("en-IN", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "No target date set";
+
+  const formattedProjected = goal?.projected_completion_date
+    ? new Date(goal.projected_completion_date).toLocaleDateString("en-IN", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : forecast?.forecast_date
+    ? new Date(forecast.forecast_date).toLocaleDateString("en-IN", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
     : null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f7f9ff]">
-      {/* Header */}
-      <View className="flex-row items-center px-margin-mobile py-stack-md bg-white border-b border-slate-100">
-        <Pressable 
+    <ScreenContainer
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      className="pt-2 pb-8"
+    >
+      {/* Top Navigation Row */}
+      <View className="flex-row items-center justify-between mb-4">
+        <TouchableOpacity
           onPress={() => {
             triggerHaptic();
             navigation.goBack();
           }}
-          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-          className="p-1 mr-3"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          className="w-10 h-10 rounded-full bg-white border border-border items-center justify-center shadow-card"
+          accessibilityRole="button"
+          accessibilityLabel="Back to goals"
         >
-          <MaterialIcons name="arrow-back" size={24} color="#181c20" />
-        </Pressable>
-        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-slate-800">
-          Goal Details
+          <ArrowLeft size={20} color="#144a32" />
+        </TouchableOpacity>
+        <Text className="text-base font-bold text-text-primary font-sans">
+          Goal Overview
         </Text>
+        <View className="w-10" />
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
-        {/* Main Card */}
-        <View style={styles.card} className="bg-white rounded-3xl p-6 border border-slate-100 mb-6">
-          <View className="items-center mb-6">
-            <Text className="text-4xl mb-2">{goal.goal_name.split(" ")[0]}</Text>
-            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-slate-800 text-center font-bold">
-              {goal.goal_name.substring(goal.goal_name.indexOf(" ") + 1) || goal.goal_name}
-            </Text>
-          </View>
+      {loading && !goal ? (
+        <View className="space-y-4 py-4">
+          <Skeleton width="100%" height={220} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={140} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={100} className="rounded-card" />
+        </View>
+      ) : goal ? (
+        <View className="space-y-4">
+          {/* Main Hero Goal Card */}
+          <Card variant="forest" padding="lg" className="shadow-card mb-4">
+            <View className="flex-row items-center mb-3">
+              <View className="w-10 h-10 rounded-full bg-sage-light items-center justify-center mr-3 border border-border">
+                <Target size={20} color="#144a32" />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-xl font-bold text-white font-sans"
+                  numberOfLines={1}
+                >
+                  {goal.goal_name}
+                </Text>
+                <Text className="text-xs text-sage-light font-sans mt-0.5">
+                  Automated Savings Goal
+                </Text>
+              </View>
+            </View>
 
-          {/* Progress numbers */}
-          <View className="flex-row justify-between mb-4">
-            <View>
-              <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-slate-400 text-xs uppercase tracking-wider">
-                Saved So Far
-              </Text>
-              <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-2xl text-emerald-600 font-extrabold mt-0.5">
-                ₹{saved.toLocaleString("en-IN")}
-              </Text>
+            {/* Figures Grid */}
+            <View className="flex-row justify-between items-end my-3 pt-2 border-t border-white/10">
+              <View>
+                <Text className="text-[11px] font-semibold text-sage-light uppercase tracking-wider font-sans">
+                  Saved So Far
+                </Text>
+                <Text className="text-2xl font-bold text-white font-sans mt-0.5">
+                  ₹{formatINR(goal.saved)}
+                </Text>
+              </View>
+              <View className="items-end">
+                <Text className="text-[11px] font-semibold text-sage-light uppercase tracking-wider font-sans">
+                  Target Amount
+                </Text>
+                <Text className="text-lg font-bold text-gold font-sans mt-0.5">
+                  ₹{formatINR(goal.target)}
+                </Text>
+              </View>
             </View>
-            <View className="items-end">
-              <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-slate-400 text-xs uppercase tracking-wider">
-                Target Amount
-              </Text>
-              <Text style={{ fontFamily: "Inter_800ExtraBold" }} className="text-2xl text-slate-800 font-extrabold mt-0.5">
-                ₹{target.toLocaleString("en-IN")}
-              </Text>
-            </View>
-          </View>
 
-          {/* Progress Bar */}
-          <View className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden mb-6">
-            <View 
-              style={{ width: `${percent}%` }}
-              className="h-full bg-blue-600 rounded-full"
-            />
-          </View>
-
-          {/* Stats list */}
-          <View className="space-y-4 border-t border-slate-100 pt-4">
-            <View className="flex-row justify-between items-center">
-              <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Percent Complete</Text>
-              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">{percent}%</Text>
-            </View>
-            <View className="flex-row justify-between items-center">
-              <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Remaining Balance</Text>
-              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">₹{left.toLocaleString("en-IN")}</Text>
-            </View>
-            <View className="flex-row justify-between items-center">
-              <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Target Date</Text>
-              <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">{formattedDeadline}</Text>
-            </View>
-            {remainingDays !== null && (
-              <View className="flex-row justify-between items-center">
-                <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-sm">Days Remaining</Text>
-                <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-slate-800 text-sm font-bold">{remainingDays} days</Text>
+            {/* Progress bar using server percentage */}
+            {goal.progress_percentage !== undefined && (
+              <View className="mt-2">
+                <ProgressBar
+                  progress={goal.progress_percentage}
+                  height={8}
+                  fillColor="bg-gold"
+                  trackColor="bg-white/20"
+                />
+                <View className="flex-row justify-between items-center mt-2">
+                  <Text className="text-xs font-bold text-white font-sans">
+                    {Math.round(goal.progress_percentage)}% completed
+                  </Text>
+                  {formattedDeadline && (
+                    <Text className="text-xs text-sage-light font-sans">
+                      Target: {formattedDeadline}
+                    </Text>
+                  )}
+                </View>
               </View>
             )}
-          </View>
-        </View>
+          </Card>
 
-        {/* Dream Engine AI Forecast */}
-        <View style={styles.card} className="bg-white rounded-3xl p-5 border border-slate-100 mb-6">
-          <View className="flex-row items-center space-x-2.5 mb-3">
-            <MaterialIcons name="smart-toy" size={20} color="#005bbf" />
-            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-base text-slate-800 font-bold">
-              Dream Engine AI
+          {/* Goal Milestones & Dates */}
+          <Card variant="default" padding="md" className="shadow-card mb-4">
+            <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-3">
+              Timeline & Forecast
             </Text>
-          </View>
-          {loadingForecast ? (
-            <ActivityIndicator size="small" color="#005bbf" className="py-4" />
-          ) : forecast ? (
+
             <View className="space-y-3">
-              <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-600 leading-relaxed">
-                {forecast.narrative}
-              </Text>
-              {forecast.forecast_date && (
-                <View className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex-row items-center space-x-2">
-                  <MaterialIcons name="event-available" size={16} color="#005bbf" />
-                  <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[11px] text-blue-800 font-medium">
-                    Projected Target: {new Date(forecast.forecast_date).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+              <View className="flex-row items-center justify-between py-2 border-b border-border/50">
+                <View className="flex-row items-center">
+                  <Calendar size={16} color="#666e69" className="mr-2.5" />
+                  <Text className="text-xs font-medium text-text-secondary font-sans ml-2">
+                    Target Date
+                  </Text>
+                </View>
+                <Text className="text-xs font-bold text-text-primary font-sans">
+                  {formattedDeadline}
+                </Text>
+              </View>
+
+              {formattedProjected && (
+                <View className="flex-row items-center justify-between py-2 border-b border-border/50">
+                  <View className="flex-row items-center">
+                    <Clock size={16} color="#144a32" className="mr-2.5" />
+                    <Text className="text-xs font-medium text-text-secondary font-sans ml-2">
+                      Projected Completion
+                    </Text>
+                  </View>
+                  <Text className="text-xs font-bold text-primary font-sans">
+                    {formattedProjected}
                   </Text>
                 </View>
               )}
             </View>
-          ) : (
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-400">
-              No forecast narrative available for this goal yet. Keep saving to build a savings timeline!
-            </Text>
-          )}
-        </View>
+          </Card>
 
-        {/* Withdrawal action box */}
-        <View style={styles.card} className="bg-white rounded-3xl p-5 border border-slate-100 items-center">
-          <MaterialIcons name="help-outline" size={28} color="#ba1a1a" className="mb-2" />
-          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-slate-800 text-sm font-bold text-center mb-1">
-            Need funds for an emergency?
-          </Text>
-          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-xs text-center mb-4 px-2">
-            You can instantly withdraw your saved balance from this goal to your primary bank account.
-          </Text>
+          {/* AI Savings Engine Insight */}
+          <Card variant="peach" padding="md" className="shadow-card mb-4">
+            <View className="flex-row items-center mb-2">
+              <Sparkles size={18} color="#856529" className="mr-2" />
+              <Text className="text-sm font-bold text-text-primary font-sans ml-1.5">
+                Dream Engine Forecast
+              </Text>
+            </View>
+            {loadingForecast ? (
+              <Skeleton width="100%" height={40} className="rounded-card" />
+            ) : forecast?.narrative ? (
+              <Text className="text-xs text-text-secondary font-sans leading-relaxed">
+                {forecast.narrative}
+              </Text>
+            ) : (
+              <Text className="text-xs text-text-secondary font-sans leading-relaxed">
+                Keep accumulating micro-savings! Penny Pilot will continuously calculate your completion trajectory based on your daily round-up momentum.
+              </Text>
+            )}
+          </Card>
 
-          <Pressable
-            onPress={() => {
-              triggerHaptic();
-              navigation.navigate("EmergencyWithdrawal", { 
-                goalId: goal.goal_id || goal.id || 1,
-                goalName: goal.goal_name,
-                savedAmount: saved
-              });
-            }}
-            className="w-full py-3.5 rounded-xl bg-red-50 border border-red-200 active:bg-red-100 flex-row justify-center items-center"
-          >
-            <MaterialIcons name="emergency" size={16} color="#ba1a1a" className="mr-1.5" />
-            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-red-700 text-xs font-bold uppercase tracking-wider">
-              Emergency Withdrawal
-            </Text>
-          </Pressable>
+          {/* Emergency Safety Net Box */}
+          <Card variant="default" padding="md" className="shadow-card border-danger/20 mb-4">
+            <View className="flex-row items-start">
+              <View className="w-9 h-9 rounded-full bg-danger-light items-center justify-center mr-3 mt-0.5">
+                <ShieldAlert size={18} color="#b3261e" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-text-primary font-sans">
+                  Need emergency access?
+                </Text>
+                <Text className="text-xs text-text-secondary font-sans mt-1 leading-relaxed">
+                  Life happens. Your savings are here to protect you. You can withdraw your balance to your primary bank account at any time without penalty.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    navigation.navigate("EmergencyWithdrawal", {
+                      goalId: goal.goal_id,
+                      goalName: goal.goal_name,
+                      savedAmount: goal.saved,
+                    });
+                  }}
+                  activeOpacity={0.8}
+                  className="mt-3 self-start px-3.5 py-2 rounded-xl bg-danger-light border border-danger/30"
+                  accessibilityRole="button"
+                  accessibilityLabel="Request emergency withdrawal"
+                >
+                  <Text className="text-xs font-bold text-danger font-sans">
+                    Emergency Withdrawal →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Card>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      ) : null}
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  }
-});
 
 export default GoalDetailScreen;

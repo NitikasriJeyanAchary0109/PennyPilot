@@ -18,7 +18,7 @@ import CreateGoalScreen from "../screens/student/CreateGoalScreen";
 
 // Student Screens
 import HomeScreen from "../screens/student/HomeScreen";
-import GoalsDashboardScreen from "../screens/student/GoalsDashboardScreen";
+import GoalsScreen from "../screens/student/GoalsScreen";
 import GoalDetailScreen from "../screens/student/GoalDetailScreen";
 import ChatScreen from "../screens/student/ChatScreen";
 import InsightsScreen from "../screens/student/InsightsScreen";
@@ -100,7 +100,7 @@ function StudentTabs() {
       />
       <Tab.Screen
         name="Goals"
-        component={GoalsDashboardScreen}
+        component={GoalsScreen}
         options={{
           title: "Goals",
           tabBarLabel: "Goals",

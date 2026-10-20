@@ -14,6 +14,7 @@ import {
 export interface ChipProps {
   label: string;
   category?: string;
+  variant?: "default" | "success" | "warning" | "danger" | "sage";
   selected?: boolean;
   onPress?: () => void;
   icon?: React.ReactNode;
@@ -23,6 +24,7 @@ export interface ChipProps {
 export const Chip: React.FC<ChipProps> = ({
   label,
   category,
+  variant,
   selected = false,
   onPress,
   icon,
@@ -36,7 +38,23 @@ export const Chip: React.FC<ChipProps> = ({
   let iconColor = "#44403c";
   let defaultIcon: React.ReactNode = <Sparkles size={13} color={iconColor} />;
 
-  if (
+  if (variant === "success") {
+    bgClass = "bg-sage-light border border-border";
+    textClass = "text-primary font-bold";
+    iconColor = "#144a32";
+  } else if (variant === "warning") {
+    bgClass = "bg-[#fef3c7] border border-[#fde68a]";
+    textClass = "text-[#b45309] font-bold";
+    iconColor = "#b45309";
+  } else if (variant === "danger") {
+    bgClass = "bg-danger-light border border-danger/30";
+    textClass = "text-danger font-bold";
+    iconColor = "#b3261e";
+  } else if (variant === "sage") {
+    bgClass = "bg-sage-light border border-border";
+    textClass = "text-sage-dark font-bold";
+    iconColor = "#4a6344";
+  } else if (
     normCategory.includes("food") ||
     normCategory.includes("dining") ||
     normCategory.includes("cafe")
@@ -89,25 +107,26 @@ export const Chip: React.FC<ChipProps> = ({
     defaultIcon = <MoreHorizontal size={13} color={iconColor} />;
   }
 
-  const renderIcon = icon !== undefined ? icon : defaultIcon;
+  const renderIcon = icon !== undefined ? icon : (variant ? null : defaultIcon);
 
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.75}
+      disabled={!onPress}
+      activeOpacity={onPress ? 0.75 : 1}
       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-      className={`flex-row items-center px-3.5 py-2 rounded-chip border transition-all ${
+      className={`flex-row items-center px-3 py-1.5 rounded-chip border transition-all ${
         selected
           ? "border-primary bg-primary/10 shadow-sm"
-          : `border-transparent ${bgClass}`
+          : bgClass
       } ${className}`}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`Category: ${label}`}
+      accessibilityRole={onPress ? "button" : "text"}
+      accessibilityState={onPress ? { selected } : undefined}
+      accessibilityLabel={`Status: ${label}`}
     >
       {renderIcon && <View className="mr-1.5">{renderIcon}</View>}
       <Text
-        className={`text-xs font-semibold ${
+        className={`text-xs ${
           selected ? "text-primary font-bold" : textClass
         }`}
       >

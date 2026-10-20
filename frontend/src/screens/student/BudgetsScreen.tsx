@@ -1,28 +1,47 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  ScrollView,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
+  TouchableOpacity,
+  Modal,
   Alert,
   TextInput,
-  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { MaterialIcons } from "@expo/vector-icons";
+import {
+  ArrowLeft,
+  Plus,
+  Edit3,
+  Trash2,
+  PieChart,
+  Coffee,
+  Utensils,
+  BookOpen,
+  ShoppingBag,
+  Film,
+  Tag,
+  X,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { apiService } from "../../services/api";
+import {
+  ScreenContainer,
+  Card,
+  Chip,
+  ProgressBar,
+  Button,
+  Skeleton,
+  EmptyState,
+} from "../../components/ui";
 
 export const BudgetsScreen = () => {
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Budgets state
   const [budgets, setBudgets] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>({
     total_budgeted: 0,
@@ -30,19 +49,22 @@ export const BudgetsScreen = () => {
     remaining: 0,
   });
 
-  // Modal forms state
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<any>(null); // null if creating, budget object if editing
+  const [editingBudget, setEditingBudget] = useState<any>(null);
   const [category, setCategory] = useState("Coffee");
   const [limitAmount, setLimitAmount] = useState("");
 
   const categories = ["Coffee", "Dining", "Textbooks", "Entertainment", "Shopping"];
 
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
   };
 
-  const loadBudgetData = async () => {
+  const loadBudgetData = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getBudgetsStatus();
@@ -55,11 +77,15 @@ export const BudgetsScreen = () => {
         });
       }
     } catch (e: any) {
-      console.warn("Failed to load budgets:", e.message);
+      console.warn("Failed to load budgets:", e?.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadBudgetData();
+  }, [loadBudgetData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -67,9 +93,12 @@ export const BudgetsScreen = () => {
     setRefreshing(false);
   };
 
-  useEffect(() => {
-    loadBudgetData();
-  }, []);
+  const formatINR = (val: number): string => {
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(val);
+  };
 
   const handleOpenCreate = () => {
     triggerHaptic();
@@ -83,47 +112,44 @@ export const BudgetsScreen = () => {
     triggerHaptic();
     setEditingBudget(budget);
     setCategory(budget.category);
-    setLimitAmount(budget.limit_amount.toString());
+    setLimitAmount(String(budget.limit_amount));
     setModalVisible(true);
   };
 
   const handleSubmit = async () => {
-    triggerHaptic();
-    if (!limitAmount.trim()) {
-      Alert.alert("Error", "Please enter a limit amount.");
-      return;
-    }
-    const limitNum = parseFloat(limitAmount);
-    if (isNaN(limitNum) || limitNum <= 0) {
-      Alert.alert("Error", "Please enter a valid positive amount.");
+    const amountVal = parseFloat(limitAmount);
+    if (isNaN(amountVal) || amountVal <= 0) {
+      Alert.alert("Invalid Limit", "Please enter a budget limit amount greater than ₹0.");
       return;
     }
 
+    triggerHaptic();
+    setLoading(true);
+    setModalVisible(false);
+
     try {
-      setLoading(true);
       if (editingBudget) {
-        // Edit flow
         await apiService.updateBudget(editingBudget.id, {
-          limit_amount: limitNum,
+          limit_amount: amountVal,
         });
-        Alert.alert("Success", `Updated ${editingBudget.category} budget limit.`);
       } else {
-        // Check duplicate category
-        if (budgets.some((b) => b.category.toLowerCase() === category.toLowerCase())) {
-          Alert.alert("Error", `A budget for category '${category}' already exists.`);
-          return;
-        }
-        // Create flow
         await apiService.createBudget({
           category,
-          limit_amount: limitNum,
+          limit_amount: amountVal,
+          period: "monthly",
         });
-        Alert.alert("Success", `Created budget for ${category}.`);
       }
-      setModalVisible(false);
-      loadBudgetData();
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // Ignore on web
+      }
+      await loadBudgetData();
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed to save budget.");
+      Alert.alert(
+        "Action Failed",
+        e?.message || "Failed to save budget changes. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -133,21 +159,19 @@ export const BudgetsScreen = () => {
     triggerHaptic();
     Alert.alert(
       "Delete Budget",
-      `Are you sure you want to delete the budget for ${budget.category}?`,
+      `Are you sure you want to remove the ${budget.category} budget limit?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            setLoading(true);
             try {
-              setLoading(true);
               await apiService.deleteBudget(budget.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Deleted", `Budget for ${budget.category} deleted.`);
-              loadBudgetData();
+              await loadBudgetData();
             } catch (e: any) {
-              Alert.alert("Error", e.message || "Failed to delete budget.");
+              Alert.alert("Error", e?.message || "Failed to delete budget.");
             } finally {
               setLoading(false);
             }
@@ -157,402 +181,310 @@ export const BudgetsScreen = () => {
     );
   };
 
+  const getCategoryIcon = (catName: string) => {
+    const c = (catName || "").toLowerCase();
+    if (c === "coffee") return <Coffee size={16} color="#144a32" />;
+    if (c === "dining") return <Utensils size={16} color="#144a32" />;
+    if (c === "textbooks") return <BookOpen size={16} color="#144a32" />;
+    if (c === "entertainment") return <Film size={16} color="#144a32" />;
+    if (c === "shopping") return <ShoppingBag size={16} color="#144a32" />;
+    return <Tag size={16} color="#144a32" />;
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-[#f7f9ff]">
-      {/* Header Banner */}
-      <View className="flex-row items-center justify-between px-margin-mobile py-stack-md bg-white border-b border-slate-100">
-        <View className="flex-row items-center space-x-2">
-          <Pressable
+    <ScreenContainer
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      className="pt-2 pb-8"
+    >
+      {/* Top Header */}
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center">
+          <TouchableOpacity
             onPress={() => {
               triggerHaptic();
               navigation.goBack();
             }}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 border border-slate-100"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            className="w-10 h-10 rounded-full bg-white border border-border items-center justify-center mr-3 shadow-card"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
-            <MaterialIcons name="arrow-back" size={20} color="#181c20" />
-          </Pressable>
-          <Text
-            style={{ fontFamily: "Inter_700Bold" }}
-            className="text-lg text-slate-800 font-bold ml-2"
-          >
-            Manage Budgets
+            <ArrowLeft size={20} color="#144a32" />
+          </TouchableOpacity>
+          <Text className="text-lg font-bold text-text-primary font-sans">
+            Budgets & Limits
           </Text>
         </View>
-        <Pressable
+
+        <TouchableOpacity
           onPress={handleOpenCreate}
-          className="px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 flex-row items-center space-x-1"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          className="flex-row items-center px-3 py-2 rounded-xl bg-primary shadow-button"
+          accessibilityRole="button"
+          accessibilityLabel="Add new budget boundary"
         >
-          <MaterialIcons name="add" size={14} color="#005bc0" />
-          <Text
-            style={{ fontFamily: "WorkSans_600SemiBold" }}
-            className="text-[10px] text-blue-700 font-bold uppercase tracking-wider"
-          >
-            Add Budget
+          <Plus size={16} color="#ffffff" />
+          <Text className="text-xs font-bold text-white font-sans ml-1">
+            New Budget
           </Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        className="flex-grow"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 100 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#005bbf" />
-        }
-      >
-        {/* Total Aggregate Card */}
-        <View style={styles.card} className="bg-white rounded-3xl p-5 border border-slate-100 mb-6">
-          <Text
-            style={{ fontFamily: "WorkSans_500Medium" }}
-            className="text-slate-400 text-xs uppercase tracking-wider mb-2"
-          >
-            Total Budget Aggregate
+      {/* Summary Card */}
+      <Card variant="forest" padding="lg" className="shadow-card mb-4">
+        <Text className="text-xs font-semibold text-sage-light uppercase tracking-wider font-sans mb-1">
+          Monthly Budget Summary
+        </Text>
+        <View className="flex-row items-baseline mb-4">
+          <Text className="text-3xl font-bold text-white font-sans">
+            ₹{formatINR(summary.total_budgeted)}
           </Text>
-          <View className="flex-row justify-between items-baseline mb-4">
-            <Text
-              style={{ fontFamily: "Inter_800ExtraBold" }}
-              className="text-3xl text-slate-800 font-extrabold"
-            >
-              ₹{summary.total_spent.toLocaleString("en-IN")}
+          <Text className="text-xs text-sage-light font-sans ml-2">
+            allocated
+          </Text>
+        </View>
+
+        <View className="flex-row space-x-3 pt-3 border-t border-white/10">
+          <View className="flex-1 bg-white/10 rounded-xl p-3 mr-1.5">
+            <Text className="text-[10px] font-bold text-sage-light uppercase tracking-wider font-sans">
+              Total Spent
             </Text>
-            <Text
-              style={{ fontFamily: "WorkSans_400Regular" }}
-              className="text-slate-500 text-xs"
-            >
-              spent of ₹{summary.total_budgeted.toLocaleString("en-IN")}
+            <Text className="text-base font-bold text-white font-sans mt-0.5">
+              ₹{formatINR(summary.total_spent)}
             </Text>
           </View>
-
-          {/* Semicircle / straight indicator progress */}
-          <View className="h-3 w-full bg-slate-100 rounded-full overflow-hidden mb-4">
-            <View
-              style={{
-                width: `${Math.min(
-                  (summary.total_spent / (summary.total_budgeted || 1)) * 100,
-                  100
-                )}%`,
-                backgroundColor: summary.total_spent > summary.total_budgeted ? "#ba1a1a" : "#005bbf",
-              }}
-              className="h-full rounded-full"
-            />
-          </View>
-
-          <View className="flex-row justify-between items-center">
-            <View className="flex-row items-center space-x-1.5">
-              <View
-                style={{
-                  backgroundColor: summary.remaining >= 0 ? "#e6f4ea" : "#fce8e6",
-                }}
-                className="w-2.5 h-2.5 rounded-full"
-              />
-              <Text
-                style={{ fontFamily: "WorkSans_500Medium" }}
-                className="text-slate-600 text-xs"
-              >
-                {summary.remaining >= 0 ? "Remaining Balance" : "Budget Overrun"}
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: "Inter_700Bold",
-                color: summary.remaining >= 0 ? "#137333" : "#c5221f",
-              }}
-              className="text-sm font-bold"
-            >
-              ₹{Math.abs(summary.remaining).toLocaleString("en-IN")}
+          <View className="flex-1 bg-white/10 rounded-xl p-3 ml-1.5">
+            <Text className="text-[10px] font-bold text-sage-light uppercase tracking-wider font-sans">
+              Remaining
+            </Text>
+            <Text className="text-base font-bold text-gold font-sans mt-0.5">
+              ₹{formatINR(summary.remaining)}
             </Text>
           </View>
         </View>
+      </Card>
 
-        {/* Budgets List */}
-        <View className="space-y-4">
-          <Text
-            style={{ fontFamily: "Inter_700Bold" }}
-            className="text-base text-slate-800 mb-1"
-          >
-            Category Budgets
-          </Text>
+      {/* Budgets List */}
+      <View className="mb-2">
+        <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-3">
+          Category Limits
+        </Text>
 
-          {loading && budgets.length === 0 ? (
-            <ActivityIndicator size="large" color="#005bbf" className="py-8" />
-          ) : budgets.length === 0 ? (
-            <View className="items-center justify-center py-12 bg-white rounded-3xl border border-slate-100 p-6">
-              <MaterialIcons name="pie-chart-outlined" size={40} color="#94a3b8" className="mb-3" />
-              <Text
-                style={{ fontFamily: "Inter_700Bold" }}
-                className="text-slate-800 text-sm mb-1"
-              >
-                No Budgets Setup
-              </Text>
-              <Text
-                style={{ fontFamily: "WorkSans_400Regular" }}
-                className="text-slate-400 text-xs text-center px-4"
-              >
-                Establish budget boundaries to receive custom micro-saving suggestions!
-              </Text>
-            </View>
-          ) : (
-            budgets.map((b) => {
-              const limit = Number(b.limit_amount) || 1;
+        {loading && budgets.length === 0 ? (
+          <View className="space-y-3 py-2">
+            <Skeleton width="100%" height={90} className="rounded-card mb-3" />
+            <Skeleton width="100%" height={90} className="rounded-card mb-3" />
+            <Skeleton width="100%" height={90} className="rounded-card" />
+          </View>
+        ) : budgets.length === 0 ? (
+          <Card variant="default" padding="lg" className="items-center shadow-card my-4">
+            <EmptyState
+              title="No budgets set yet"
+              description="Establish category spending limits (e.g. Coffee, Dining) to receive smart micro-savings suggestions."
+              actionTitle="+ Set first budget"
+              onAction={handleOpenCreate}
+              icon={<PieChart size={32} color="#144a32" />}
+            />
+          </Card>
+        ) : (
+          <View className="space-y-3">
+            {budgets.map((b) => {
+              const limit = Number(b.limit_amount) || 0;
               const spent = Number(b.spent_amount) || 0;
-              const percent = Math.min(Math.round((spent / limit) * 100), 150);
-              const isOver = b.is_over_limit || spent > limit;
-              const isWarning = !isOver && spent / limit >= 0.85;
+              const remaining = Number(b.remaining_amount) || 0;
+              const isOver = Boolean(b.is_over_limit);
 
               return (
-                <View
+                <Card
                   key={b.id}
-                  style={styles.card}
-                  className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3"
+                  variant="default"
+                  padding="md"
+                  className={`shadow-card mb-3 ${isOver ? "border-danger/30" : ""}`}
                 >
-                  <View className="flex-row justify-between items-center">
-                    <View className="flex-row items-center space-x-3">
-                      <View className="w-10 h-10 rounded-full bg-blue-50/50 flex items-center justify-center">
-                        <MaterialIcons
-                          name={
-                            b.category.toLowerCase() === "coffee"
-                              ? "local-cafe"
-                              : b.category.toLowerCase() === "dining"
-                              ? "restaurant"
-                              : b.category.toLowerCase() === "textbooks"
-                              ? "menu-book"
-                              : b.category.toLowerCase() === "shopping"
-                              ? "shopping-bag"
-                              : "card-giftcard"
-                          }
-                          size={18}
-                          color="#005bbf"
-                        />
+                  <View className="flex-row justify-between items-center mb-2.5">
+                    <View className="flex-row items-center flex-1 mr-2">
+                      <View className="w-9 h-9 rounded-full bg-sage-light border border-border items-center justify-center mr-2.5">
+                        {getCategoryIcon(b.category)}
                       </View>
-                      <View>
+                      <View className="flex-1">
                         <Text
-                          style={{ fontFamily: "Inter_700Bold" }}
-                          className="text-sm text-slate-800"
+                          className="text-sm font-bold text-text-primary font-sans"
+                          numberOfLines={1}
                         >
                           {b.category}
                         </Text>
-                        <Text
-                          style={{ fontFamily: "WorkSans_400Regular" }}
-                          className="text-[10px] text-slate-400 uppercase tracking-wider"
-                        >
-                          {b.period} Cycle
+                        <Text className="text-[11px] text-text-muted font-sans mt-0.5">
+                          {b.period || "Monthly"} cycle
                         </Text>
                       </View>
                     </View>
 
-                    {/* Status Pill Badge */}
-                    <View
-                      style={{
-                        backgroundColor: isOver
-                          ? "#fde8e8"
-                          : isWarning
-                          ? "#fef3c7"
-                          : "#e6f4ea",
-                      }}
-                      className="px-2.5 py-0.5 rounded-full"
-                    >
-                      <Text
-                        style={{
-                          fontFamily: "WorkSans_600SemiBold",
-                          color: isOver ? "#c5221f" : isWarning ? "#b06000" : "#137333",
-                        }}
-                        className="text-[8px] font-bold uppercase tracking-wider"
-                      >
-                        {isOver ? "Exceeded" : isWarning ? "Warning" : "Safe"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Progress info */}
-                  <View className="space-y-1.5">
-                    <View className="flex-row justify-between text-[11px] text-slate-500">
-                      <Text style={{ fontFamily: "WorkSans_400Regular" }}>
-                        Spent: ₹{spent.toLocaleString("en-IN")}
-                      </Text>
-                      <Text style={{ fontFamily: "WorkSans_400Regular" }}>
-                        Limit: ₹{limit.toLocaleString("en-IN")}
-                      </Text>
-                    </View>
-                    <View className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <View
-                        style={{
-                          width: `${Math.min(percent, 100)}%`,
-                          backgroundColor: isOver ? "#c5221f" : isWarning ? "#d97706" : "#1a73e8",
-                        }}
-                        className="h-full rounded-full"
+                    {isOver ? (
+                      <Chip
+                        label="Exceeded"
+                        variant="danger"
+                        icon={<AlertTriangle size={12} color="#b3261e" />}
                       />
-                    </View>
+                    ) : (
+                      <Chip
+                        label="Within Limit"
+                        variant="success"
+                        icon={<CheckCircle2 size={12} color="#144a32" />}
+                      />
+                    )}
                   </View>
 
-                  {/* Modify/Delete actions */}
-                  <View className="border-t border-slate-50 pt-2 flex-row justify-end space-x-2">
-                    <Pressable
-                      onPress={() => handleOpenEdit(b)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 flex-row items-center space-x-1"
+                  {/* Figure Row */}
+                  <View className="flex-row justify-between items-center py-1">
+                    <Text className="text-xs text-text-secondary font-sans">
+                      Spent: <Text className="font-bold text-text-primary">₹{formatINR(spent)}</Text>
+                    </Text>
+                    <Text className="text-xs text-text-secondary font-sans">
+                      Limit: <Text className="font-bold text-text-primary">₹{formatINR(limit)}</Text>
+                    </Text>
+                  </View>
+
+                  {/* Remaining amount row */}
+                  <View className="flex-row justify-between items-center mt-1 pt-2 border-t border-border/40">
+                    <Text className="text-[11px] text-text-muted font-sans">
+                      Remaining balance:
+                    </Text>
+                    <Text
+                      className={`text-xs font-bold font-sans ${
+                        isOver ? "text-danger" : "text-primary"
+                      }`}
                     >
-                      <MaterialIcons name="edit" size={12} color="#64748b" />
-                      <Text
-                        style={{ fontFamily: "WorkSans_500Medium" }}
-                        className="text-[10px] text-slate-500 font-bold"
-                      >
+                      ₹{formatINR(remaining)}
+                    </Text>
+                  </View>
+
+                  {/* Actions */}
+                  <View className="flex-row justify-end space-x-2 mt-3 pt-2 border-t border-border/30">
+                    <TouchableOpacity
+                      onPress={() => handleOpenEdit(b)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      className="px-3 py-1.5 rounded-xl bg-sage-light border border-border mr-2 flex-row items-center"
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit ${b.category} budget`}
+                    >
+                      <Edit3 size={12} color="#144a32" />
+                      <Text className="text-xs font-bold text-primary font-sans ml-1">
                         Edit
                       </Text>
-                    </Pressable>
-                    <Pressable
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                       onPress={() => handleDelete(b)}
-                      className="px-3 py-1.5 rounded-lg bg-red-50/50 border border-red-100 flex-row items-center space-x-1"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      className="px-3 py-1.5 rounded-xl bg-danger-light border border-danger/20 flex-row items-center"
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${b.category} budget`}
                     >
-                      <MaterialIcons name="delete" size={12} color="#ba1a1a" />
-                      <Text
-                        style={{ fontFamily: "WorkSans_500Medium" }}
-                        className="text-[10px] text-red-700 font-bold"
-                      >
+                      <Trash2 size={12} color="#b3261e" />
+                      <Text className="text-xs font-bold text-danger font-sans ml-1">
                         Delete
                       </Text>
-                    </Pressable>
+                    </TouchableOpacity>
                   </View>
-                </View>
+                </Card>
               );
-            })
-          )}
-        </View>
-      </ScrollView>
+            })}
+          </View>
+        )}
+      </View>
 
-      {/* Create / Edit Budget Modal Dialog */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay} className="flex-1 bg-slate-900/60 justify-center px-6">
-          <View className="bg-white rounded-3xl p-5 border border-slate-100 space-y-4">
-            <View className="flex-row justify-between items-center">
-              <Text
-                style={{ fontFamily: "Inter_700Bold" }}
-                className="text-lg text-slate-800"
-              >
-                {editingBudget ? "Modify Budget limit" : "Establish new boundary"}
+      {/* Modal Dialog */}
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View className="flex-1 justify-center px-5 bg-black/40">
+          <View className="bg-white rounded-3xl p-5 border border-border shadow-card">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-base font-bold text-text-primary font-sans">
+                {editingBudget ? "Edit Budget Limit" : "New Spending Limit"}
               </Text>
-              <Pressable
+              <TouchableOpacity
                 onPress={() => setModalVisible(false)}
-                className="w-7 h-7 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center"
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                className="w-8 h-8 rounded-full bg-cream border border-border items-center justify-center"
               >
-                <MaterialIcons name="close" size={14} color="#181c20" />
-              </Pressable>
+                <X size={16} color="#707773" />
+              </TouchableOpacity>
             </View>
 
             {/* Category selection */}
             {!editingBudget ? (
-              <View className="space-y-1.5">
-                <Text
-                  style={{ fontFamily: "WorkSans_500Medium" }}
-                  className="text-[10px] text-slate-400 uppercase tracking-wider"
-                >
-                  Select Category
+              <View className="mb-4">
+                <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-2">
+                  Category
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {categories.map((cat) => {
                     const isSelected = category === cat;
                     return (
-                      <Pressable
+                      <TouchableOpacity
                         key={cat}
                         onPress={() => {
                           triggerHaptic();
                           setCategory(cat);
                         }}
-                        className={`py-2 px-3 rounded-lg border ${
-                          isSelected ? "bg-blue-50 border-blue-600" : "bg-slate-50 border-slate-100"
+                        className={`px-3 py-2 rounded-xl border mb-1.5 ${
+                          isSelected
+                            ? "bg-primary border-primary shadow-button"
+                            : "bg-cream border-border"
                         }`}
                       >
                         <Text
-                          style={{ fontFamily: "WorkSans_500Medium" }}
-                          className={`text-[10px] font-semibold ${
-                            isSelected ? "text-blue-700" : "text-slate-500"
+                          className={`text-xs font-sans ${
+                            isSelected
+                              ? "font-bold text-white"
+                              : "font-semibold text-text-secondary"
                           }`}
                         >
                           {cat}
                         </Text>
-                      </Pressable>
+                      </TouchableOpacity>
                     );
                   })}
                 </View>
               </View>
             ) : (
-              <View className="space-y-1.5">
-                <Text
-                  style={{ fontFamily: "WorkSans_500Medium" }}
-                  className="text-[10px] text-slate-400 uppercase tracking-wider"
-                >
+              <View className="mb-4">
+                <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-1">
                   Category
                 </Text>
-                <Text
-                  style={{ fontFamily: "Inter_700Bold" }}
-                  className="text-sm text-slate-800 ml-1"
-                >
+                <Text className="text-sm font-bold text-text-primary font-sans">
                   {editingBudget.category}
                 </Text>
               </View>
             )}
 
-            {/* Limit Input field */}
-            <View className="space-y-1.5">
-              <Text
-                style={{ fontFamily: "WorkSans_500Medium" }}
-                className="text-[10px] text-slate-400 uppercase tracking-wider"
-              >
-                Limit amount (₹)
+            {/* Limit Input */}
+            <View className="mb-5">
+              <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-1.5">
+                Monthly Limit Amount (₹)
               </Text>
               <TextInput
                 value={limitAmount}
                 onChangeText={(val) => setLimitAmount(val.replace(/[^0-9.]/g, ""))}
                 placeholder="e.g. 5000"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#707773"
                 keyboardType="decimal-pad"
-                className="bg-slate-50 border border-slate-100 text-slate-800 rounded-xl px-4 py-3 text-xs"
+                className="bg-cream border border-border rounded-2xl px-4 py-3 text-sm text-text-primary font-sans min-h-[44px]"
               />
             </View>
 
-            {/* Submit Action */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.modalSubmitBtn,
-                { opacity: pressed ? 0.85 : 1 },
-              ]}
+            <Button
+              title={editingBudget ? "Save Changes" : "Create Budget"}
+              variant="primary"
+              size="lg"
               onPress={handleSubmit}
-              className="bg-blue-600 w-full h-12 rounded-xl items-center justify-center"
-            >
-              <Text
-                style={{ fontFamily: "Inter_600SemiBold" }}
-                className="text-white text-sm"
-              >
-                {editingBudget ? "Apply changes" : "Create Budget"}
-              </Text>
-            </Pressable>
+              className="min-h-[48px]"
+            />
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  modalOverlay: {
-    justifyContent: "center",
-  },
-  modalSubmitBtn: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-});
 
 export default BudgetsScreen;
