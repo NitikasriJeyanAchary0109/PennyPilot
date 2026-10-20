@@ -1,43 +1,56 @@
-Mutation Testing Report for rule_engine.py
-Date: 2026-10-19
-Branch: phase-1b-zero-arithmetic
+======================================================================
+REPRODUCIBLE MUTATION TESTING SUITE FOR RULE_ENGINE.PY
+Target file: backend/app/services/rule_engine.py
+Total mutations evaluated: 6
+======================================================================
 
-Mutation 1: Negative Roundup
-----------------------------
-File: backend/app/services/rule_engine.py:88
-Mutation: `roundup = -(next_milestone - amount)` instead of `roundup = next_milestone - amount`
-Expected Behavior: Mutation should be caught by non-negativity checks and unit calculations.
-Actual Result: KILLED (0 survivors)
-Killing Tests:
-  - backend/tests/test_rule_engine_units.py::test_calculate_roundup_paise_tier1 (FAILED: assert Decimal('-0.40') == Decimal('0.40'))
-  - backend/tests/test_rule_engine_units.py::test_calculate_roundup_whole_rupee_tier2 (FAILED: assert Decimal('-5.00') == Decimal('5.00'))
-  - backend/tests/test_rule_engine_units.py::test_apply_roundup_if_eligible_cases (FAILED: assert Decimal('-0.50') == Decimal('0.50'))
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_roundups_never_negative (FAILED: Negative roundup -0.99 for amount 0.01)
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_roundup_milestone_alignment (FAILED: 4 sub-exceptions on milestone and positivity)
-  - backend/tests/test_transactions.py::test_create_transaction_with_roundup (FAILED: assert '-0.40' == '0.40')
+Evaluating MUT-01: Negative Roundup Sign Inversion...
+  Result: KILLED (exit code 1)
 
-Mutation 2: Wrong Budget Delta
-------------------------------
-File: backend/app/services/rule_engine.py:142
-Mutation: `return budget + spent` instead of `return budget - spent`
-Expected Behavior: Mutation should be caught by headroom calculation and property-based delta consistency tests.
-Actual Result: KILLED (0 survivors)
-Killing Tests:
-  - backend/tests/test_rule_engine_units.py::test_remaining_budget_and_status (FAILED: assert Decimal('7000') == Decimal('3000'))
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_budget_ceilings_respected (FAILED: headroom != budget - spent)
-  - backend/tests/test_rule_engine_hypothesis.py::test_property_budget_delta_consistency (FAILED: shifting spend did not shift remaining by -delta)
+Evaluating MUT-02: Inverted Budget Headroom...
+  Result: KILLED (exit code 1)
 
-Mutation 3: Off-by-one in Velocity
-----------------------------------
-File: backend/app/services/rule_engine.py:210
-Mutation: `monthly_rate = daily_rate * Decimal("31")` instead of `Decimal("30")`
-Expected Behavior: Mutation should be caught by unit tests asserting deterministic monthly scaling.
-Actual Result: KILLED (0 survivors)
-Killing Tests:
-  - backend/tests/test_rule_engine_units.py::test_savings_velocity_and_summary (FAILED: assert Decimal('620.00') == Decimal('600.00'))
+Evaluating MUT-03: Off-by-one in Monthly Scaling Days...
+  Result: KILLED (exit code 1)
 
-Summary:
-- Total Mutations: 3
-- Mutations Killed: 3
-- Mutations Survived: 0
-- Mutation Kill Rate: 100%
+Evaluating MUT-04: Tier 1 vs Tier 2 Paise Boundary Mutation...
+  Result: KILLED (exit code 1)
+
+Evaluating MUT-05: Roundup Eligibility Threshold Strict Inequality...
+  Result: KILLED (exit code 1)
+
+Evaluating MUT-06: Accelerated Savings Options Decrement Velocity...
+  Result: KILLED (exit code 1)
+
+======================================================================
+MUTATION SUMMARY REPORT
+======================================================================
+Total Mutants:    6
+Mutants Killed:   6
+Mutants Survived: 0
+Mutation Score:   100.0%
+
+[KILLED] MUT-01: Negative Roundup Sign Inversion
+       Target:      roundup = next_milestone - amount
+       Replacement: roundup = -(next_milestone - amount)
+       Caught by:   assert calculate_roundup(Decimal("127.60")) == Decimal("0.40")
+[KILLED] MUT-02: Inverted Budget Headroom
+       Target:      return budget - spent
+       Replacement: return budget + spent
+       Caught by:   assert remaining_budget(Decimal("5000"), Decimal("2000")) == Decimal("3000")
+[KILLED] MUT-03: Off-by-one in Monthly Scaling Days
+       Target:      days_needed = int(months_needed * Decimal("30"))
+       Replacement: days_needed = int(months_needed * Decimal("31"))
+       Caught by:   assert projected == today + datetime.timedelta(days=30)
+[KILLED] MUT-04: Tier 1 vs Tier 2 Paise Boundary Mutation
+       Target:      if paise > Decimal("0"):
+       Replacement: if paise >= Decimal("0"):
+       Caught by:   assert calculate_roundup(Decimal("145.00")) == Decimal("5.00")
+[KILLED] MUT-05: Roundup Eligibility Threshold Strict Inequality
+       Target:      return current_balance >= threshold
+       Replacement: return current_balance > threshold
+       Caught by:   assert is_eligible_for_roundup(Decimal("20.00")) is True
+[KILLED] MUT-06: Accelerated Savings Options Decrement Velocity
+       Target:      effective_vel = max(base_velocity, Decimal("0")) + inc
+       Replacement: effective_vel = max(base_velocity, Decimal("0")) - inc
+       Caught by:   assert opts[0]["new_velocity"] == Decimal("750.00")
