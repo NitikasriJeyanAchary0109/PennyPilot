@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
 Reproducible Mutation Testing Harness for backend/app/services/rule_engine.py
-Applies deliberate mutations, executes unit and property-based test suites,
-records killing test assertions, and guarantees clean file restoration.
+Evaluates hand-picked mutants with strict test assertion verification.
+Guarantees clean restoration of rule_engine.py even under interruption or failure.
 """
+import os
+import re
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -61,70 +64,135 @@ def main():
         sys.exit(1)
 
     original_code = RULE_ENGINE.read_text()
+
+    def signal_handler(signum, frame):
+        RULE_ENGINE.write_text(original_code)
+        print(f"\n[INTERRUPT] Caught signal {signum}. Restored {RULE_ENGINE} cleanly.")
+        sys.exit(128 + signum)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    test_targets = [
+        "backend/tests/test_rule_engine_units.py",
+        "backend/tests/test_rule_engine_hypothesis.py"
+    ]
+
     print("=" * 70)
     print("REPRODUCIBLE MUTATION TESTING SUITE FOR RULE_ENGINE.PY")
     print(f"Target file: {RULE_ENGINE}")
-    print(f"Total mutations evaluated: {len(MUTATIONS)}")
+    print(f"Total hand-picked mutants evaluated: {len(MUTATIONS)}")
     print("=" * 70)
+
+    # Step (a): Run unmutated baseline tests first and abort unless they pass
+    print("\n[STEP 1] Running unmutated baseline tests...")
+    baseline_cmd = [sys.executable, "-m", "pytest"] + test_targets + ["-q", "--tb=short"]
+    baseline_env = os.environ.copy()
+    baseline_env["PYTHONPATH"] = "backend"
+
+    baseline_res = subprocess.run(
+        baseline_cmd,
+        capture_output=True,
+        text=True,
+        env=baseline_env
+    )
+
+    if baseline_res.returncode != 0:
+        print("[ABORT] Baseline unmutated tests failed!", file=sys.stderr)
+        print(baseline_res.stdout, file=sys.stderr)
+        print(baseline_res.stderr, file=sys.stderr)
+        sys.exit(1)
+
+    passed_match = re.search(r"(\d+) passed", baseline_res.stdout)
+    passed_count = passed_match.group(1) if passed_match else "unknown"
+    print(f"Baseline tests passed cleanly: exit 0 ({passed_count} passed). Proceeding to mutants.\n")
 
     results = []
 
-    for m in MUTATIONS:
-        print(f"\nEvaluating {m['id']}: {m['name']}...")
-        if m["target"] not in original_code:
-            print(f"  [ERROR] Target string not found in {RULE_ENGINE}!", file=sys.stderr)
-            sys.exit(1)
+    try:
+        for m in MUTATIONS:
+            print(f"Evaluating {m['id']}: {m['name']}...")
+            if m["target"] not in original_code:
+                print(f"  [ERROR] Target string not found in {RULE_ENGINE}!", file=sys.stderr)
+                sys.exit(1)
 
-        mutated_code = original_code.replace(m["target"], m["replacement"], 1)
-        RULE_ENGINE.write_text(mutated_code)
+            mutated_code = original_code.replace(m["target"], m["replacement"], 1)
+            RULE_ENGINE.write_text(mutated_code)
 
-        try:
-            res = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pytest",
-                    "backend/tests/test_rule_engine_units.py",
-                    "backend/tests/test_rule_engine_hypothesis.py",
-                    "-q",
-                    "--tb=short",
-                    "-o",
-                    "hypothesis_max_examples=10"
-                ],
-                capture_output=True,
-                text=True
-            )
-        finally:
-            RULE_ENGINE.write_text(original_code)
+            try:
+                res = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "pytest",
+                        *test_targets,
+                        "-q",
+                        "--tb=short"
+                    ],
+                    capture_output=True,
+                    text=True,
+                    env=baseline_env
+                )
+            finally:
+                RULE_ENGINE.write_text(original_code)
 
-        killed = res.returncode != 0
-        status = "KILLED" if killed else "SURVIVED"
-        print(f"  Result: {status} (exit code {res.returncode})")
+            # Step (b): Count as KILLED only if pytest reports at least one FAILED test
+            has_failed_test = bool(re.search(r"\bFAILED\b", res.stdout) or re.search(r"\d+ failed\b", res.stdout))
+            has_collection_error = bool(re.search(r"\bERROR\b", res.stdout) or "ImportError" in res.stderr or "SyntaxError" in res.stderr)
 
-        failing = [
-            line.strip()
-            for line in res.stdout.splitlines()
-            if line.startswith("FAILED") or "assert" in line or "Error" in line
-        ]
+            if has_failed_test:
+                status = "KILLED"
+                killed = True
+            elif res.returncode != 0 and has_collection_error:
+                status = "ERROR (Collection/Import failure - NOT counted as killed)"
+                killed = False
+            elif res.returncode != 0:
+                status = f"FAILED ({res.returncode}) - NOT counted as killed"
+                killed = False
+            else:
+                status = "SURVIVED"
+                killed = False
 
-        results.append({
-            "mutation": m,
-            "status": status,
-            "killed": killed,
-            "failing": failing[:4]
-        })
+            failing_lines = [
+                line.strip()
+                for line in res.stdout.splitlines()
+                if line.startswith("FAILED") or "assert" in line
+            ]
+
+            print(f"  Result: {status} (pytest exit code {res.returncode})")
+            results.append({
+                "mutation": m,
+                "status": status,
+                "killed": killed,
+                "failing": failing_lines[:4]
+            })
+    finally:
+        # Step (c): Guaranteed restore in finally
+        RULE_ENGINE.write_text(original_code)
+
+    # Step (c) check: Verify git diff --stat backend/app/services/rule_engine.py is empty
+    diff_check = subprocess.run(
+        ["git", "diff", "--stat", str(RULE_ENGINE)],
+        capture_output=True,
+        text=True
+    )
+    if diff_check.stdout.strip():
+        print(f"[ERROR] {RULE_ENGINE} is modified after run! Content:\n{diff_check.stdout}", file=sys.stderr)
+        RULE_ENGINE.write_text(original_code)
+        sys.exit(1)
+    else:
+        print(f"\n[VERIFIED] git diff --stat {RULE_ENGINE} is empty.")
 
     print("\n" + "=" * 70)
     print("MUTATION SUMMARY REPORT")
     print("=" * 70)
     killed_count = sum(1 for r in results if r["killed"])
     survived_count = len(results) - killed_count
-    kill_rate = (killed_count / len(results)) * 100
 
-    print(f"Total Mutants:    {len(results)}")
-    print(f"Mutants Killed:   {killed_count}")
-    print(f"Mutants Survived: {survived_count}")
-    print(f"Mutation Score:   {kill_rate:.1f}%\n")
+    print(f"Total Mutants Evaluated: {len(results)}")
+    print(f"Mutants Killed:          {killed_count}")
+    print(f"Mutants Survived:        {survived_count}")
+    print(f"Result:                  {killed_count} of {len(results)} hand-picked mutants killed\n")
 
     for r in results:
         m = r["mutation"]

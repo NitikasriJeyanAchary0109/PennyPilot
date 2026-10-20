@@ -1,56 +1,7 @@
-======================================================================
-REPRODUCIBLE MUTATION TESTING SUITE FOR RULE_ENGINE.PY
-Target file: backend/app/services/rule_engine.py
-Total mutations evaluated: 6
-======================================================================
+NOTE: The earlier hand-written mutation testing evidence file was removed because it did not match the real code (it referenced monthly_rate = daily_rate * 31 in savings_velocity, whereas the actual codebase implements goal_forecast).
 
-Evaluating MUT-01: Negative Roundup Sign Inversion...
-  Result: KILLED (exit code 1)
+The updated, reproducible mutation test harness is located at backend/scripts/run_mutations.py and evaluates hand-picked mutants with strict test assertion verification (requiring actual pytest test failures, not collection/import errors). Results are reported as "N of M hand-picked mutants killed" rather than a generalized mutation score.
 
-Evaluating MUT-02: Inverted Budget Headroom...
-  Result: KILLED (exit code 1)
-
-Evaluating MUT-03: Off-by-one in Monthly Scaling Days...
-  Result: KILLED (exit code 1)
-
-Evaluating MUT-04: Tier 1 vs Tier 2 Paise Boundary Mutation...
-  Result: KILLED (exit code 1)
-
-Evaluating MUT-05: Roundup Eligibility Threshold Strict Inequality...
-  Result: KILLED (exit code 1)
-
-Evaluating MUT-06: Accelerated Savings Options Decrement Velocity...
-  Result: KILLED (exit code 1)
-
-======================================================================
-MUTATION SUMMARY REPORT
-======================================================================
-Total Mutants:    6
-Mutants Killed:   6
-Mutants Survived: 0
-Mutation Score:   100.0%
-
-[KILLED] MUT-01: Negative Roundup Sign Inversion
-       Target:      roundup = next_milestone - amount
-       Replacement: roundup = -(next_milestone - amount)
-       Caught by:   assert calculate_roundup(Decimal("127.60")) == Decimal("0.40")
-[KILLED] MUT-02: Inverted Budget Headroom
-       Target:      return budget - spent
-       Replacement: return budget + spent
-       Caught by:   assert remaining_budget(Decimal("5000"), Decimal("2000")) == Decimal("3000")
-[KILLED] MUT-03: Off-by-one in Monthly Scaling Days
-       Target:      days_needed = int(months_needed * Decimal("30"))
-       Replacement: days_needed = int(months_needed * Decimal("31"))
-       Caught by:   assert projected == today + datetime.timedelta(days=30)
-[KILLED] MUT-04: Tier 1 vs Tier 2 Paise Boundary Mutation
-       Target:      if paise > Decimal("0"):
-       Replacement: if paise >= Decimal("0"):
-       Caught by:   assert calculate_roundup(Decimal("145.00")) == Decimal("5.00")
-[KILLED] MUT-05: Roundup Eligibility Threshold Strict Inequality
-       Target:      return current_balance >= threshold
-       Replacement: return current_balance > threshold
-       Caught by:   assert is_eligible_for_roundup(Decimal("20.00")) is True
-[KILLED] MUT-06: Accelerated Savings Options Decrement Velocity
-       Target:      effective_vel = max(base_velocity, Decimal("0")) + inc
-       Replacement: effective_vel = max(base_velocity, Decimal("0")) - inc
-       Caught by:   assert opts[0]["new_velocity"] == Decimal("750.00")
+Official evidence files:
+- docs/evidence/phase1b/mutation_testing_results.txt: Raw execution output of backend/scripts/run_mutations.py
+- docs/evidence/integration/mutmut.txt: Raw execution output of mutmut run

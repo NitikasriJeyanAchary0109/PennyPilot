@@ -1,0 +1,56 @@
+======================================================================
+REPRODUCIBLE MUTATION TESTING SUITE FOR RULE_ENGINE.PY
+Target file: backend/app/services/rule_engine.py
+Total hand-picked mutants evaluated: 6
+======================================================================
+
+[STEP 1] Running unmutated baseline tests...
+Baseline tests passed cleanly: exit 0 (24 passed). Proceeding to mutants.
+
+Evaluating MUT-01: Negative Roundup Sign Inversion...
+  Result: KILLED (pytest exit code 1)
+Evaluating MUT-02: Inverted Budget Headroom...
+  Result: KILLED (pytest exit code 1)
+Evaluating MUT-03: Off-by-one in Monthly Scaling Days...
+  Result: KILLED (pytest exit code 1)
+Evaluating MUT-04: Tier 1 vs Tier 2 Paise Boundary Mutation...
+  Result: KILLED (pytest exit code 1)
+Evaluating MUT-05: Roundup Eligibility Threshold Strict Inequality...
+  Result: KILLED (pytest exit code 1)
+Evaluating MUT-06: Accelerated Savings Options Decrement Velocity...
+  Result: KILLED (pytest exit code 1)
+
+[VERIFIED] git diff --stat backend/app/services/rule_engine.py is empty.
+
+======================================================================
+MUTATION SUMMARY REPORT
+======================================================================
+Total Mutants Evaluated: 6
+Mutants Killed:          6
+Mutants Survived:        0
+Result:                  6 of 6 hand-picked mutants killed
+
+[KILLED] MUT-01: Negative Roundup Sign Inversion
+       Target:      roundup = next_milestone - amount
+       Replacement: roundup = -(next_milestone - amount)
+       Caught by:   assert calculate_roundup(Decimal("127.60")) == Decimal("0.40")
+[KILLED] MUT-02: Inverted Budget Headroom
+       Target:      return budget - spent
+       Replacement: return budget + spent
+       Caught by:   assert remaining_budget(Decimal("5000"), Decimal("2000")) == Decimal("3000")
+[KILLED] MUT-03: Off-by-one in Monthly Scaling Days
+       Target:      days_needed = int(months_needed * Decimal("30"))
+       Replacement: days_needed = int(months_needed * Decimal("31"))
+       Caught by:   assert projected == today + datetime.timedelta(days=30)
+[KILLED] MUT-04: Tier 1 vs Tier 2 Paise Boundary Mutation
+       Target:      if paise > Decimal("0"):
+       Replacement: if paise >= Decimal("0"):
+       Caught by:   assert calculate_roundup(Decimal("145.00")) == Decimal("5.00")
+[KILLED] MUT-05: Roundup Eligibility Threshold Strict Inequality
+       Target:      return current_balance >= threshold
+       Replacement: return current_balance > threshold
+       Caught by:   assert is_eligible_for_roundup(Decimal("20.00")) is True
+[KILLED] MUT-06: Accelerated Savings Options Decrement Velocity
+       Target:      effective_vel = max(base_velocity, Decimal("0")) + inc
+       Replacement: effective_vel = max(base_velocity, Decimal("0")) - inc
+       Caught by:   assert opts[0]["new_velocity"] == Decimal("750.00")
