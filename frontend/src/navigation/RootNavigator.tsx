@@ -3,7 +3,7 @@ import { View, ActivityIndicator } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useAuth } from "../hooks/useAuth";
-import { Home, Target, LineChart, MessageSquare, User } from "lucide-react-native";
+import { Home, Target, LineChart, MessageSquare, User, LayoutDashboard, TrendingUp, GraduationCap } from "lucide-react-native";
 
 // Authentication Screens
 import LoginScreen from "../screens/auth/LoginScreen";
@@ -215,13 +215,16 @@ function OnboardingStackScreen() {
 // ==========================
 function EducatorTabs() {
   return (
-    <Tab.Navigator screenOptions={screenOptions}>
+    <Tab.Navigator screenOptions={studentScreenOptions}>
       <Tab.Screen
         name="Overview"
         component={OverviewScreen}
         options={{
-          title: "Overview Dashboard",
+          title: "Educator Dashboard",
           tabBarLabel: "Overview",
+          tabBarIcon: ({ color, size }) => (
+            <LayoutDashboard size={size || 22} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -230,14 +233,20 @@ function EducatorTabs() {
         options={{
           title: "Cohort Trends",
           tabBarLabel: "Trends",
+          tabBarIcon: ({ color, size }) => (
+            <TrendingUp size={size || 22} color={color} />
+          ),
         }}
       />
       <Tab.Screen
         name="Literacy"
         component={LiteracyScreen}
         options={{
-          title: "Oversight Log",
+          title: "AI Quality Oversight",
           tabBarLabel: "Oversight",
+          tabBarIcon: ({ color, size }) => (
+            <GraduationCap size={size || 22} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>

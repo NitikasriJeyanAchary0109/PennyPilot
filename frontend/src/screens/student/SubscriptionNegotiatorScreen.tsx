@@ -1,57 +1,90 @@
-import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  Pressable, 
-  SafeAreaView, 
-  StyleSheet, 
-  ScrollView,
-  TextInput,
-  ActivityIndicator,
-  Alert 
-} from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, TouchableOpacity, Alert, TextInput } from "react-native";
+import {
+  ArrowLeft,
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Check,
+  Tag,
+  ShieldCheck,
+} from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { apiService } from "../../services/api";
+import {
+  ScreenContainer,
+  Card,
+  Chip,
+  Button,
+  Skeleton,
+} from "../../components/ui";
 
-export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }) => {
+const CATEGORIES = [
+  "Coffee",
+  "Dining",
+  "Electronics",
+  "Entertainment",
+  "Subscriptions",
+];
+
+export const SubscriptionNegotiatorScreen = ({
+  navigation,
+}: {
+  navigation: any;
+}) => {
   const [activeTab, setActiveTab] = useState<"subscriptions" | "custom">("subscriptions");
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [selectedSub, setSelectedSub] = useState<any>(null);
 
-  // Custom purchase form state
+  // Custom purchase form
   const [itemName, setItemName] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [category, setCategory] = useState("Coffee");
 
-  // Evaluation response state
+  // Evaluation state
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalResult, setEvalResult] = useState<any>(null);
 
-  const categories = ["Coffee", "Dining", "Electronics", "Entertainment", "Subscriptions"];
-
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
   };
 
-  useEffect(() => {
-    const fetchSubscriptions = async () => {
-      try {
-        setLoadingSubs(true);
-        const res = await apiService.getNegotiatorSubscriptions();
+  const fetchSubscriptions = useCallback(async () => {
+    try {
+      setLoadingSubs(true);
+      const res = await apiService.getNegotiatorSubscriptions();
+      if (Array.isArray(res)) {
         setSubscriptions(res);
-        if (res && res.length > 0) {
+        if (res.length > 0) {
           setSelectedSub(res[0]);
         }
-      } catch (e) {
-        console.warn("Failed to fetch subscriptions:", e);
-      } finally {
-        setLoadingSubs(false);
+      } else {
+        setSubscriptions([]);
       }
-    };
-    fetchSubscriptions();
+    } catch (e: any) {
+      console.warn("Failed to fetch subscriptions:", e?.message);
+    } finally {
+      setLoadingSubs(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, [fetchSubscriptions]);
+
+  const formatINR = (val: number | string | null | undefined): string => {
+    const num = typeof val === "number" ? val : parseFloat(String(val || 0));
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(isNaN(num) ? 0 : num);
+  };
 
   const handleEvaluate = async () => {
     triggerHaptic();
@@ -63,20 +96,20 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
 
     if (activeTab === "subscriptions") {
       if (!selectedSub) {
-        Alert.alert("Error", "No subscription selected.");
+        Alert.alert("Selection Required", "Please select a recurring subscription to evaluate.");
         return;
       }
-      priceNum = Number(selectedSub.amount);
+      priceNum = Number(selectedSub.amount) || 0;
       cat = "Subscriptions";
       desc = selectedSub.name;
     } else {
       if (!itemName.trim() || !itemPrice.trim()) {
-        Alert.alert("Error", "Please fill in all fields.");
+        Alert.alert("Input Required", "Please enter both an item name and expected price.");
         return;
       }
       priceNum = parseFloat(itemPrice);
       if (isNaN(priceNum) || priceNum <= 0) {
-        Alert.alert("Error", "Please enter a valid positive price.");
+        Alert.alert("Invalid Price", "Please enter a valid price amount greater than ₹0.");
         return;
       }
       cat = category;
@@ -88,304 +121,349 @@ export const SubscriptionNegotiatorScreen = ({ navigation }: { navigation: any }
       const res = await apiService.evaluatePurchase({
         price: priceNum,
         category: cat,
-        description: desc
+        description: desc,
       });
       setEvalResult(res);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // Ignore on web
+      }
     } catch (e: any) {
-      console.warn("Evaluation failed:", e);
-      Alert.alert("Error", e.message || "Failed to run AI evaluation.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Evaluation Error", e?.message || "Failed to run AI purchase evaluation.");
     } finally {
       setEvalLoading(false);
     }
   };
 
-  // Status pill styling helper
-  const getStatusColor = (status: string) => {
-    const s = (status || "").toLowerCase();
-    if (s.includes("exceeded") || s.includes("danger") || s.includes("red")) {
-      return { bg: "#fde8e8", text: "#ba1a1a", label: "Exceeded" };
-    }
-    if (s.includes("warning") || s.includes("caution") || s.includes("amber")) {
-      return { bg: "#fef3c7", text: "#d97706", label: "Warning" };
-    }
-    return { bg: "#d1fae5", text: "#065f46", label: "Safe" };
+  const handleConfirmPause = () => {
+    triggerHaptic();
+    Alert.alert(
+      "Subscription Paused",
+      `Successfully scheduled a pause for ${selectedSub?.name}. We will redirect ₹${formatINR(
+        selectedSub?.amount
+      )} to your priority savings goal next billing cycle!`,
+      [{ text: "Great!", onPress: () => navigation.goBack() }]
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container} className="flex-1">
-      {/* Background Underlay (translucent dark sheet) */}
-      <View style={StyleSheet.absoluteFillObject} className="bg-slate-900/60" />
-
-      {/* Main Bottom Sheet Canvas */}
-      <View style={styles.sheet} className="bg-white rounded-t-3xl pt-2 pb-10 px-margin-mobile flex-col max-h-[90%]">
-        {/* Drag Handle indicator */}
-        <View className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
-
-        {/* Header Title with Back button */}
-        <View className="flex-row items-center justify-between mb-4">
-          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-slate-800">
-            AI Negotiator
-          </Text>
-          <Pressable 
+    <ScreenContainer className="pt-2 pb-8">
+      {/* Top Header */}
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center">
+          <TouchableOpacity
             onPress={() => {
               triggerHaptic();
               navigation.goBack();
             }}
-            className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            className="w-10 h-10 rounded-full bg-white border border-border items-center justify-center mr-3 shadow-card"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
-            <MaterialIcons name="close" size={16} color="#181c20" />
-          </Pressable>
+            <ArrowLeft size={20} color="#144a32" />
+          </TouchableOpacity>
+          <View>
+            <Text className="text-lg font-bold text-text-primary font-sans">
+              Impulse & Subscription Evaluator
+            </Text>
+            <Text className="text-xs text-text-muted font-sans mt-0.5">
+              AI delay evaluator and subscription pauser
+            </Text>
+          </View>
         </View>
+      </View>
 
-        {/* Tab Buttons */}
-        <View className="flex-row bg-slate-100 rounded-xl p-1 mb-5">
-          <Pressable
-            onPress={() => {
-              triggerHaptic();
-              setActiveTab("subscriptions");
-              setEvalResult(null);
-            }}
-            className={`flex-1 py-2.5 rounded-lg items-center ${
-              activeTab === "subscriptions" ? "bg-white shadow-sm" : ""
+      {/* Mode Switcher Tabs */}
+      <View className="flex-row bg-cream p-1 rounded-2xl border border-border justify-center mb-4">
+        <TouchableOpacity
+          onPress={() => {
+            triggerHaptic();
+            setActiveTab("subscriptions");
+            setEvalResult(null);
+          }}
+          activeOpacity={0.8}
+          className={`flex-1 py-2.5 px-3 rounded-xl items-center flex-row justify-center min-h-[44px] ${
+            activeTab === "subscriptions"
+              ? "bg-white shadow-button border border-border/40"
+              : ""
+          }`}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "subscriptions" }}
+        >
+          <ShieldCheck
+            size={15}
+            color={activeTab === "subscriptions" ? "#144a32" : "#666e69"}
+          />
+          <Text
+            className={`text-xs ml-1.5 font-sans ${
+              activeTab === "subscriptions"
+                ? "font-bold text-primary"
+                : "font-semibold text-text-muted"
             }`}
           >
-            <Text 
-              style={{ fontFamily: "WorkSans_600SemiBold" }} 
-              className={`text-xs ${activeTab === "subscriptions" ? "text-slate-800" : "text-slate-500"}`}
-            >
-              Subscription Pause
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              triggerHaptic();
-              setActiveTab("custom");
-              setEvalResult(null);
-            }}
-            className={`flex-1 py-2.5 rounded-lg items-center ${
-              activeTab === "custom" ? "bg-white shadow-sm" : ""
+            Subscription Pause
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            triggerHaptic();
+            setActiveTab("custom");
+            setEvalResult(null);
+          }}
+          activeOpacity={0.8}
+          className={`flex-1 py-2.5 px-3 rounded-xl items-center flex-row justify-center min-h-[44px] ${
+            activeTab === "custom"
+              ? "bg-white shadow-button border border-border/40"
+              : ""
+          }`}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "custom" }}
+        >
+          <Sparkles
+            size={15}
+            color={activeTab === "custom" ? "#144a32" : "#666e69"}
+          />
+          <Text
+            className={`text-xs ml-1.5 font-sans ${
+              activeTab === "custom"
+                ? "font-bold text-primary"
+                : "font-semibold text-text-muted"
             }`}
           >
-            <Text 
-              style={{ fontFamily: "WorkSans_600SemiBold" }} 
-              className={`text-xs ${activeTab === "custom" ? "text-slate-800" : "text-slate-500"}`}
-            >
-              Custom Purchase
-            </Text>
-          </Pressable>
-        </View>
+            Custom Purchase
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-grow">
-          {activeTab === "subscriptions" ? (
-            <View className="space-y-4">
-              <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-500 mb-2">
-                Evaluate the impact of pausing recurring monthly payments on your savings trajectory.
-              </Text>
-              
-              {loadingSubs ? (
-                <ActivityIndicator size="small" color="#005bbf" className="py-6" />
-              ) : subscriptions.length === 0 ? (
-                <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-400 italic text-center py-4">
-                  No active pausable subscriptions found.
-                </Text>
-              ) : (
-                <View className="space-y-2">
-                  {subscriptions.map((sub) => {
-                    const isSelected = selectedSub?.id === sub.id;
-                    return (
-                      <Pressable
-                        key={sub.id}
-                        onPress={() => {
-                          triggerHaptic();
-                          setSelectedSub(sub);
-                          setEvalResult(null);
-                        }}
-                        className={`flex-row justify-between items-center p-4 rounded-2xl border ${
-                          isSelected ? "bg-blue-50/50 border-blue-600" : "bg-slate-50/50 border-slate-100"
+      {/* Tab 1: Subscriptions */}
+      {activeTab === "subscriptions" ? (
+        <Card variant="default" padding="md" className="shadow-card mb-4">
+          <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-1">
+            Active Subscriptions
+          </Text>
+          <Text className="text-xs text-text-secondary font-sans mb-3 leading-relaxed">
+            Select an ongoing monthly subscription to analyze the impact of pausing it for 30–60 days.
+          </Text>
+
+          {loadingSubs ? (
+            <View className="space-y-2 py-2">
+              <Skeleton width="100%" height={56} className="rounded-2xl mb-2" />
+              <Skeleton width="100%" height={56} className="rounded-2xl" />
+            </View>
+          ) : subscriptions.length === 0 ? (
+            <Text className="text-xs text-text-muted italic text-center py-4 font-sans">
+              No active recurring subscriptions detected.
+            </Text>
+          ) : (
+            <View className="space-y-2 mb-2">
+              {subscriptions.map((sub) => {
+                const isSelected = selectedSub?.id === sub.id;
+                return (
+                  <TouchableOpacity
+                    key={sub.id}
+                    onPress={() => {
+                      triggerHaptic();
+                      setSelectedSub(sub);
+                      setEvalResult(null);
+                    }}
+                    activeOpacity={0.8}
+                    className={`flex-row items-center justify-between p-3.5 rounded-2xl border min-h-[50px] mb-2 ${
+                      isSelected
+                        ? "bg-sage-light/70 border-primary shadow-sm"
+                        : "bg-cream border-border"
+                    }`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isSelected }}
+                  >
+                    <View className="flex-row items-center">
+                      <View
+                        className={`w-7 h-7 rounded-full items-center justify-center mr-3 ${
+                          isSelected ? "bg-primary" : "bg-white border border-border"
                         }`}
                       >
-                        <View className="flex-row items-center space-x-3.5">
-                          <View className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                            <MaterialIcons name="subscriptions" size={20} color={isSelected ? "#005bbf" : "#64748b"} />
-                          </View>
-                          <View>
-                            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-slate-800">
-                              {sub.name}
-                            </Text>
-                            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[10px] text-slate-400">
-                              Billed: {sub.billing_date}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={{ fontFamily: "Inter_700Bold" }} className="text-sm text-slate-800">
-                          ₹{sub.amount}/mo
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          ) : (
-            <View className="space-y-4">
-              <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-500 mb-2">
-                Simulate a hypothetical item purchase to evaluate how it impacts your budgets and goals.
-              </Text>
-
-              {/* Form Input fields */}
-              <View className="space-y-3">
-                <View>
-                  <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Item Name</Text>
-                  <TextInput
-                    value={itemName}
-                    onChangeText={setItemName}
-                    placeholder="e.g. boAt Airdopes"
-                    placeholderTextColor="#94a3b8"
-                    className="bg-slate-50 border border-slate-100 text-slate-800 rounded-xl px-4 py-3 text-xs"
-                  />
-                </View>
-
-                <View>
-                  <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Price (₹)</Text>
-                  <TextInput
-                    value={itemPrice}
-                    onChangeText={itemPrice => setItemPrice(itemPrice.replace(/[^0-9.]/g, ""))}
-                    placeholder="e.g. 1499"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="decimal-pad"
-                    className="bg-slate-50 border border-slate-100 text-slate-800 rounded-xl px-4 py-3 text-xs"
-                  />
-                </View>
-
-                <View>
-                  <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">Category</Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {categories.map((cat) => {
-                      const isSelected = category === cat;
-                      return (
-                        <Pressable
-                          key={cat}
-                          onPress={() => {
-                            triggerHaptic();
-                            setCategory(cat);
-                          }}
-                          className={`py-2 px-3 rounded-lg border ${
-                            isSelected ? "bg-blue-50 border-blue-600" : "bg-slate-50 border-slate-100"
-                          }`}
-                        >
-                          <Text 
-                            style={{ fontFamily: "WorkSans_500Medium" }} 
-                            className={`text-[10px] font-semibold ${isSelected ? "text-blue-700" : "text-slate-500"}`}
-                          >
-                            {cat}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              </View>
+                        {isSelected && <Check size={14} color="#ffffff" />}
+                      </View>
+                      <Text
+                        className={`text-sm font-sans ${
+                          isSelected
+                            ? "font-bold text-primary"
+                            : "font-semibold text-text-primary"
+                        }`}
+                      >
+                        {sub.name}
+                      </Text>
+                    </View>
+                    <Text className="text-sm font-bold text-text-primary font-sans">
+                      ₹{formatINR(sub.amount)}
+                      <Text className="text-[10px] text-text-muted font-normal">
+                        /mo
+                      </Text>
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
-          {/* Action button */}
-          <Pressable
-            disabled={evalLoading}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              { opacity: (pressed || evalLoading) ? 0.85 : 1 }
-            ]}
+          <Button
+            title={evalLoading ? "Analyzing Impact..." : "Evaluate Pause Impact"}
+            variant="primary"
+            size="lg"
             onPress={handleEvaluate}
-            className="mt-6 mb-4 w-full h-12 rounded-xl bg-blue-600 items-center justify-center flex-row"
-          >
-            {evalLoading ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <>
-                <MaterialIcons name="auto-awesome" size={16} color="#ffffff" className="mr-2" />
-                <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-white text-sm">
-                  {activeTab === "subscriptions" ? "Evaluate Pause" : "Should I Buy?"}
-                </Text>
-              </>
-            )}
-          </Pressable>
+            loading={evalLoading}
+            disabled={evalLoading || !selectedSub}
+            className="mt-3 min-h-[48px]"
+          />
+        </Card>
+      ) : (
+        /* Tab 2: Custom Purchase */
+        <Card variant="default" padding="md" className="shadow-card mb-4">
+          <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-1">
+            Evaluate a Desired Purchase
+          </Text>
+          <Text className="text-xs text-text-secondary font-sans mb-3 leading-relaxed">
+            Thinking of buying something non-essential? Our rule engine checks if it will delay your goals.
+          </Text>
 
-          {/* AI Result Card */}
-          {evalResult && (
-            <View style={styles.card} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mt-2 space-y-3.5">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center space-x-2">
-                  <MaterialIcons name="smart-toy" size={18} color="#005bbf" />
-                  <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xs text-slate-800">
-                    AI recommendation
-                  </Text>
-                </View>
-                {/* Budget status badge */}
-                <View 
-                  style={{ backgroundColor: getStatusColor(evalResult.budget_status).bg }}
-                  className="px-2.5 py-0.5 rounded-full"
-                >
-                  <Text 
-                    style={{ fontFamily: "WorkSans_600SemiBold", color: getStatusColor(evalResult.budget_status).text }}
-                    className="text-[9px] uppercase tracking-wider font-bold"
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-1.5 ml-1">
+              Item Name
+            </Text>
+            <TextInput
+              value={itemName}
+              onChangeText={setItemName}
+              placeholder="e.g. Wireless Noise-Cancelling Headphones"
+              placeholderTextColor="#707773"
+              className="bg-cream border border-border rounded-2xl px-4 py-3 text-xs text-text-primary font-sans min-h-[44px]"
+            />
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-1.5 ml-1">
+              Estimated Price (₹)
+            </Text>
+            <TextInput
+              value={itemPrice}
+              onChangeText={(val) => setItemPrice(val.replace(/[^0-9.]/g, ""))}
+              placeholder="e.g. 2499"
+              placeholderTextColor="#707773"
+              keyboardType="decimal-pad"
+              className="bg-cream border border-border rounded-2xl px-4 py-3 text-xs text-text-primary font-sans min-h-[44px]"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-2 ml-1">
+              Category
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {CATEGORIES.map((cat) => {
+                const isSelected = category === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => {
+                      triggerHaptic();
+                      setCategory(cat);
+                    }}
+                    className={`px-3 py-2 rounded-xl border mb-1.5 ${
+                      isSelected
+                        ? "bg-primary border-primary shadow-button"
+                        : "bg-cream border-border"
+                    }`}
                   >
-                    Budget: {getStatusColor(evalResult.budget_status).label}
-                  </Text>
-                </View>
-              </View>
+                    <Text
+                      className={`text-xs font-sans ${
+                        isSelected
+                          ? "font-bold text-white"
+                          : "font-semibold text-text-secondary"
+                      }`}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
-              {/* Advice description */}
-              <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-600 leading-relaxed">
-                "{evalResult.advice}"
+          <Button
+            title={evalLoading ? "Analyzing..." : "Should I Buy This?"}
+            variant="primary"
+            size="lg"
+            onPress={handleEvaluate}
+            loading={evalLoading}
+            disabled={evalLoading || !itemName || !itemPrice}
+            className="mt-2 min-h-[48px]"
+          />
+        </Card>
+      )}
+
+      {/* AI Evaluation Result Card */}
+      {evalResult && (
+        <Card variant="peach" padding="md" className="shadow-card mb-4">
+          <View className="flex-row items-center justify-between mb-2 pb-2 border-b border-border/40">
+            <View className="flex-row items-center">
+              <Sparkles size={16} color="#856529" className="mr-1.5" />
+              <Text className="text-xs font-bold text-text-primary font-sans ml-1">
+                AI Recommendation
               </Text>
+            </View>
 
-              {/* Goal impact status bar */}
-              <View className="border-t border-slate-200/60 pt-3 flex-row items-start space-x-2">
-                <MaterialIcons name="track-changes" size={16} color="#64748b" className="mt-0.5" />
-                <View className="flex-1">
-                  <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-[10px] text-slate-700 font-bold mb-0.5">
-                    Goal impact
-                  </Text>
-                  <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-slate-500">
-                    {evalResult.goal_impact}
-                  </Text>
-                </View>
+            <Chip
+              label={
+                evalResult.budget_status === "exceeded"
+                  ? "Over Limit"
+                  : evalResult.budget_status === "warning"
+                  ? "High Impact"
+                  : "Within Safe Range"
+              }
+              variant={
+                evalResult.budget_status === "exceeded"
+                  ? "danger"
+                  : evalResult.budget_status === "warning"
+                  ? "warning"
+                  : "success"
+              }
+            />
+          </View>
+
+          <Text className="text-xs text-text-primary font-sans leading-relaxed mb-3">
+            "{evalResult.advice}"
+          </Text>
+
+          {evalResult.goal_impact && (
+            <View className="bg-white/80 p-3 rounded-xl border border-border/60 mb-3">
+              <View className="flex-row items-center mb-1">
+                <Clock size={13} color="#144a32" className="mr-1.5" />
+                <Text className="text-xs font-bold text-primary font-sans ml-1">
+                  Goal Timeline Impact
+                </Text>
               </View>
+              <Text className="text-xs text-text-secondary font-sans leading-relaxed">
+                {evalResult.goal_impact}
+              </Text>
             </View>
           )}
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+
+          {activeTab === "subscriptions" && selectedSub && (
+            <Button
+              title={`Pause ${selectedSub.name} & Save ₹${formatINR(
+                selectedSub.amount
+              )}/mo`}
+              variant="nudge"
+              size="md"
+              onPress={handleConfirmPause}
+              className="mt-1"
+            />
+          )}
+        </Card>
+      )}
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 24,
-  },
-  actionBtn: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 3,
-    elevation: 1,
-  }
-});
 
 export default SubscriptionNegotiatorScreen;

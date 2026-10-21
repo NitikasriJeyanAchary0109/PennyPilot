@@ -1,15 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, TouchableOpacity, Alert } from "react-native";
+import { Users, Coins, CreditCard, Sparkles, LogOut } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
-import { Card } from "../../components/Card";
 import { EducatorAnalytics } from "../../types";
-
-const formatCurrency = (val: string | number | null | undefined): string => {
-  if (val === null || val === undefined) return "0.00";
-  const num = typeof val === "number" ? val : parseFloat(String(val));
-  return isNaN(num) ? "0.00" : num.toFixed(2);
-};
+import { ScreenContainer, Header, Card, Skeleton } from "../../components/ui";
 
 export const OverviewScreen = () => {
   const { logout } = useAuth();
@@ -17,17 +13,25 @@ export const OverviewScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<EducatorAnalytics | null>(null);
 
-  const fetchAnalytics = async () => {
+  const triggerHaptic = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
+  };
+
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getEducatorAnalytics();
       setData(res);
     } catch (e: any) {
-      console.warn("Failed to load educator analytics:", e.message);
+      console.warn("Failed to load educator analytics:", e?.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -37,71 +41,154 @@ export const OverviewScreen = () => {
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [fetchAnalytics]);
+
+  const handleLogout = () => {
+    triggerHaptic();
+    Alert.alert("Logout", "Sign out of your Educator Advisor account?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {
+            // Ignore on web
+          }
+          await logout();
+        },
+      },
+    ]);
+  };
+
+  const formatINR = (val: number | string | null | undefined): string => {
+    const num = typeof val === "number" ? val : parseFloat(String(val || 0));
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(isNaN(num) ? 0 : num);
+  };
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#005bbf" />
-      }
+    <ScreenContainer
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      className="pt-2 pb-8"
     >
-      {/* Header */}
-      <View className="flex-row justify-between items-center mb-6">
+      {/* Top Header */}
+      <View className="flex-row items-center justify-between mb-4">
         <View>
-          <Text className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Advisor Portal</Text>
-          <Text className="text-on-surface text-2xl font-black">Educator Dashboard</Text>
+          <Text className="text-xl font-bold text-text-primary font-sans">
+            Educator Dashboard
+          </Text>
+          <Text className="text-xs text-text-muted font-sans mt-0.5">
+            Campus-wide savings & cohort metrics
+          </Text>
         </View>
+
         <TouchableOpacity
-          onPress={logout}
-          className="bg-white border border-outline-variant py-2 px-4 rounded-xl"
+          onPress={handleLogout}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          className="flex-row items-center px-3.5 py-2 rounded-xl bg-white border border-danger/30 shadow-card min-h-[44px]"
+          accessibilityRole="button"
+          accessibilityLabel="Log out of educator portal"
         >
-          <Text className="text-red-400 text-xs font-bold">Logout</Text>
+          <LogOut size={14} color="#b3261e" />
+          <Text className="text-xs font-bold text-danger font-sans ml-1.5">
+            Sign Out
+          </Text>
         </TouchableOpacity>
       </View>
 
       {loading && !data ? (
-        <View className="flex-1 justify-center items-center py-20">
-          <ActivityIndicator size="large" color="#005bbf" />
+        <View className="space-y-4 py-4">
+          <Skeleton width="100%" height={140} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={100} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={120} className="rounded-card" />
         </View>
       ) : (
-        <View className="mb-10">
-          {/* Main Indicators */}
-          <Card className="items-center py-6 mb-4">
-            <Text className="text-on-surface-variant text-xs font-semibold mb-1 uppercase tracking-wider">Total Micro-Savings (All Students)</Text>
-            <Text className="text-tertiary text-4xl font-black">₹{formatCurrency(data?.total_savings)}</Text>
+        <View className="space-y-4">
+          {/* Main Hero Card: Total Micro-Savings */}
+          <Card variant="forest" padding="lg" className="shadow-card mb-4">
+            <Text className="text-xs font-semibold text-sage-light uppercase tracking-wider font-sans mb-1">
+              Total Micro-Savings (All Students)
+            </Text>
+            <View className="flex-row items-baseline mb-2">
+              <Text className="text-3xl font-bold text-white font-sans">
+                ₹{formatINR(data?.total_savings)}
+              </Text>
+              <Text className="text-xs text-sage-light font-sans ml-2">
+                accumulated
+              </Text>
+            </View>
+            <Text className="text-xs text-sage-light font-sans leading-relaxed">
+              Automated spare-change deposits across all enrolled campus accounts.
+            </Text>
           </Card>
 
-          <View className="flex-row gap-x-4 mb-4">
-            <Card className="flex-1 my-0 py-4 items-center">
-              <Text className="text-on-surface-variant text-xs font-semibold mb-1">Active Students</Text>
-              <Text className="text-ob-primary text-2xl font-black">{data?.total_students ?? 0}</Text>
+          {/* Sub Metrics Grid */}
+          <View className="flex-row space-x-3 mb-4">
+            <Card variant="default" padding="md" className="flex-1 mr-1.5 shadow-card items-center">
+              <View className="w-9 h-9 rounded-full bg-sage-light items-center justify-center mb-2 border border-border">
+                <Users size={16} color="#144a32" />
+              </View>
+              <Text className="text-[11px] font-semibold text-text-muted uppercase tracking-wider font-sans mb-1 text-center">
+                Active Savers
+              </Text>
+              <Text className="text-2xl font-bold text-text-primary font-sans">
+                {data?.total_students ?? 0}
+              </Text>
             </Card>
 
-            <Card className="flex-1 my-0 py-4 items-center">
-              <Text className="text-on-surface-variant text-xs font-semibold mb-1">Average Savings</Text>
-              <Text className="text-tertiary text-2xl font-black">₹{formatCurrency(data?.average_savings_per_student)}</Text>
+            <Card variant="default" padding="md" className="flex-1 ml-1.5 shadow-card items-center">
+              <View className="w-9 h-9 rounded-full bg-sage-light items-center justify-center mb-2 border border-border">
+                <Coins size={16} color="#144a32" />
+              </View>
+              <Text className="text-[11px] font-semibold text-text-muted uppercase tracking-wider font-sans mb-1 text-center">
+                Avg Savings
+              </Text>
+              <Text className="text-2xl font-bold text-primary font-sans">
+                ₹{formatINR(data?.average_savings_per_student)}
+              </Text>
             </Card>
           </View>
 
-          <Card className="items-center py-4 mb-6">
-            <Text className="text-on-surface-variant text-xs font-semibold mb-1">Card Swipes Processed</Text>
-            <Text className="text-on-surface text-xl font-bold">{data?.total_transactions_processed ?? 0} Swipes</Text>
+          {/* Swipes Activity Card */}
+          <Card variant="default" padding="md" className="shadow-card mb-4 flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-full bg-sage-light items-center justify-center mr-3 border border-border">
+                <CreditCard size={18} color="#144a32" />
+              </View>
+              <View>
+                <Text className="text-sm font-bold text-text-primary font-sans">
+                  Card Swipes Processed
+                </Text>
+                <Text className="text-xs text-text-muted font-sans mt-0.5">
+                  Simulated purchase round-up events
+                </Text>
+              </View>
+            </View>
+            <Text className="text-lg font-bold text-text-primary font-sans">
+              {data?.total_transactions_processed ?? 0}
+            </Text>
           </Card>
 
-          {/* Quick Info Box */}
-          <Card>
-            <Text className="text-on-surface text-base font-bold mb-2">Advisor Insights</Text>
-            <Text className="text-on-surface-variant text-xs leading-relaxed">
-              This panel aggregates automated savings metrics over all student accounts with `role='student'`.
-              Students build financial buffers through round-up micro-savings. If average savings rates decrease,
-              consider pushing localized curriculum guidelines via the Financial Literacy tab.
+          {/* Advisor Oversight Insights Note */}
+          <Card variant="peach" padding="md" className="shadow-card mb-4">
+            <View className="flex-row items-center mb-2">
+              <Sparkles size={16} color="#856529" className="mr-2" />
+              <Text className="text-xs font-bold text-text-primary font-sans ml-1">
+                Advisor Insights & Curriculum
+              </Text>
+            </View>
+            <Text className="text-xs text-text-secondary font-sans leading-relaxed">
+              This portal aggregates automated savings metrics for all student accounts. Students build financial buffers through round-up micro-savings without manual budget strain. If cohort velocity dips, consider pushing targeted curriculum guidance via the AI Quality Oversight tab.
             </Text>
           </Card>
         </View>
       )}
-    </ScrollView>
+    </ScreenContainer>
   );
 };
 

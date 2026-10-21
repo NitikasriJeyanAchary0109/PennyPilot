@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, ActivityIndicator } from "react-native";
+import { MessageSquare, Coins, TrendingUp } from "lucide-react-native";
 import { ChartWrapper } from "../../components/ChartWrapper";
-import { Card } from "../../components/Card";
 import { apiService } from "../../services/api";
 import { EducatorTrends } from "../../types";
+import { ScreenContainer, Header, Card, Skeleton } from "../../components/ui";
 
 const truncateLabel = (label: string, maxLen = 8) =>
   label.length > maxLen ? `${label.slice(0, maxLen - 1)}…` : label;
@@ -13,17 +14,17 @@ export const TrendsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<EducatorTrends | null>(null);
 
-  const fetchTrends = async () => {
+  const fetchTrends = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getEducatorTrends();
       setData(res);
     } catch (e: any) {
-      console.warn("Failed to load educator trends:", e.message);
+      console.warn("Failed to load educator trends:", e?.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -33,13 +34,22 @@ export const TrendsScreen = () => {
 
   useEffect(() => {
     fetchTrends();
-  }, []);
+  }, [fetchTrends]);
+
+  const formatINR = (val: number | string | null | undefined): string => {
+    const num = typeof val === "number" ? val : parseFloat(String(val || 0));
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(isNaN(num) ? 0 : num);
+  };
 
   const categoryLabels =
-    data?.top_categories_discussed.map((item) =>
+    data?.top_categories_discussed?.map((item) =>
       truncateLabel(item.category?.trim() || "Other")
     ) ?? [];
-  const categoryCounts = data?.top_categories_discussed.map((item) => item.count) ?? [];
+  const categoryCounts =
+    data?.top_categories_discussed?.map((item) => item.count) ?? [];
 
   const summaryLabels = ["Messages", "Round-up"];
   const summaryData = data
@@ -47,60 +57,78 @@ export const TrendsScreen = () => {
     : [];
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#005bbf" />
-      }
+    <ScreenContainer
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      className="pt-2 pb-8"
     >
-      <View className="mb-6">
-        <Text className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Visual Analytics</Text>
-        <Text className="text-on-surface text-2xl font-black">Cohort Trends</Text>
-        <Text className="text-on-surface-variant text-xs mt-1">Aggregate metrics only — no individual student data</Text>
-      </View>
+      <Header
+        title="Cohort Trends"
+        subtitle="Aggregate metrics only — no individual student data"
+        showLogo
+        showNotification={false}
+        className="px-0 mb-4"
+      />
 
       {loading && !data ? (
-        <View className="flex-1 justify-center items-center py-20">
-          <ActivityIndicator size="large" color="#005bbf" />
+        <View className="space-y-4 py-4">
+          <Skeleton width="100%" height={100} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={220} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={220} className="rounded-card" />
         </View>
       ) : (
-        <>
-          <View className="flex-row gap-x-4 mb-2">
-            <Card className="flex-1 my-0 py-4 items-center">
-              <Text className="text-slate-400 text-xs font-semibold mb-1">Coach Messages (30d)</Text>
-              <Text className="text-indigo-400 text-2xl font-black">
+        <View className="space-y-4">
+          {/* Top KPI Metrics Row */}
+          <View className="flex-row space-x-3 mb-4">
+            <Card variant="default" padding="md" className="flex-1 mr-1.5 shadow-card items-center">
+              <View className="w-9 h-9 rounded-full bg-sage-light items-center justify-center mb-2 border border-border">
+                <MessageSquare size={16} color="#144a32" />
+              </View>
+              <Text className="text-[11px] font-semibold text-text-muted uppercase tracking-wider font-sans mb-1 text-center">
+                Coach Messages (30d)
+              </Text>
+              <Text className="text-2xl font-bold text-text-primary font-sans">
                 {data?.total_student_messages_last_30_days ?? 0}
               </Text>
             </Card>
-            <Card className="flex-1 my-0 py-4 items-center">
-              <Text className="text-slate-400 text-xs font-semibold mb-1">Avg Round-up</Text>
-              <Text className="text-emerald-400 text-2xl font-black">
-                ₹{Number(data?.average_round_up_amount ?? 0).toFixed(2)}
+
+            <Card variant="default" padding="md" className="flex-1 ml-1.5 shadow-card items-center">
+              <View className="w-9 h-9 rounded-full bg-sage-light items-center justify-center mb-2 border border-border">
+                <Coins size={16} color="#144a32" />
+              </View>
+              <Text className="text-[11px] font-semibold text-text-muted uppercase tracking-wider font-sans mb-1 text-center">
+                Avg Round-up
+              </Text>
+              <Text className="text-2xl font-bold text-primary font-sans">
+                ₹{formatINR(data?.average_round_up_amount)}
               </Text>
             </Card>
           </View>
 
-          <ChartWrapper
-            title="Transaction Volume by Category"
-            labels={categoryLabels.length > 0 ? categoryLabels : ["—"]}
-            data={categoryCounts.length > 0 ? categoryCounts : [0]}
-            type="line"
-            suffix=""
-          />
+          {/* Visual Category Trends */}
+          <View className="mb-4">
+            <ChartWrapper
+              title="Transaction Volume by Category"
+              labels={categoryLabels.length > 0 ? categoryLabels : ["—"]}
+              data={categoryCounts.length > 0 ? categoryCounts : [0]}
+              type="line"
+              suffix=""
+            />
+          </View>
 
-          <ChartWrapper
-            title="Cohort Activity Summary"
-            labels={summaryLabels}
-            data={summaryData.length > 0 ? summaryData : [0, 0]}
-            type="bar"
-            suffix=""
-          />
-        </>
+          {/* Cohort Activity Summary */}
+          <View className="mb-4">
+            <ChartWrapper
+              title="Cohort Activity Summary"
+              labels={summaryLabels}
+              data={summaryData.length > 0 ? summaryData : [0, 0]}
+              type="bar"
+              suffix=""
+            />
+          </View>
+        </View>
       )}
-
-      <View className="h-10" />
-    </ScrollView>
+    </ScreenContainer>
   );
 };
 
