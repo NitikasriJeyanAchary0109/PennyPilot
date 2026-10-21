@@ -10,7 +10,6 @@ from app.routers import (
     chat,
     coach,
     dream,
-    educator,
     forecast,
     goals,
     negotiator,
@@ -112,7 +111,6 @@ app.include_router(chat.router, prefix="/api")
 app.include_router(negotiator.router, prefix="/api")
 app.include_router(forecast.router, prefix="/api")
 app.include_router(wellness.router, prefix="/api")
-app.include_router(educator.router, prefix="/api")
 app.include_router(savings.router, prefix="/api")
 app.include_router(budgets.router, prefix="/api")
 app.include_router(calculations.router, prefix="/api")

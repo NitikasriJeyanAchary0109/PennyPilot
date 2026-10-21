@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import { User, GraduationCap, ArrowRight } from "lucide-react-native";
+import { ArrowRight } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "../../hooks/useAuth";
 import {
@@ -15,7 +15,6 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"student" | "educator">("student");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +44,7 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
     setLoading(true);
 
     try {
-      await register(name.trim(), email.trim().toLowerCase(), password, role);
+      await register(name.trim(), email.trim().toLowerCase(), password);
       setSuccessMsg("Account created! Redirecting to login...");
       setTimeout(() => {
         navigation.navigate("Login");
@@ -89,76 +88,6 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
             </Text>
           </View>
         )}
-
-        {/* Role Selector Tabs (≥44pt touch targets) */}
-        <View className="mb-4">
-          <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-2 ml-1">
-            Choose Account Role
-          </Text>
-          <View className="flex-row space-x-2">
-            <TouchableOpacity
-              onPress={() => {
-                triggerHaptic();
-                setRole("student");
-              }}
-              activeOpacity={0.8}
-              className={`flex-1 py-3 px-3 rounded-2xl border flex-row items-center justify-center min-h-[48px] mr-1 ${
-                role === "student"
-                  ? "bg-primary border-primary shadow-button"
-                  : "bg-cream border-border"
-              }`}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: role === "student" }}
-              accessibilityLabel="Student Saver Role"
-            >
-              <User
-                size={16}
-                color={role === "student" ? "#ffffff" : "#144a32"}
-                className="mr-1.5"
-              />
-              <Text
-                className={`text-xs font-sans ${
-                  role === "student"
-                    ? "font-bold text-white"
-                    : "font-semibold text-text-secondary"
-                }`}
-              >
-                Student Saver
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                triggerHaptic();
-                setRole("educator");
-              }}
-              activeOpacity={0.8}
-              className={`flex-1 py-3 px-3 rounded-2xl border flex-row items-center justify-center min-h-[48px] ml-1 ${
-                role === "educator"
-                  ? "bg-primary border-primary shadow-button"
-                  : "bg-cream border-border"
-              }`}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: role === "educator" }}
-              accessibilityLabel="Educator Administrator Role"
-            >
-              <GraduationCap
-                size={16}
-                color={role === "educator" ? "#ffffff" : "#144a32"}
-                className="mr-1.5"
-              />
-              <Text
-                className={`text-xs font-sans ${
-                  role === "educator"
-                    ? "font-bold text-white"
-                    : "font-semibold text-text-secondary"
-                }`}
-              >
-                Educator
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* Form Inputs */}
         <Input

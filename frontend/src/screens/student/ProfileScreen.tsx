@@ -83,10 +83,7 @@ export const ProfileScreen = () => {
     .slice(0, 2)
     .toUpperCase();
 
-  const roleLabel =
-    (userProfile?.role || userRole) === "educator"
-      ? "Educator Administrator"
-      : "Student Saver";
+  const roleLabel = "Student Saver";
 
   return (
     <ScreenContainer

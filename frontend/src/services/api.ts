@@ -356,19 +356,6 @@ export const apiService = {
     return response.data;
   },
 
-  // Educator
-  getEducatorAnalytics: async () => {
-    const response = await api.get("/educator/analytics");
-    return response.data;
-  },
-  getEducatorOverview: async () => {
-    const response = await api.get("/educator/overview");
-    return response.data;
-  },
-  getEducatorTrends: async () => {
-    const response = await api.get("/educator/trends");
-    return response.data;
-  },
 
   // Google OAuth direct exchange
   googleLoginPost: async (data: { email: string; full_name: string; oauth_id: string }) => {

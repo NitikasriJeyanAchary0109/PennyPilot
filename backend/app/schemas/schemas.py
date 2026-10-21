@@ -12,7 +12,7 @@ class UserBase(BaseModel):
     full_name: str
     email: EmailStr
     phone: Optional[str] = None
-    role: str = Field(default="student", description="Role: student or educator")
+    role: str = Field(default="student", description="Role: student")
 
 
 class UserCreate(UserBase):
@@ -307,12 +307,4 @@ class AuditLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ==========================================
-# EDUCATOR/ANALYTICS SCHEMAS
-# ==========================================
-class EducatorAnalyticsResponse(BaseModel):
-    total_students: int
-    total_savings: Decimal
-    average_savings_per_student: Decimal
-    total_transactions_processed: int
-    recent_insights: List[ChatHistoryResponse]
+

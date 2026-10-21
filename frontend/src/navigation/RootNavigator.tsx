@@ -29,11 +29,6 @@ import ProfileScreen from "../screens/student/ProfileScreen";
 import NotificationsScreen from "../screens/student/NotificationsScreen";
 import BudgetsScreen from "../screens/student/BudgetsScreen";
 
-// Educator Screens
-import OverviewScreen from "../screens/educator/OverviewScreen";
-import TrendsScreen from "../screens/educator/TrendsScreen";
-import LiteracyScreen from "../screens/educator/LiteracyScreen";
-
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -193,53 +188,10 @@ function OnboardingStackScreen() {
 }
 
 // ==========================
-// EDUCATOR TABS
-// ==========================
-function EducatorTabs() {
-  return (
-    <Tab.Navigator screenOptions={studentScreenOptions}>
-      <Tab.Screen
-        name="Overview"
-        component={OverviewScreen}
-        options={{
-          title: "Educator Dashboard",
-          tabBarLabel: "Overview",
-          tabBarIcon: ({ color, size }) => (
-            <LayoutDashboard size={size || 22} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Trends"
-        component={TrendsScreen}
-        options={{
-          title: "Cohort Trends",
-          tabBarLabel: "Trends",
-          tabBarIcon: ({ color, size }) => (
-            <TrendingUp size={size || 22} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Literacy"
-        component={LiteracyScreen}
-        options={{
-          title: "AI Quality Oversight",
-          tabBarLabel: "Oversight",
-          tabBarIcon: ({ color, size }) => (
-            <GraduationCap size={size || 22} color={color} />
-          ),
-        }}
-      />
-    </Tab.Navigator>
-  );
-}
-
-// ==========================
 // ROOT NAVIGATOR
 // ==========================
 export const RootNavigator = () => {
-  const { userToken, userRole, isLoading, hasCompletedOnboarding } = useAuth();
+  const { userToken, isLoading, hasCompletedOnboarding } = useAuth();
 
   if (isLoading) {
     return (
@@ -263,11 +215,6 @@ export const RootNavigator = () => {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
         </>
-      ) : userRole === "educator" ? (
-        <Stack.Screen
-          name="EducatorHome"
-          component={EducatorTabs}
-        />
       ) : hasCompletedOnboarding ? (
         <Stack.Screen
           name="StudentHome"

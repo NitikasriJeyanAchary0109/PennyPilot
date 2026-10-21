@@ -3,7 +3,7 @@ export interface User {
   full_name: string;
   email: string;
   phone?: string;
-  role: "student" | "educator";
+  role: "student";
   has_completed_onboarding: boolean;
   created_at: string;
   updated_at: string;
@@ -108,22 +108,8 @@ export interface AuditLog {
 export interface TokenResponse {
   access_token: string;
   token_type: string;
-  role: "student" | "educator";
+  role: "student";
   has_completed_onboarding: boolean;
-}
-
-export interface EducatorAnalytics {
-  total_students: number;
-  total_savings: number;
-  average_savings_per_student: number;
-  total_transactions_processed: number;
-  recent_insights: ChatHistory[];
-}
-
-export interface EducatorTrends {
-  total_student_messages_last_30_days: number;
-  top_categories_discussed: { category: string | null; count: number }[];
-  average_round_up_amount: number;
 }
 
 export interface AIInsight {

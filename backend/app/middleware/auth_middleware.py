@@ -49,7 +49,7 @@ async def get_current_user(
 class RoleChecker:
     """
     Dependency class to enforce role-based access control.
-    Example usage: current_user: User = Depends(RoleChecker(["educator"]))
+    Example usage: current_user: User = Depends(RoleChecker(["student"]))
     """
 
     def __init__(self, allowed_roles: List[str]):
@@ -66,4 +66,3 @@ class RoleChecker:
 
 # Conveniences for common requirements
 require_student = RoleChecker(["student"])
-require_educator = RoleChecker(["educator"])

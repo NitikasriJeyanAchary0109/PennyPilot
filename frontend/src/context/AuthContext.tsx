@@ -7,12 +7,12 @@ import { apiService } from "../services/api";
 
 interface AuthContextType {
   userToken: string | null;
-  userRole: "student" | "educator" | null;
+  userRole: "student" | null;
   isLoading: boolean;
   hasCompletedOnboarding: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (fullName: string, email: string, password: string, role: "student" | "educator") => Promise<void>;
-  loginWithToken: (token: string, role: "student" | "educator", hasCompletedOnboarding?: boolean) => Promise<void>;
+  register: (fullName: string, email: string, password: string, role?: string) => Promise<void>;
+  loginWithToken: (token: string, role?: string, hasCompletedOnboarding?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   loginAsGuest: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -22,7 +22,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userToken, setUserToken] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<"student" | "educator" | null>(null);
+  const [userRole, setUserRole] = useState<"student" | null>(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -31,12 +31,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const bootstrapAsync = async () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
-        const role = await AsyncStorage.getItem("userRole") as "student" | "educator" | null;
         const completed = await AsyncStorage.getItem("hasCompletedOnboarding");
         
-        if (token && role) {
+        if (token) {
           setUserToken(token);
-          setUserRole(role);
+          setUserRole("student");
         }
         if (completed === "true") {
           setHasCompletedOnboarding(true);
@@ -59,14 +58,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
       });
 
-      const { access_token, role, has_completed_onboarding } = response.data;
+      const { access_token, has_completed_onboarding } = response.data;
 
       await AsyncStorage.setItem("userToken", access_token);
-      await AsyncStorage.setItem("userRole", role);
+      await AsyncStorage.setItem("userRole", "student");
       await AsyncStorage.setItem("hasCompletedOnboarding", String(has_completed_onboarding));
 
       setUserToken(access_token);
-      setUserRole(role);
+      setUserRole("student");
       setHasCompletedOnboarding(has_completed_onboarding);
     } catch (error: any) {
       const errMsg = error.response?.data?.detail || "Authentication login failed.";
@@ -76,14 +75,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (fullName: string, email: string, password: string, role: "student" | "educator") => {
+  const register = async (fullName: string, email: string, password: string, _role = "student") => {
     try {
       setIsLoading(true);
       await axios.post(`${API_URL}/auth/register`, {
         full_name: fullName,
         email,
         password,
-        role,
+        role: "student",
       });
     } catch (error: any) {
       const errMsg = error.response?.data?.detail || "Registration failed.";
@@ -93,14 +92,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const loginWithToken = async (token: string, role: "student" | "educator", completed = false) => {
+  const loginWithToken = async (token: string, _role = "student", completed = false) => {
     try {
       setIsLoading(true);
       await AsyncStorage.setItem("userToken", token);
-      await AsyncStorage.setItem("userRole", role);
+      await AsyncStorage.setItem("userRole", "student");
       await AsyncStorage.setItem("hasCompletedOnboarding", String(completed));
       setUserToken(token);
-      setUserRole(role);
+      setUserRole("student");
       setHasCompletedOnboarding(completed);
     } catch (e) {
       console.error("Failed to store credentials during OAuth login", e);

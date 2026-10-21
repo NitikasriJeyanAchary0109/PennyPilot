@@ -3,7 +3,7 @@ import datetime
 import pytest
 from app.database import Base, get_db
 from app.main import app
-from app.middleware.auth_middleware import require_educator, require_student
+from app.middleware.auth_middleware import require_student
 from app.models.models import (
     AuditLog,
     Budget,
@@ -57,25 +57,7 @@ def override_require_student():
         db.close()
 
 
-def override_require_educator():
-    db = TestingSessionLocal()
-    try:
-        user = db.query(User).filter(User.user_id == 2).first()
-        if user is None:
-            user = User(
-                user_id=2,
-                full_name="Test Educator",
-                email="educator@test.com",
-                role="educator",
-                created_at=datetime.datetime.utcnow(),
-                updated_at=datetime.datetime.utcnow(),
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        return user
-    finally:
-        db.close()
+
 
 
 client = TestClient(app)
@@ -100,7 +82,6 @@ def setup_database():
     app.dependency_overrides.clear()
     app.dependency_overrides[get_db] = get_testing_db
     app.dependency_overrides[require_student] = override_require_student
-    app.dependency_overrides[require_educator] = override_require_educator
 
     db = TestingSessionLocal()
     # Clean tables
@@ -324,40 +305,7 @@ def test_notifications():
     assert response.json()["status"] == "read"
 
 
-def test_educator_overview_trends():
-    db = TestingSessionLocal()
-    # Ensure there is a student and some data
-    std = db.query(User).filter(User.user_id == 1).first()
-    if std is None:
-        std = User(
-            user_id=1,
-            full_name="Test Student",
-            email="student@test.com",
-            role="student",
-        )
-        db.add(std)
 
-    db_goal = Goal(
-        user_id=1,
-        title="Holiday",
-        target_amount=1000.00,
-        current_amount=200.00,
-        status="active",
-    )
-    db.add(db_goal)
-    db.commit()
-    db.close()
-
-    # Test GET /api/educator/overview
-    response = client.get("/api/educator/overview")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["total_students"] >= 1
-    assert float(data["total_savings"]) >= 200.00
-
-    # Test GET /api/educator/trends
-    response = client.get("/api/educator/trends")
-    assert response.status_code == 200
 
 
 def test_legacy_bcrypt_hash_backward_compatibility():

@@ -44,11 +44,10 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
     try {
       const parsed = Linking.parse(url);
       const token = parsed.queryParams?.token as string;
-      const role = parsed.queryParams?.role as "student" | "educator";
       const completed = parsed.queryParams?.has_completed_onboarding === "true";
 
-      if (token && role) {
-        loginWithToken(token, role, completed);
+      if (token) {
+        loginWithToken(token, "student", completed);
         WebBrowser.dismissBrowser();
       }
     } catch (e) {

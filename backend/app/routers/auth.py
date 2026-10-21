@@ -59,7 +59,7 @@ def log_login_session(db: Session, user: User, request: Request) -> UserSession:
     "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """Registers a new student or educator (email/password)."""
+    """Registers a new student user (email/password)."""
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
@@ -68,21 +68,14 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="A user with this email address already exists.",
         )
 
-    # Validate role
-    if user_data.role not in ["student", "educator"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid role. Must be 'student' or 'educator'.",
-        )
-
-    # Hash password and create user
+    # Hash password and create user with student role
     hashed_pwd = get_password_hash(user_data.password) if user_data.password else None
     new_user = User(
         full_name=user_data.full_name,
         email=user_data.email,
         password_hash=hashed_pwd,
         phone=user_data.phone,
-        role=user_data.role,
+        role="student",
         created_at=datetime.datetime.utcnow(),
         updated_at=datetime.datetime.utcnow(),
     )
