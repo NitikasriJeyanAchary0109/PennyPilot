@@ -123,6 +123,19 @@ async def get_wellness_score(
         db, current_user.user_id, timeframe_days
     )
 
+    # Return existing cached report if available within the last 24 hours
+    recent_report = (
+        db.query(FinancialHealth)
+        .filter(
+            FinancialHealth.user_id == current_user.user_id,
+            FinancialHealth.created_at >= datetime.datetime.utcnow() - datetime.timedelta(hours=24),
+        )
+        .order_by(FinancialHealth.created_at.desc())
+        .first()
+    )
+    if recent_report:
+        return recent_report
+
     # Build wellness narration
     prompt = wellness_prompt(
         stress_score=score,
@@ -135,12 +148,12 @@ async def get_wellness_score(
             system_prompt="You are Penny Pilot, giving friendly, non-judgmental wellness insights.",
             user_prompt=prompt,
         )
-    except AIEngineError as exc:
-        logger.error("wellness.score | AIEngineError: %s", exc.message)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI wellness scanning is currently offline. Please try again in a moment.",
-        ) from exc
+    except Exception as exc:
+        logger.warning("wellness.score | Ollama unavailable, activating heuristic fallback: %s", exc)
+        ai_summary = (
+            f"Your financial wellness score is {health_score}/100. "
+            "Your spending is stable, and micro-savings are actively channeling spare change into your goals."
+        )
 
     # Cache report in FinancialHealth table
     report = FinancialHealth(

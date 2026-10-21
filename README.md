@@ -81,17 +81,27 @@ Penny Pilot features a custom **Warm Cream & Forest Green** design system (`#fbf
 
 ---
 
-### 2. Authentication & Guided Student Onboarding
-Clean, accessible authentication supporting email/password and Google OAuth, followed by a personalized onboarding flow.
+### 2. Accessible Authentication & Role Selection
+Clean, accessible authentication supporting email/password and Google OAuth, with intuitive role selection between student savers and faculty advisors.
 
-| Warm Cream Authentication | Interactive Onboarding Flow |
+| Warm Cream Authentication | Role-Based Account Registration |
 | :---: | :---: |
-| ![Login Screen](docs/screenshots/03_login.png) | ![Onboarding Setup](docs/screenshots/12_onboarding.png) |
-| *High-contrast inputs with 44pt tap targets and seamless student/educator role selection.* | *Step-by-step guidance to set up initial allowance, recurring bills, and savings targets.* |
+| ![Login Screen](docs/screenshots/03_login.png) | ![Register Screen](docs/screenshots/04_register.png) |
+| *High-contrast inputs with 44pt tap targets and seamless OAuth options.* | *Accessible onboarding with 48pt "Student Saver" vs "Educator" role selection chips.* |
 
 ---
 
-### 3. Purpose-Driven Goals & Impulse Monitor
+### 3. Guided Student Onboarding & Budget Boundaries
+Personalized onboarding guides students to set sustainable baselines, paired with intelligent budget categories that establish safe monthly spending boundaries.
+
+| Interactive Onboarding Flow | Intelligent Budget Boundaries |
+| :---: | :---: |
+| ![Onboarding Setup](docs/screenshots/12_onboarding.png) | ![Budget Management](docs/screenshots/08_budgets.png) |
+| *Step-by-step guidance to set up initial allowance, recurring bills, and savings targets.* | *Category spending limits with real-time remaining balance and visual boundary alerts.* |
+
+---
+
+### 4. Purpose-Driven Goals & Impulse Monitor
 Students save for what matters most—laptop upgrades, semester travel, emergency cushions—with real-time progress percentages computed deterministically by the backend.
 
 | Smart Goals Dashboard | Impulse Monitor & Insights |
@@ -101,7 +111,7 @@ Students save for what matters most—laptop upgrades, semester travel, emergenc
 
 ---
 
-### 4. Private AI Financial Coach & Subscription Negotiator
+### 5. Private AI Financial Coach & Subscription Negotiator
 A conversational AI partner powered by on-device LLaMA 3 provides contextual financial literacy without sending student banking details to proprietary external cloud services.
 
 | AI Financial Coach Chat | Subscription Negotiator |
@@ -111,17 +121,17 @@ A conversational AI partner powered by on-device LLaMA 3 provides contextual fin
 
 ---
 
-### 5. Automated Round-Up Tracker & Emergency Vault
+### 6. Automated Round-Up Tracker & Emergency Vault
 Automate micro-savings on every transaction and protect reserves from accidental spending.
 
 | Transaction Round-Up Tracker | Emergency Vault Guard |
 | :---: | :---: |
 | ![Round-Up Tracker](docs/screenshots/09_roundup_tracker.png) | ![Emergency Withdrawal](docs/screenshots/11_emergency_withdrawal.png) |
-| *Visual log of round-up spare change accumulated across debits.* | *Confirmation-locked withdrawal modal protecting emergency cushions.* |
+| *Visual log of round-up spare change accumulated across debits.* | *Compassionate rainy-day fund protection featuring multi-step confirmation modals.* |
 
 ---
 
-### 6. Educator Cohort Analytics & AI Literacy Dashboard
+### 7. Educator Cohort Analytics & AI Literacy Dashboard
 Campus financial advisors and educators gain macro-level insights into student financial health and AI coaching safety without violating individual student privacy.
 
 | Educator Cohort Oversight Dashboard | Design System Mood Board |
@@ -329,14 +339,16 @@ ConsumerLiterarcyTrack/
 ├── frontend/
 │   ├── App.tsx                 # Root mobile/web application wrapper
 │   ├── src/
-│   │   ├── components/ui/      # Warm cream accessible UI components (Button, Card, etc.)
+│   │   ├── components/ui/      # Warm cream accessible UI components (Button, Card, Input, ScreenContainer, etc.)
 │   │   ├── context/            # AuthContext and state providers
 │   │   ├── navigation/         # Tab and Stack navigators (Student & Educator)
 │   │   ├── screens/
-│   │   │   ├── auth/           # LoginScreen, RegisterScreen
+│   │   │   ├── auth/           # LoginScreen, RegisterScreen (48pt role selectors)
 │   │   │   ├── educator/       # OverviewScreen, TrendsScreen, LiteracyScreen
-│   │   │   ├── onboarding/     # CSVUploadScreen
-│   │   │   └── student/        # HomeScreen, GoalsScreen, ChatScreen, BudgetsScreen...
+│   │   │   ├── onboarding/     # CSVUploadScreen (bank statement parser)
+│   │   │   └── student/        # Core student tabs (HomeScreen, GoalsScreen, ChatScreen, BudgetsScreen)
+│   │   │                       # Action screens (RoundupTracker, SubscriptionNegotiator, EmergencyWithdrawal)
+│   │   │                       # Guided onboarding flow (OnboardingSetup, SpendingEntryChoice, ManualIncomeExpense, CreateGoal)
 │   │   └── services/           # Typed Axios API client
 │   ├── tailwind.config.js      # Design tokens (warm cream, forest green, accessible gold)
 │   └── package.json            # Expo dependencies & scripts
