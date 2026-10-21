@@ -1,0 +1,73 @@
+================================================================================
+PENNY PILOT STEP 2: WCAG 2.1 AA COLOR CONTRAST AUDIT & DARKENING REPORT
+Source Reference: docs/ux/reference/pennypilot_ui.png
+Worktree: .worktrees/ui-production
+================================================================================
+
+PART 1: RAW SAMPLED TOKENS CONTRAST EVALUATION
+--------------------------------------------------------------------------------
+Color Pair / Use Case                            | FG Hex    | BG Hex    | Req   | Ratio   | Verdict
+--------------------------------------------------------------------------------------------
+Body text primary on cream                       | #0d3a2b   | #fbf7ee   | 4.5:1 | 11.85:1 | PASS
+Body text primary on white                       | #0d3a2b   | #ffffff   | 4.5:1 | 12.67:1 | PASS
+Transaction title text on white                  | #0b0e17   | #ffffff   | 4.5:1 | 19.28:1 | PASS
+Secondary text on cream                          | #73767a   | #fbf7ee   | 4.5:1 |  4.27:1 | FAIL (<4.5:1)
+Secondary text on white                          | #73767a   | #ffffff   | 4.5:1 |  4.56:1 | PASS
+Muted text on cream                              | #80888c   | #fbf7ee   | 4.5:1 |  3.38:1 | FAIL (<4.5:1)
+Muted text on white                              | #80888c   | #ffffff   | 4.5:1 |  3.61:1 | FAIL (<4.5:1)
+Placeholder text on white                        | #a0a5b1   | #ffffff   | 4.5:1 |  2.47:1 | FAIL (<4.5:1)
+Placeholder text on cream                        | #a0a5b1   | #fbf7ee   | 4.5:1 |  2.31:1 | FAIL (<4.5:1)
+White text on primary forest green               | #ffffff   | #144a32   | 4.5:1 | 10.22:1 | PASS
+Gold coins/accent on cream (large text)          | #d5ad64   | #fbf7ee   | 3.0:1 |  1.97:1 | FAIL (<3.0:1)
+Gold coins/accent on white (large text)          | #d5ad64   | #ffffff   | 3.0:1 |  2.10:1 | FAIL (<3.0:1)
+Gold coins/accent on cream (body text)           | #d5ad64   | #fbf7ee   | 4.5:1 |  1.97:1 | FAIL (<4.5:1)
+Caption text on white                            | #73767a   | #ffffff   | 4.5:1 |  4.56:1 | PASS
+Caption text on cream                            | #73767a   | #fbf7ee   | 4.5:1 |  4.27:1 | FAIL (<4.5:1)
+Nudge banner text on nudge peach                 | #191b1c   | #fdebd8   | 4.5:1 | 14.86:1 | PASS
+
+================================================================================
+PART 2: TOKENS REQUIRING DARKENING & ADJUSTED VALUES
+--------------------------------------------------------------------------------
+Rule: Darken any token under 4.5:1 (3:1 for large text / graphical accents).
+
+Use Case                                 | Original  | Darkened  | On BG     | Req   | Ratio   | Status
+------------------------------------------------------------------------------------------------
+Adjusted Secondary text on cream         | #73767a   | #525956   | #fbf7ee   | 4.5:1 |  6.72:1 | PASS
+Adjusted Secondary text on white         | #73767a   | #525956   | #ffffff   | 4.5:1 |  7.19:1 | PASS
+Adjusted Muted text on cream             | #80888c   | #666e69   | #fbf7ee   | 4.5:1 |  4.91:1 | PASS
+Adjusted Muted text on white             | #80888c   | #666e69   | #ffffff   | 4.5:1 |  5.25:1 | PASS
+Adjusted Placeholder #707773 on white    | #a0a5b1   | #707773   | #ffffff   | 4.5:1 |  4.59:1 | PASS
+Adjusted Placeholder #707773 on cream    | #a0a5b1   | #707773   | #fbf7ee   | 4.5:1 |  4.29:1 | FAIL
+Darkened Placeholder #6d7370 on cream    | #a0a5b1   | #6d7370   | #fbf7ee   | 4.5:1 |  4.53:1 | PASS
+Darkened Placeholder #6d7370 on white    | #a0a5b1   | #6d7370   | #ffffff   | 4.5:1 |  4.84:1 | PASS
+Adjusted Caption text on cream           | #73767a   | #525956   | #fbf7ee   | 4.5:1 |  6.72:1 | PASS
+Adjusted Caption text on white           | #73767a   | #525956   | #ffffff   | 4.5:1 |  7.19:1 | PASS
+Adjusted Gold on cream (large/UI)        | #d5ad64   | #a88544   | #fbf7ee   | 3.0:1 |  3.22:1 | PASS
+Adjusted Gold on cream (body text)       | #d5ad64   | #856529   | #fbf7ee   | 4.5:1 |  5.05:1 | PASS
+
+================================================================================
+PART 3: SUMMARY OF COLOR TOKEN MODIFICATIONS
+--------------------------------------------------------------------------------
+1. Secondary Text: Darkened from #73767a -> #525956
+   - Reason: Raw sampled #73767a had 4.27:1 on cream (fails 4.5:1).
+   - Result: #525956 achieves 6.72:1 on cream and 7.19:1 on white (robust PASS).
+
+2. Muted Text: Darkened from #80888c -> #666e69
+   - Reason: Raw sampled #80888c had 3.38:1 on cream and 3.61:1 on white (fails 4.5:1).
+   - Result: #666e69 achieves 4.91:1 on cream and 5.25:1 on white (PASS).
+
+3. Placeholder Text: Contrast evaluation on white vs cream:
+   - Raw sampled #a0a5b1 had 2.47:1 on white and 2.31:1 on cream (fails 4.5:1).
+   - Token #707773 achieves 4.59:1 on white inputs (PASS), but 4.29:1 on cream (FAILS 4.5:1).
+   - Background policy: In the reference design, inputs sit inside white cards (#ffffff) where #707773 passes WCAG AA.
+   - Universal token #6d7370 achieves 4.53:1 on cream and 4.84:1 on white (PASS on all surfaces).
+
+4. Gold Accent / Text: Configured as distinct tokens per usage requirements:
+   - gold = #d5ad64: decorative fills only (coins, sparkles, illustration) where contrast is not required.
+   - gold-ui = #a88544: icons/large elements (3.22:1 on cream, PASS >= 3.0:1).
+   - gold-text = #856529: text/links (5.05:1 on cream, PASS >= 4.5:1).
+
+5. Caption Text: Darkened from #73767a -> #525956
+   - Reason: Raw #73767a had 4.27:1 on cream.
+   - Result: Reuses #525956 for 6.72:1 on cream and 7.19:1 on white.
+================================================================================

@@ -1,42 +1,110 @@
 import React from "react";
-import { Image, Pressable, SafeAreaView, Text, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { View, Text, Image, TouchableOpacity } from "react-native";
+import { TrendingUp, Coins, Target, ArrowRight } from "lucide-react-native";
 import { useAuth } from "../../hooks/useAuth";
+import { ScreenContainer } from "../../components/ui/ScreenContainer";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
 
 export default function OnboardingSetupScreen({ navigation }: { navigation: any }) {
   const { completeOnboarding } = useAuth();
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="items-center px-margin-mobile py-stack-md">
-        <Text className="font-jakarta-semibold text-xl text-ob-primary">SpareChange AI</Text>
+    <ScreenContainer scrollable={true} className="justify-between py-6">
+      {/* Brand Header */}
+      <View className="items-center pt-2 pb-4">
+        <Text className="font-sans font-bold text-2xl text-primary tracking-tight">
+          Penny Pilot
+        </Text>
+        <Text className="font-sans text-xs text-text-secondary mt-0.5">
+          Student Financial Companion
+        </Text>
       </View>
-      <View className="flex-1 items-center justify-center px-margin-mobile">
-        <View className="h-60 w-60 items-center justify-center rounded-full bg-surface-container-low">
-          <Image source={require("../../../assets/illustrations/onboarding.png")} className="h-52 w-52" resizeMode="contain" />
-          <View className="absolute right-0 top-4 h-11 w-11 items-center justify-center rounded-2xl border border-outline-variant bg-white">
-            <MaterialIcons name="trending-up" size={22} color="#006d2a" />
+
+      {/* Hero Illustration & Welcome */}
+      <View className="items-center my-4">
+        <View className="relative w-56 h-56 items-center justify-center rounded-full bg-primary-tint/60 border border-primary/10">
+          <Image
+            source={require("../../../assets/illustrations/onboarding.png")}
+            className="w-44 h-44"
+            resizeMode="contain"
+            accessibilityLabel="Penny Pilot student onboarding illustration"
+          />
+
+          {/* Floating badge 1: Trend */}
+          <View className="absolute right-1 top-3 w-11 h-11 items-center justify-center rounded-2xl border border-border bg-surface shadow-sm">
+            <TrendingUp size={22} color="#144a32" />
           </View>
-          <View className="absolute bottom-5 left-0 h-11 w-11 items-center justify-center rounded-2xl border border-outline-variant bg-white">
-            <MaterialIcons name="savings" size={22} color="#005bbf" />
+
+          {/* Floating badge 2: Savings Coins */}
+          <View className="absolute bottom-3 left-1 w-11 h-11 items-center justify-center rounded-2xl border border-border bg-surface shadow-sm">
+            <Coins size={22} color="#a88544" />
           </View>
         </View>
-        <View className="mt-stack-xl items-center">
-          <Text className="font-jakarta-bold text-2xl text-on-surface">Welcome to SpareChange AI</Text>
-          <Text className="mt-2 max-w-[280px] text-center font-worksans text-base text-on-surface-variant">Let’s build your financial future together.</Text>
-        </View>
-        <View className="mt-stack-xl w-full gap-4">
-          <Pressable onPress={() => navigation.navigate("CreateGoal")} className="h-14 items-center justify-center rounded-full bg-primary-container">
-            <Text className="font-jakarta-semibold text-base text-white">Set a Goal First</Text>
-          </Pressable>
-          <Pressable onPress={() => navigation.navigate("SpendingEntryChoice")} className="h-14 items-center justify-center rounded-full border-2 border-outline-variant bg-white">
-            <Text className="font-jakarta-semibold text-base text-ob-primary">Tell Us About Your Spending</Text>
-          </Pressable>
+
+        <View className="mt-8 items-center px-4">
+          <Text className="font-sans font-extrabold text-2xl text-text text-center tracking-tight">
+            Welcome to Penny Pilot
+          </Text>
+          <Text className="mt-2 text-center font-sans text-sm text-text-secondary leading-relaxed max-w-[300px]">
+            Master your student budget, automate spare change savings, and reach your goals effortlessly.
+          </Text>
         </View>
       </View>
-      <View className="items-center px-margin-mobile py-stack-xl">
-        <Pressable onPress={completeOnboarding} hitSlop={12}><Text className="font-worksans-medium text-sm text-ob-secondary">Skip for now</Text></Pressable>
+
+      {/* Feature Highlights Card */}
+      <Card variant="default" className="p-4 mx-1 mb-6">
+        <View className="flex-row items-center justify-around">
+          <View className="items-center">
+            <View className="w-10 h-10 rounded-full bg-primary-tint items-center justify-center mb-1.5">
+              <Target size={18} color="#144a32" />
+            </View>
+            <Text className="font-sans font-semibold text-xs text-text">Smart Goals</Text>
+            <Text className="font-sans text-[11px] text-text-secondary">Target tracking</Text>
+          </View>
+          <View className="w-[1px] h-8 bg-border" />
+          <View className="items-center">
+            <View className="w-10 h-10 rounded-full bg-gold-light items-center justify-center mb-1.5">
+              <Coins size={18} color="#a88544" />
+            </View>
+            <Text className="font-sans font-semibold text-xs text-text">Micro Savings</Text>
+            <Text className="font-sans text-[11px] text-text-secondary">Roundup spares</Text>
+          </View>
+        </View>
+      </Card>
+
+      {/* Action Buttons */}
+      <View className="w-full gap-3 px-1">
+        <Button
+          title="Set a Goal First"
+          onPress={() => navigation.navigate("CreateGoal")}
+          variant="primary"
+          size="lg"
+          rightIcon={<ArrowRight size={18} color="#ffffff" />}
+          accessibilityLabel="Set a Goal First"
+        />
+
+        <Button
+          title="Tell Us About Your Spending"
+          onPress={() => navigation.navigate("SpendingEntryChoice")}
+          variant="secondary"
+          size="lg"
+          accessibilityLabel="Tell Us About Your Spending"
+        />
+
+        <TouchableOpacity
+          onPress={completeOnboarding}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+          className="items-center justify-center min-h-[44px] mt-1"
+          accessibilityRole="button"
+          accessibilityLabel="Skip for now"
+        >
+          <Text className="font-sans font-medium text-xs text-text-secondary">
+            Skip for now and explore dashboard
+          </Text>
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }

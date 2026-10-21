@@ -1,8 +1,15 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, SafeAreaView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
+import { User, GraduationCap, ArrowRight } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 import { useAuth } from "../../hooks/useAuth";
-import { Button } from "../../components/Button";
-import { Card } from "../../components/Card";
+import {
+  ScreenContainer,
+  Card,
+  Input,
+  Button,
+  PennyPilotLogoIcon,
+} from "../../components/ui";
 
 export const RegisterScreen = ({ navigation }: { navigation: any }) => {
   const [name, setName] = useState("");
@@ -14,161 +21,205 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
+  const triggerHaptic = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
+  };
+
   const handleRegister = async () => {
-    if (!name || !email || !password) {
-      setErrorMsg("Please fill in all fields.");
+    if (!name.trim() || !email.trim() || !password) {
+      setErrorMsg("Please complete all fields to create your account.");
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMsg("Password must be at least 6 characters long.");
       return;
     }
 
+    triggerHaptic();
     setErrorMsg(null);
     setSuccessMsg(null);
     setLoading(true);
+
     try {
       await register(name.trim(), email.trim().toLowerCase(), password, role);
-      setSuccessMsg("Account registered successfully! Redirecting to login...");
+      setSuccessMsg("Account created! Redirecting to login...");
       setTimeout(() => {
         navigation.navigate("Login");
-      }, 2000);
+      }, 1500);
     } catch (e: any) {
-      setErrorMsg(e.message || "Registration failed. Try again.");
+      setErrorMsg(e?.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f7f9ff" }}>
-      {/* Header Bar */}
-      <View style={{ width: "100%", paddingVertical: 16, alignItems: "center", justifyContent: "center", backgroundColor: "#ffffff", borderBottomWidth: 1, borderBottomColor: "#f1f5f9" }}>
-        <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 20, color: "#005bbf" }}>
-          SpareChange AI
+    <ScreenContainer scrollable className="justify-center py-6">
+      {/* Brand & Title */}
+      <View className="items-center mb-6">
+        <View className="w-16 h-16 rounded-full bg-sage-light items-center justify-center mb-3 border border-border shadow-card">
+          <PennyPilotLogoIcon size={36} />
+        </View>
+        <Text className="text-2xl font-bold text-text-primary font-sans text-center">
+          Create Account
+        </Text>
+        <Text className="text-xs text-text-muted font-sans text-center mt-1">
+          Join the automated micro-savings platform
         </Text>
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView 
-          style={{ flex: 1 }} 
-          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20, paddingVertical: 24 }}
-        >
-          <View style={{ width: "100%", maxWidth: 440 }}>
-            <View style={{ marginBottom: 24, alignItems: "center" }}>
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 24, color: "#1e293b", textAlign: "center" }}>
-                Create Account
-              </Text>
-              <Text style={{ fontFamily: "WorkSans_400Regular", fontSize: 14, color: "#64748b", marginTop: 4, textAlign: "center" }}>
-                Join the micro-savings automation platform
-              </Text>
-            </View>
-
-            <Card className="my-0">
-              {errorMsg && (
-                <View className="bg-red-50 border border-red-200 p-3.5 rounded-xl mb-4">
-                  <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-red-700 text-xs text-center">{errorMsg}</Text>
-                </View>
-              )}
-
-              {successMsg && (
-                <View className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl mb-4">
-                  <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-emerald-700 text-xs text-center">{successMsg}</Text>
-                </View>
-              )}
-
-              <View className="mb-4">
-                <Text style={{ fontFamily: "WorkSans_600SemiBold" }} className="text-slate-500 text-[10px] uppercase tracking-wider mb-2 ml-1">
-                  Full Name
-                </Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Alex Morgan"
-                  placeholderTextColor="#94a3b8"
-                  style={{ fontFamily: "WorkSans_400Regular" }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 text-sm focus:border-[#005bbf]"
-                />
-              </View>
-
-              <View className="mb-4">
-                <Text style={{ fontFamily: "WorkSans_600SemiBold" }} className="text-slate-500 text-[10px] uppercase tracking-wider mb-2 ml-1">
-                  Email Address
-                </Text>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="alex@college.edu"
-                  placeholderTextColor="#94a3b8"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={{ fontFamily: "WorkSans_400Regular" }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 text-sm focus:border-[#005bbf]"
-                />
-              </View>
-
-              <View className="mb-4">
-                <Text style={{ fontFamily: "WorkSans_600SemiBold" }} className="text-slate-500 text-[10px] uppercase tracking-wider mb-2 ml-1">
-                  Password
-                </Text>
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Minimum 6 characters"
-                  placeholderTextColor="#94a3b8"
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={{ fontFamily: "WorkSans_400Regular" }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 text-sm focus:border-[#005bbf]"
-                />
-              </View>
-
-              {/* Role selection */}
-              <View className="mb-6">
-                <Text style={{ fontFamily: "WorkSans_600SemiBold" }} className="text-slate-500 text-[10px] uppercase tracking-wider mb-2 ml-1">
-                  Account Type
-                </Text>
-                <View className="flex-row gap-x-3">
-                  <TouchableOpacity
-                    onPress={() => setRole("student")}
-                    activeOpacity={0.8}
-                    className={`flex-1 py-3 px-4 rounded-xl border flex-row justify-center items-center ${
-                      role === "student" ? "bg-blue-50 border-[#005bbf]" : "bg-slate-50 border-slate-200"
-                    }`}
-                  >
-                    <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${role === "student" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
-                      Student
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setRole("educator")}
-                    activeOpacity={0.8}
-                    className={`flex-1 py-3 px-4 rounded-xl border flex-row justify-center items-center ${
-                      role === "educator" ? "bg-blue-50 border-[#005bbf]" : "bg-slate-50 border-slate-200"
-                    }`}
-                  >
-                    <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${role === "educator" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
-                      Educator
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <Button title="Register" onPress={handleRegister} loading={loading} variant="primary" />
-
-              <View className="flex-row justify-center items-center mt-5">
-                <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-slate-500 text-xs">Already have an account? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-                  <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-[#005bbf] text-xs font-bold">Login</Text>
-                </TouchableOpacity>
-              </View>
-            </Card>
+      <Card variant="default" padding="lg" className="shadow-card max-w-md mx-auto w-full mb-6">
+        {/* Error / Success Notifications */}
+        {errorMsg && (
+          <View className="bg-danger-light border border-danger/30 p-3 rounded-2xl mb-4">
+            <Text className="text-xs font-semibold text-danger font-sans text-center">
+              {errorMsg}
+            </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        )}
+
+        {successMsg && (
+          <View className="bg-sage-light border border-border p-3 rounded-2xl mb-4">
+            <Text className="text-xs font-semibold text-primary font-sans text-center">
+              {successMsg}
+            </Text>
+          </View>
+        )}
+
+        {/* Role Selector Tabs (≥44pt touch targets) */}
+        <View className="mb-4">
+          <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-2 ml-1">
+            Choose Account Role
+          </Text>
+          <View className="flex-row space-x-2">
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic();
+                setRole("student");
+              }}
+              activeOpacity={0.8}
+              className={`flex-1 py-3 px-3 rounded-2xl border flex-row items-center justify-center min-h-[48px] mr-1 ${
+                role === "student"
+                  ? "bg-primary border-primary shadow-button"
+                  : "bg-cream border-border"
+              }`}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: role === "student" }}
+              accessibilityLabel="Student Saver Role"
+            >
+              <User
+                size={16}
+                color={role === "student" ? "#ffffff" : "#144a32"}
+                className="mr-1.5"
+              />
+              <Text
+                className={`text-xs font-sans ${
+                  role === "student"
+                    ? "font-bold text-white"
+                    : "font-semibold text-text-secondary"
+                }`}
+              >
+                Student Saver
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic();
+                setRole("educator");
+              }}
+              activeOpacity={0.8}
+              className={`flex-1 py-3 px-3 rounded-2xl border flex-row items-center justify-center min-h-[48px] ml-1 ${
+                role === "educator"
+                  ? "bg-primary border-primary shadow-button"
+                  : "bg-cream border-border"
+              }`}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: role === "educator" }}
+              accessibilityLabel="Educator Administrator Role"
+            >
+              <GraduationCap
+                size={16}
+                color={role === "educator" ? "#ffffff" : "#144a32"}
+                className="mr-1.5"
+              />
+              <Text
+                className={`text-xs font-sans ${
+                  role === "educator"
+                    ? "font-bold text-white"
+                    : "font-semibold text-text-secondary"
+                }`}
+              >
+                Educator
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Form Inputs */}
+        <Input
+          label="Full Name"
+          value={name}
+          onChangeText={setName}
+          placeholder="e.g. Priya Sharma"
+          autoCapitalize="words"
+          className="mb-4"
+        />
+
+        <Input
+          label="Campus Email Address"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="e.g. priya@college.edu"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          className="mb-4"
+        />
+
+        <Input
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          placeholder="At least 6 characters"
+          secureTextEntry
+          autoCapitalize="none"
+          className="mb-6"
+        />
+
+        {/* Submit Button */}
+        <Button
+          title={loading ? "Creating Account..." : "Create Account"}
+          onPress={handleRegister}
+          loading={loading}
+          variant="primary"
+          size="lg"
+          className="mb-4"
+        />
+
+        {/* Navigation to Login */}
+        <View className="flex-row justify-center items-center mt-2 py-2">
+          <Text className="text-xs text-text-secondary font-sans">
+            Already have an account?{" "}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              triggerHaptic();
+              navigation.navigate("Login");
+            }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text className="text-xs font-bold text-primary font-sans underline">
+              Sign In
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Card>
+    </ScreenContainer>
   );
 };
 

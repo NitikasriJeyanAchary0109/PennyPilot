@@ -1,6 +1,6 @@
 """
 Coach Router — POST /coach/chat and GET /coach/history endpoints for the
-SpareChange AI Financial Coach feature.
+Penny Pilot Financial Coach feature.
 
 Architecture contract
 ---------------------
@@ -35,7 +35,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger("sparechange_ai.coach")
+logger = logging.getLogger("pennypilot.coach")
 
 router = APIRouter(prefix="/coach", tags=["AI Coach"])
 

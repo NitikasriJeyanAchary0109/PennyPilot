@@ -132,6 +132,66 @@ def test_auth_google():
     assert data["role"] == "student"
 
 
+def test_google_callback_html_onboarding_states():
+    from unittest.mock import AsyncMock, patch
+
+    # 1. Test new user (has_completed_onboarding=False)
+    mock_token_new = {
+        "userinfo": {
+            "email": "new_oauth_user@test.com",
+            "name": "New OAuth User",
+        }
+    }
+    with patch(
+        "app.routers.auth.oauth.google.authorize_access_token",
+        new=AsyncMock(return_value=mock_token_new),
+    ):
+        response_new = client.get("/api/auth/google/callback")
+        assert response_new.status_code == 200
+        assert "text/html" in response_new.headers["content-type"]
+        html_new = response_new.text
+        # Assert onboardingComplete evaluates to "false" with NO "$"
+        assert 'const onboardingComplete = "false";' in html_new
+        assert "has_completed_onboarding=false" in html_new
+        assert "$false" not in html_new
+        assert "$true" not in html_new
+        assert "exp://" not in html_new
+        assert "127.0.0.1" not in html_new
+
+    # 2. Test existing onboarded user (has_completed_onboarding=True)
+    db = TestingSessionLocal()
+    user_onboarded = User(
+        full_name="Onboarded User",
+        email="onboarded_oauth_user@test.com",
+        role="student",
+        has_completed_onboarding=True,
+    )
+    db.add(user_onboarded)
+    db.commit()
+    db.close()
+
+    mock_token_onboarded = {
+        "userinfo": {
+            "email": "onboarded_oauth_user@test.com",
+            "name": "Onboarded User",
+        }
+    }
+    with patch(
+        "app.routers.auth.oauth.google.authorize_access_token",
+        new=AsyncMock(return_value=mock_token_onboarded),
+    ):
+        response_onboarded = client.get("/api/auth/google/callback")
+        assert response_onboarded.status_code == 200
+        html_onboarded = response_onboarded.text
+        # Assert onboardingComplete evaluates to "true" with NO "$"
+        assert 'const onboardingComplete = "true";' in html_onboarded
+        assert "has_completed_onboarding=true" in html_onboarded
+        assert "$true" not in html_onboarded
+        assert "$false" not in html_onboarded
+        assert "exp://" not in html_onboarded
+        assert "127.0.0.1" not in html_onboarded
+
+
 def test_wellness_and_stress():
     # Test GET /api/wellness/score
     response = client.get("/api/wellness/score")
@@ -298,3 +358,22 @@ def test_educator_overview_trends():
     # Test GET /api/educator/trends
     response = client.get("/api/educator/trends")
     assert response.status_code == 200
+
+
+def test_legacy_bcrypt_hash_backward_compatibility():
+    """Verify passwords hashed prior to direct bcrypt change (generated with passlib==1.7.4 / bcrypt==3.2.2)."""
+    from app.utils.security import verify_password
+
+    # Standard password (<=72 bytes) hashed with passlib==1.7.4 & bcrypt==3.2.2
+    pwd_standard = "OldPasslibPassword2024!"
+    legacy_hash_standard = (
+        "$2b$12$H/7tbWgEWV442BfOd.Co3ujUzro7qyiG6VbmaSH98FgjEOelfr6Yy"
+    )
+    assert verify_password(pwd_standard, legacy_hash_standard) is True
+    assert verify_password("WrongPassword!", legacy_hash_standard) is False
+
+    # Long password (>72 bytes: 87 chars) hashed with passlib==1.7.4 & bcrypt==3.2.2
+    pwd_long = "OldPasslibPassword2024!ThisIsAVeryLongPasswordOver72BytesLongForTestingTruncation123456789"
+    legacy_hash_long = "$2b$12$wp/01e92dlC40lmgh.9OXOYGeyd8nfUUydSv4MZQbptqOc6NRMZ92"
+    assert verify_password(pwd_long, legacy_hash_long) is True
+    assert verify_password("WrongPassword!", legacy_hash_long) is False

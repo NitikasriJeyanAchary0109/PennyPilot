@@ -51,6 +51,14 @@ export const apiService = {
     const response = await api.patch("/users/me/onboarding-complete");
     return response.data;
   },
+  getCurrentUser: async () => {
+    try {
+      const response = await api.get("/auth/me");
+      return response.data;
+    } catch (e) {
+      return null;
+    }
+  },
   // Onboarding & Pattern Detection
   postManualSalary: async (data: { monthly_income: number; recurring_expenses: number }) => {
     try {
@@ -141,6 +149,19 @@ export const apiService = {
       deadline: g.target_date
     }));
   },
+  getGoalById: async (goalId: number) => {
+    const response = await api.get(`/goals/${goalId}`);
+    return {
+      goal_id: response.data.id,
+      user_id: response.data.user_id,
+      goal_name: response.data.title,
+      target: Number(response.data.target_amount),
+      saved: Number(response.data.current_amount),
+      deadline: response.data.target_date,
+      progress_percentage: response.data.progress_percentage !== undefined ? Number(response.data.progress_percentage) : undefined,
+      projected_completion_date: response.data.projected_completion_date,
+    };
+  },
   createGoal: async (data: { goal_name: string; target: number; deadline?: string }) => {
     const payload = {
       title: data.goal_name,
@@ -199,8 +220,29 @@ export const apiService = {
     return response.data;
   },
   getRoundupStats: async () => {
-    const response = await api.get("/roundups/stats");
-    return response.data;
+    try {
+      const response = await api.get("/roundups/stats");
+      return response.data;
+    } catch {
+      // Fallback to official /savings/summary and /savings/?source=round_up
+      try {
+        const [summary, roundups] = await Promise.all([
+          api.get("/savings/summary"),
+          api.get("/savings/", { params: { source: "round_up" } }),
+        ]);
+        return {
+          total_saved: summary.data.total_saved,
+          roundup_transactions_count: Array.isArray(roundups.data) ? roundups.data.length : 0,
+          currency: "INR",
+        };
+      } catch {
+        return {
+          total_saved: "0.00",
+          roundup_transactions_count: 0,
+          currency: "INR",
+        };
+      }
+    }
   },
 
   // Savings (manual additions)

@@ -1,4 +1,6 @@
-frontend/.expo/
-frontend/node_modules/
-backend/.venv/
+.expo/
+.expo
+node_modules/
 .env
+.env.*
+!.env.example

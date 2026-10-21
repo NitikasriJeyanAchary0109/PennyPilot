@@ -1,0 +1,7 @@
+16:21:16 INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+16:21:16 INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+16:21:16 INFO  [alembic.runtime.migration] Running upgrade  -> 001_initial_schema, initial schema 11 tables
+16:21:16 INFO  [alembic.runtime.migration] Running upgrade 001_initial_schema -> 002_modify_transactions, modify transactions table schema
+16:21:16 INFO  [alembic.runtime.migration] Running upgrade 002_modify_transactions -> 003_modify_goals, modify goals
+16:21:16 INFO  [alembic.runtime.migration] Running upgrade 003_modify_goals -> 004_modify_savings, modify savings
+16:21:16 INFO  [alembic.runtime.migration] Running upgrade 004_modify_savings -> 005_add_onboarding_completion, add onboarding completion flag

@@ -1,5 +1,5 @@
 """
-Rule Engine — pure deterministic business logic for SpareChange AI.
+Rule Engine — pure deterministic business logic for Penny Pilot.
 
 Architecture contract
 ---------------------
@@ -45,7 +45,7 @@ DEFAULT_ROUNDUP_THRESHOLD = Decimal("20.00")
 def calculate_roundup(amount: Decimal) -> Decimal:
     """
     Return the rupee-paise difference between *amount* and the next savings
-    milestone, following SpareChange AI's two-tier rounding rule:
+    milestone, following Penny Pilot's two-tier rounding rule:
 
     Tier 1 — amount has paise (fractional rupees):
         Round up to the next whole rupee.
@@ -568,7 +568,7 @@ def apply_roundup_if_eligible(
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("SpareChange AI — Rule Engine sanity checks")
+    print("Penny Pilot — Rule Engine sanity checks")
     print("=" * 60)
 
     # --- calculate_roundup ---

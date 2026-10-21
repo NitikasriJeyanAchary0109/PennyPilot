@@ -1,0 +1,31 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nitikasri/ConsumerLiterarcyTrack-1/.venv/bin/python3
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /Users/nitikasri/ConsumerLiterarcyTrack-1
+configfile: pyproject.toml
+plugins: anyio-4.12.1, cov-7.1.0, hypothesis-6.141.1
+collecting ... collected 20 items
+
+backend/tests/test_budgets.py::test_create_and_list_budgets_with_spending_summary PASSED [  5%]
+backend/tests/test_budgets.py::test_duplicate_active_budget_returns_conflict PASSED [ 10%]
+backend/tests/test_budgets.py::test_get_single_budget_and_update_and_delete_soft_delete PASSED [ 15%]
+backend/tests/test_calculations.py::test_net_savings_rate_and_stress_score_endpoints PASSED [ 20%]
+backend/tests/test_calculations.py::test_round_up_projection_and_goal_feasibility_endpoints PASSED [ 25%]
+backend/tests/test_new_features.py::test_auth_google PASSED              [ 30%]
+backend/tests/test_new_features.py::test_wellness_and_stress PASSED      [ 35%]
+backend/tests/test_new_features.py::test_goals_patch_and_forecast PASSED [ 40%]
+backend/tests/test_new_features.py::test_budgets_status PASSED           [ 45%]
+backend/tests/test_new_features.py::test_savings_manual_and_audit PASSED [ 50%]
+backend/tests/test_new_features.py::test_notifications PASSED            [ 55%]
+backend/tests/test_new_features.py::test_educator_overview_trends PASSED [ 60%]
+backend/tests/test_transactions.py::test_create_transaction_with_roundup PASSED [ 65%]
+backend/tests/test_transactions.py::test_create_transaction_no_roundup_needed PASSED [ 70%]
+backend/tests/test_transactions.py::test_get_transactions_pagination_and_filtering PASSED [ 75%]
+backend/tests/test_transactions.py::test_get_transaction_by_id PASSED    [ 80%]
+backend/tests/test_transactions.py::test_get_transaction_404_not_owned PASSED [ 85%]
+backend/tests/test_transactions.py::test_update_transaction_success PASSED [ 90%]
+backend/tests/test_transactions.py::test_update_transaction_amount_conflict PASSED [ 95%]
+backend/tests/test_transactions.py::test_delete_transaction_soft_delete_and_reverse_roundup PASSED [100%]
+
+============================== 20 passed in 2.30s ==============================

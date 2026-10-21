@@ -14,7 +14,7 @@ from app.utils.prompts import wellness_prompt
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger("sparechange_ai.wellness")
+logger = logging.getLogger("pennypilot.wellness")
 
 router = APIRouter(prefix="", tags=["Financial Wellness"])
 
@@ -132,7 +132,7 @@ async def get_wellness_score(
 
     try:
         ai_summary = await call_llama(
-            system_prompt="You are SpareChange AI, giving friendly, non-judgmental wellness insights.",
+            system_prompt="You are Penny Pilot, giving friendly, non-judgmental wellness insights.",
             user_prompt=prompt,
         )
     except AIEngineError as exc:

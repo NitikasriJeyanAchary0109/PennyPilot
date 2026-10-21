@@ -1,0 +1,8 @@
+penny-pilot-frontend@1.0.0 /Users/nitikasri/ConsumerLiterarcyTrack-1/.worktrees/ui-production/frontend
+├─┬ nativewind@4.2.7
+│ └─┬ react-native-css-interop@0.2.7
+│   └── react-native-reanimated@4.1.7 deduped
+├─┬ react-native-reanimated@4.1.7
+│ └── react-native-worklets@0.5.1 deduped
+└── react-native-worklets@0.5.1
+

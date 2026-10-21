@@ -65,7 +65,7 @@ async def forecast_savings(
     try:
         ai_forecast = await call_llama(
             system_prompt=(
-                "You are SpareChange AI's Dream Engine, describing savings forecasts in plain language. "
+                "You are Penny Pilot's Dream Engine, describing savings forecasts in plain language. "
                 "Strictly adhere to Zero-Arithmetic: only restate precomputed numbers from the prompt, "
                 "and never calculate, estimate, project, or invent dates or amounts."
             ),

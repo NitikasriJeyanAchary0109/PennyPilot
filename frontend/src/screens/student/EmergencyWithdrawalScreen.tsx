@@ -1,50 +1,127 @@
-import React, { useState } from "react";
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  SafeAreaView, 
-  StyleSheet, 
-  Image, 
-  TextInput,
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
   Modal,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  TextInput,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import {
+  ArrowLeft,
+  ShieldAlert,
+  Check,
+  ChevronDown,
+  HeartHandshake,
+  AlertTriangle,
+} from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { apiService } from "../../services/api";
+import {
+  ScreenContainer,
+  Card,
+  Button,
+  Skeleton,
+  EmptyState,
+} from "../../components/ui";
 
-export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; navigation: any }) => {
-  const goalName = route?.params?.goalName || "Laptop Goal";
-  const balance = route?.params?.savedAmount || 12500;
+const REASONS = [
+  { value: "medical", label: "Medical Emergency" },
+  { value: "food", label: "Food & Daily Essentials" },
+  { value: "rent", label: "Rent & Housing" },
+  { value: "travel", label: "Urgent Family Travel" },
+  { value: "other", label: "Other Unexpected Emergency" },
+];
 
-  const [amount, setAmount] = useState("1000");
+export const EmergencyWithdrawalScreen = ({
+  route,
+  navigation,
+}: {
+  route: any;
+  navigation: any;
+}) => {
+  const goalIdParam = route?.params?.goalId;
+  const [goalId, setGoalId] = useState<number | null>(goalIdParam || null);
+  const [goalName, setGoalName] = useState<string>(route?.params?.goalName || "");
+  const [balance, setBalance] = useState<number>(route?.params?.savedAmount || 0);
+
+  const [availableGoals, setAvailableGoals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [showPicker, setShowPicker] = useState(false);
+  const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
 
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
   };
 
-  const REASONS = [
-    { value: "medical", label: "Medical Emergency" },
-    { value: "food", label: "Food & Essentials" },
-    { value: "rent", label: "Rent / Housing" },
-    { value: "travel", label: "Urgent Travel" },
-  ];
+  const loadGoalData = useCallback(async () => {
+    try {
+      setLoading(true);
+      if (goalIdParam) {
+        const goalData = await apiService.getGoalById(goalIdParam);
+        if (goalData) {
+          setGoalId(goalData.goal_id);
+          setGoalName(goalData.goal_name);
+          setBalance(Number(goalData.saved) || 0);
+        }
+      } else {
+        // If no goalIdParam, fetch all goals so user can select
+        const allGoals = await apiService.getGoals();
+        if (Array.isArray(allGoals) && allGoals.length > 0) {
+          setAvailableGoals(allGoals);
+          const firstWithBalance = allGoals.find((g) => Number(g.saved) > 0) || allGoals[0];
+          setGoalId(firstWithBalance.goal_id);
+          setGoalName(firstWithBalance.goal_name);
+          setBalance(Number(firstWithBalance.saved) || 0);
+        }
+      }
+    } catch (e: any) {
+      console.warn("Failed to load goal for withdrawal:", e?.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [goalIdParam]);
+
+  useEffect(() => {
+    loadGoalData();
+  }, [loadGoalData]);
+
+  const formatINR = (val: number): string => {
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(val);
+  };
 
   const handleConfirm = async () => {
-    if (!reason) {
-      Alert.alert("Reason Required", "Please select a reason for this withdrawal.");
+    if (!goalId) {
+      Alert.alert("Goal Required", "Please select a goal to withdraw funds from.");
       return;
     }
-    const val = parseFloat(amount) || 0;
-    if (val <= 0 || val > balance) {
-      Alert.alert("Invalid Amount", `Please enter an amount between ₹1 and ₹${balance.toLocaleString("en-IN")}.`);
+    if (!reason) {
+      Alert.alert("Reason Required", "Please choose a reason for this withdrawal.");
+      return;
+    }
+
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid withdrawal amount.");
+      return;
+    }
+
+    if (val > balance) {
+      Alert.alert(
+        "Insufficient Balance",
+        `Your maximum withdrawable balance from "${goalName}" is ₹${formatINR(balance)}.`
+      );
       return;
     }
 
@@ -52,253 +129,308 @@ export const EmergencyWithdrawalScreen = ({ route, navigation }: { route: any; n
     setIsProcessing(true);
 
     try {
-      const goalId = route?.params?.goalId || 1;
       await apiService.withdrawGoal(goalId, { amount: val, reason });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setIsCompleted(true);
-      
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // Ignore on web
+      }
+
       Alert.alert(
-        "Withdrawal Confirmed",
-        `Successfully transferred ₹${val.toLocaleString("en-IN")} from "${goalName}" to your primary account.`,
+        "Withdrawal Processed",
+        `₹${formatINR(val)} has been transferred from "${goalName}" to your primary bank account.`,
         [{ text: "Done", onPress: () => navigation.goBack() }]
       );
     } catch (e: any) {
-      Alert.alert("Withdrawal Error", e.message || "Failed to process emergency withdrawal.");
+      Alert.alert(
+        "Withdrawal Error",
+        e?.message || "Failed to process emergency withdrawal. Please try again."
+      );
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const selectedReasonLabel = REASONS.find(r => r.value === reason)?.label || "Select a reason...";
+  const selectedReasonLabel =
+    REASONS.find((r) => r.value === reason)?.label || "Choose emergency reason...";
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f7f9ff]">
-      {/* Top App Bar */}
-      <View className="flex-row justify-between items-center px-margin-mobile py-stack-md bg-white border-b border-slate-100">
-        <View className="flex-row items-center space-x-3">
-          <Pressable 
-            onPress={() => {
-              triggerHaptic();
-              navigation.goBack();
-            }}
-            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-            className="p-1"
-          >
-            <MaterialIcons name="arrow-back" size={24} color="#181c20" />
-          </Pressable>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xl text-ob-primary">
-            SpareChange AI
-          </Text>
-        </View>
-        <View className="flex-row items-center space-x-2">
-          <View className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
-            <Image 
-              source={{ uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuCBr27xl_NE-E1FDPyMOkQ6F9N0JWMqe4a-rxCzIAUHCWjiKEx_-EC11TzOV-_P-w4JXq7rxu1J_KU-jbYFTFNm85P7aRHT1MyAivzuJT9J9oE_D2oh9oxHww-AFOV2UpqLxTX1Wb-Z-vrSyp5yjtyAQb0ty7Rt2Vr3e4wjPBJL3avBkgRprPasP2HktDndAhaylkaCllZXvcTZnNpzrxMrhvr7UUTDzfIWdozJmDLsdOHRzk2D4Hr2" }}
-              style={{ width: "100%", height: "100%", resizeMode: "cover" }}
-            />
-          </View>
-          <Pressable 
-            onPress={triggerHaptic}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-            className="p-1"
-          >
-            <MaterialIcons name="settings" size={20} color="#5c5f60" />
-          </Pressable>
-        </View>
+    <ScreenContainer className="pt-2 pb-8">
+      {/* Top Header */}
+      <View className="flex-row items-center justify-between mb-4">
+        <TouchableOpacity
+          onPress={() => {
+            triggerHaptic();
+            navigation.goBack();
+          }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          className="w-10 h-10 rounded-full bg-white border border-border items-center justify-center shadow-card"
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <ArrowLeft size={20} color="#144a32" />
+        </TouchableOpacity>
+        <Text className="text-base font-bold text-text-primary font-sans">
+          Emergency Safety Net
+        </Text>
+        <View className="w-10" />
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
-        {/* Emergency Header */}
-        <View className="items-center mb-6">
-          <View className="w-16 h-16 bg-error-container text-on-error-container rounded-full items-center justify-center mb-4 shadow-sm">
-            <MaterialIcons name="emergency" size={32} color="#ba1a1a" />
-          </View>
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-2xl text-on-surface text-center mb-1">
-            Emergency Withdrawal
-          </Text>
-          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant text-center px-4">
-            Funds will be moved to your primary account instantly
-          </Text>
+      {loading ? (
+        <View className="space-y-4 py-4">
+          <Skeleton width="100%" height={120} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={140} className="rounded-card mb-4" />
+          <Skeleton width="100%" height={80} className="rounded-card" />
         </View>
+      ) : balance <= 0 && !goalName ? (
+        <Card variant="default" padding="lg" className="items-center shadow-card my-6">
+          <EmptyState
+            title="No Withdrawable Goals"
+            description="You don't currently have any active savings goals with an accumulated balance."
+            actionTitle="View Goals →"
+            onAction={() => navigation.navigate("Goals")}
+            icon={<ShieldAlert size={32} color="#144a32" />}
+          />
+        </Card>
+      ) : (
+        <View className="space-y-4">
+          {/* Compassionate Reassurance Card */}
+          <Card variant="peach" padding="md" className="shadow-card mb-3">
+            <View className="flex-row items-start">
+              <View className="w-9 h-9 rounded-full bg-white/80 items-center justify-center mr-3 mt-0.5 border border-border/40">
+                <HeartHandshake size={20} color="#856529" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-text-primary font-sans">
+                  Life happens. You're protected.
+                </Text>
+                <Text className="text-xs text-text-secondary font-sans mt-1 leading-relaxed">
+                  Your micro-savings are designed to support you when urgent needs arise. Withdraw what you need now without penalties.
+                </Text>
+              </View>
+            </View>
+          </Card>
 
-        {/* Warning Banner */}
-        <View style={styles.warningCard} className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex-row space-x-3 mb-6 items-center">
-          <MaterialIcons name="warning" size={24} color="#d97706" />
-          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-amber-900 flex-1 leading-5">
-            <Text style={{ fontFamily: "WorkSans_500Medium" }} className="font-bold">Attention:</Text> This withdrawal will delay your 'New Laptop' goal by <Text style={{ fontFamily: "WorkSans_500Medium" }} className="font-bold">6 days</Text>.
-          </Text>
-        </View>
-
-        {/* Amount Input */}
-        <View className="items-center mb-6">
-          <View className="flex-row items-center justify-center">
-            <Text style={{ fontFamily: "PlusJakartaSans_800ExtraBold" }} className="text-4xl text-on-surface mr-2">
-              ₹
-            </Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="numeric"
-              maxLength={6}
-              style={{ fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 44, color: "#181c20", minWidth: 100, textAlign: "center" }}
-            />
-          </View>
-          <View className="mt-2 bg-slate-100 px-3.5 py-1.5 rounded-full border border-slate-200/50">
-            <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-on-surface-variant">
-              Balance: ₹12,500
-            </Text>
-          </View>
-        </View>
-
-        {/* Custom Dropdown Selector */}
-        <View className="mb-6">
-          <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-on-surface-variant mb-2 ml-2 uppercase tracking-wider">
-            Reason for withdrawal
-          </Text>
-          <Pressable
-            onPress={() => {
-              triggerHaptic();
-              setShowPicker(true);
-            }}
-            className="flex-row justify-between items-center bg-white border border-outline-variant rounded-2xl py-4 px-5"
-          >
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-base text-on-surface">
-              {selectedReasonLabel}
-            </Text>
-            <MaterialIcons name="expand-more" size={24} color="#5c5f60" />
-          </Pressable>
-        </View>
-
-        {/* AI Insight Card */}
-        <View style={styles.card} className="bg-white border border-outline-variant/30 rounded-2xl p-5 mb-8 flex-row space-x-4 items-start">
-          <View className="p-2 bg-primary-fixed rounded-xl">
-            <MaterialIcons name="smart-toy" size={24} color="#005bbf" />
-          </View>
-          <View className="flex-1">
-            <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-on-surface mb-1">
-              Coach's Tip
-            </Text>
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-relaxed">
-              Try to keep this below ₹2,000 to keep your "Financial Resilience" badge active this month.
-            </Text>
-          </View>
-        </View>
-
-        {/* Dropdown Modal Selector */}
-        <Modal visible={showPicker} transparent animationType="slide">
-          <View style={styles.pickerModalOverlay} className="flex-1 justify-end">
-            <View className="bg-white rounded-t-3xl pt-2 pb-8 px-margin-mobile">
-              <View className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
-              <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-lg text-on-surface mb-4 px-2">
-                Select a reason
+          {/* Goal & Balance Card */}
+          <Card variant="default" padding="md" className="shadow-card mb-3">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans">
+                Source Goal
               </Text>
-              {REASONS.map((r) => (
-                <Pressable
+              {availableGoals.length > 1 && (
+                <TouchableOpacity
+                  onPress={() => setShowGoalPicker(true)}
+                  className="flex-row items-center"
+                >
+                  <Text className="text-xs font-semibold text-primary font-sans mr-1">
+                    Change Goal
+                  </Text>
+                  <ChevronDown size={14} color="#144a32" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <Text className="text-base font-bold text-text-primary font-sans">
+              {goalName}
+            </Text>
+
+            <View className="flex-row items-baseline mt-2 pt-2 border-t border-border/50">
+              <Text className="text-xs text-text-secondary font-sans">
+                Available to withdraw:
+              </Text>
+              <Text className="text-base font-bold text-primary font-sans ml-2">
+                ₹{formatINR(balance)}
+              </Text>
+            </View>
+          </Card>
+
+          {/* Amount Entry Card */}
+          <Card variant="default" padding="lg" className="shadow-card items-center mb-3">
+            <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-2">
+              Withdrawal Amount
+            </Text>
+
+            <View className="flex-row items-center justify-center my-2">
+              <Text className="text-3xl font-bold text-text-primary font-sans mr-1.5">
+                ₹
+              </Text>
+              <TextInput
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="0"
+                placeholderTextColor="#707773"
+                keyboardType="numeric"
+                className="text-4xl font-bold text-text-primary font-sans text-center min-w-[120px] pb-1"
+                maxLength={7}
+              />
+            </View>
+
+            {/* Quick preset buttons (UX convenience) */}
+            {balance > 0 && (
+              <View className="flex-row space-x-2 mt-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    setAmount(Math.min(500, balance).toString());
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-cream border border-border mr-2"
+                >
+                  <Text className="text-xs font-bold text-text-secondary font-sans">
+                    ₹500
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    setAmount(Math.min(1000, balance).toString());
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-cream border border-border mr-2"
+                >
+                  <Text className="text-xs font-bold text-text-secondary font-sans">
+                    ₹1,000
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    setAmount(balance.toString());
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-sage-light border border-border"
+                >
+                  <Text className="text-xs font-bold text-primary font-sans">
+                    All (₹{formatINR(balance)})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Card>
+
+          {/* Reason Selector */}
+          <View className="mb-4">
+            <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-1.5 ml-1">
+              Reason for withdrawal
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic();
+                setShowPicker(true);
+              }}
+              activeOpacity={0.8}
+              className="flex-row items-center justify-between p-4 bg-white border border-border rounded-2xl shadow-card min-h-[48px]"
+              accessibilityRole="button"
+              accessibilityLabel={`Reason: ${selectedReasonLabel}`}
+            >
+              <Text
+                className={`text-sm font-sans ${
+                  reason ? "font-bold text-text-primary" : "text-text-muted"
+                }`}
+              >
+                {selectedReasonLabel}
+              </Text>
+              <ChevronDown size={18} color="#707773" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Action Button */}
+          <Button
+            title={isProcessing ? "Processing..." : "Confirm Emergency Withdrawal"}
+            variant="danger"
+            size="lg"
+            disabled={isProcessing || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > balance}
+            onPress={handleConfirm}
+            className="mt-2 min-h-[50px]"
+          />
+        </View>
+      )}
+
+      {/* Reason Picker Modal */}
+      <Modal visible={showPicker} transparent animationType="slide">
+        <View className="flex-1 justify-end bg-black/40">
+          <View className="bg-white rounded-t-3xl pt-3 pb-8 px-5">
+            <View className="w-12 h-1.5 bg-border rounded-full mx-auto mb-4" />
+            <Text className="text-base font-bold text-text-primary font-sans mb-3">
+              Select Emergency Reason
+            </Text>
+            {REASONS.map((r) => {
+              const isSelected = reason === r.value;
+              return (
+                <TouchableOpacity
                   key={r.value}
                   onPress={() => {
                     triggerHaptic();
                     setReason(r.value);
                     setShowPicker(false);
                   }}
-                  className="py-4 border-b border-slate-100 flex-row justify-between items-center"
+                  className="py-3.5 border-b border-border/50 flex-row justify-between items-center min-h-[48px]"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                 >
-                  <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-sm text-on-surface pl-2">
+                  <Text
+                    className={`text-sm font-sans ${
+                      isSelected
+                        ? "font-bold text-primary"
+                        : "font-medium text-text-secondary"
+                    }`}
+                  >
                     {r.label}
                   </Text>
-                  {reason === r.value && (
-                    <MaterialIcons name="check" size={20} color="#005bbf" />
-                  )}
-                </Pressable>
-              ))}
+                  {isSelected && <Check size={18} color="#144a32" />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Goal Switcher Modal */}
+      {availableGoals.length > 1 && (
+        <Modal visible={showGoalPicker} transparent animationType="slide">
+          <View className="flex-1 justify-end bg-black/40">
+            <View className="bg-white rounded-t-3xl pt-3 pb-8 px-5">
+              <View className="w-12 h-1.5 bg-border rounded-full mx-auto mb-4" />
+              <Text className="text-base font-bold text-text-primary font-sans mb-3">
+                Select Source Goal
+              </Text>
+              {availableGoals.map((g) => {
+                const isSelected = goalId === g.goal_id;
+                return (
+                  <TouchableOpacity
+                    key={g.goal_id}
+                    onPress={() => {
+                      triggerHaptic();
+                      setGoalId(g.goal_id);
+                      setGoalName(g.goal_name);
+                      setBalance(Number(g.saved) || 0);
+                      setShowGoalPicker(false);
+                    }}
+                    className="py-3.5 border-b border-border/50 flex-row justify-between items-center min-h-[48px]"
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                  >
+                    <View>
+                      <Text
+                        className={`text-sm font-sans ${
+                          isSelected
+                            ? "font-bold text-primary"
+                            : "font-medium text-text-secondary"
+                        }`}
+                      >
+                        {g.goal_name}
+                      </Text>
+                      <Text className="text-xs text-text-muted font-sans mt-0.5">
+                        Balance: ₹{formatINR(Number(g.saved) || 0)}
+                      </Text>
+                    </View>
+                    {isSelected && <Check size={18} color="#144a32" />}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </Modal>
-      </ScrollView>
-
-      {/* Fixed bottom actions */}
-      <View style={styles.fixedBottom} className="px-margin-mobile py-4 bg-white/95 border-t border-slate-100">
-        <Pressable
-          android_ripple={{ color: "rgba(255,255,255,0.2)" }}
-          disabled={isProcessing}
-          style={({ pressed }) => [
-            styles.confirmBtn,
-            { 
-              opacity: pressed || isProcessing ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-              backgroundColor: isCompleted ? "#006d2a" : "#ba1a1a"
-            }
-          ]}
-          onPress={handleConfirm}
-        >
-          {isProcessing ? (
-            <View className="flex-row items-center space-x-2">
-              <ActivityIndicator size="small" color="#ffffff" />
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base">
-                Processing...
-              </Text>
-            </View>
-          ) : isCompleted ? (
-            <View className="flex-row items-center space-x-2">
-              <MaterialIcons name="check-circle" size={20} color="#ffffff" />
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base">
-                Transfer Complete
-              </Text>
-            </View>
-          ) : (
-            <View className="flex-row items-center space-x-2">
-              <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className="text-white text-base mr-1">
-                Confirm Withdrawal
-              </Text>
-              <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />
-            </View>
-          )}
-        </Pressable>
-        <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[10px] text-on-surface-variant text-center mt-3 px-margin-mobile">
-          By confirming, you agree to the instant transfer terms.
-        </Text>
-      </View>
-    </SafeAreaView>
+      )}
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  warningCard: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  pickerModalOverlay: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  fixedBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-  },
-  confirmBtn: {
-    width: "100%",
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  }
-});
 
 export default EmergencyWithdrawalScreen;

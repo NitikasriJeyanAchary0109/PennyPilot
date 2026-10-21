@@ -44,7 +44,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger("sparechange_ai.dream")
+logger = logging.getLogger("pennypilot.dream")
 
 router = APIRouter(prefix="/goal", tags=["Dream Engine"])
 
@@ -188,7 +188,7 @@ async def get_goal_forecast(
     try:
         explanation = await call_llama(
             system_prompt=(
-                "You are SpareChange AI. You motivate college students about "
+                "You are Penny Pilot. You motivate college students about "
                 "their savings goals in plain, upbeat language. Be specific — "
                 "use ONLY the precomputed numbers provided. If suggesting an action, "
                 "cite one of the precomputed accelerated savings scenarios verbatim. "

@@ -1,31 +1,33 @@
 import React, { useState, useRef, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  SafeAreaView, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  ScrollView,
   TextInput,
+  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  ActivityIndicator,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import {
+  Send,
+  Sparkles,
+  ShieldCheck,
+  RotateCcw,
+  Bot,
+  User,
+  Info,
+} from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { apiService } from "../../services/api";
+import { Card, Chip } from "../../components/ui";
 
 interface ChatMessage {
   id: string;
-  sender: "ai" | "user";
+  sender: "user" | "ai";
   text: string;
   time: string;
-  card?: {
-    title: string;
-    saved: number;
-    target: number;
-    quote: string;
-  };
+  isError?: boolean;
   investmentCard?: {
     fundName: string;
     risk: string;
@@ -34,405 +36,400 @@ interface ChatMessage {
   };
 }
 
-interface ChatScreenProps {
-  mode?: "coach" | "advisor";
-}
-
-const INITIAL_COACH_MESSAGES: ChatMessage[] = [
-  {
-    id: "m-1",
-    sender: "ai",
-    text: "Hi Alex! 👋 I've been looking at your transactions. You saved ₹1,245 in spare change this week just by rounding up your purchases. That's 15% more than last week!",
-    time: "9:41 AM"
-  },
-  {
-    id: "m-2",
-    sender: "user",
-    text: "That's awesome! How close am I to my Laptop goal?",
-    time: "9:42 AM"
-  },
-  {
-    id: "m-3",
-    sender: "ai",
-    text: "You're currently at 68% of your ₹50,000 goal. Based on your current savings rate, you'll reach it by October 12th.",
-    time: "9:43 AM",
-    card: {
-      title: "Laptop Goal",
-      saved: 34000,
-      target: 50000,
-      quote: "Keep the momentum! Skipping one ₹150 latte a week gets you there 2 weeks earlier."
-    }
-  }
+const COACH_PROMPTS = [
+  "How do micro-savings and round-ups work?",
+  "How can I save ₹1,000 extra this month?",
+  "Tips for avoiding impulsive purchases on campus",
 ];
 
-const INITIAL_ADVISOR_MESSAGES: ChatMessage[] = [
-  {
-    id: "a-1",
-    sender: "user",
-    text: "I have ₹5,000 extra this month. Where should I start investing with low risk?",
-    time: "4:30 PM"
-  },
-  {
-    id: "a-2",
-    sender: "ai",
-    text: "For low risk and steady growth, index funds are a fantastic choice. Based on your profile, here's a top recommendation:",
-    time: "4:31 PM",
-    investmentCard: {
-      fundName: "HDFC Nifty 50 Index Fund",
-      risk: "Low Risk",
-      returnRate: "12.5% p.a.",
-      disclaimer: "Disclaimer: This AI tool is not a licensed financial advisor. Please conduct independent research before investing."
-    }
-  }
+const ADVISOR_PROMPTS = [
+  "What is a low-risk index fund?",
+  "How does compounding interest work?",
+  "Should I prioritize an emergency fund first?",
 ];
 
-export const ChatScreen = ({ mode = "coach" }: ChatScreenProps) => {
-  const [activeMode, setActiveMode] = useState<"coach" | "advisor">(mode);
-  const [coachList, setCoachList] = useState<ChatMessage[]>(INITIAL_COACH_MESSAGES);
-  const [advisorList, setAdvisorList] = useState<ChatMessage[]>(INITIAL_ADVISOR_MESSAGES);
+export const ChatScreen = () => {
+  const [activeMode, setActiveMode] = useState<"coach" | "advisor">("coach");
+  const [coachMessages, setCoachMessages] = useState<ChatMessage[]>([]);
+  const [advisorMessages, setAdvisorMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Ignore on web
+    }
   };
 
-  const handleSend = async (text: string) => {
-    if (!text.trim()) return;
-    triggerHaptic();
+  const activeMessages = activeMode === "coach" ? coachMessages : advisorMessages;
 
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  useEffect(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 120);
+  }, [coachMessages, advisorMessages, isTyping, activeMode]);
+
+  const handleSend = async (textToSend?: string) => {
+    const messageText = (textToSend !== undefined ? textToSend : inputText).trim();
+    if (!messageText || isTyping) return;
+
+    triggerHaptic();
+    setInputText("");
+
+    const timestamp = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       sender: "user",
-      text,
-      time: timestamp
+      text: messageText,
+      time: timestamp,
     };
 
     if (activeMode === "coach") {
-      setCoachList((prev) => [...prev, userMsg]);
+      setCoachMessages((prev) => [...prev, userMsg]);
     } else {
-      setAdvisorList((prev) => [...prev, userMsg]);
+      setAdvisorMessages((prev) => [...prev, userMsg]);
     }
 
-    setInputText("");
     setIsTyping(true);
 
     try {
       if (activeMode === "coach") {
-        const res = await apiService.chatWithCoach(text);
+        const res = await apiService.chatWithCoach(messageText);
+        const replyText =
+          res?.response || res?.message || "Keep building your daily savings streak!";
         const aiMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
           sender: "ai",
-          text: res.response || res.message || "Keep up your great savings habits!",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          text: replyText,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
         };
-        setCoachList((prev) => [...prev, aiMsg]);
+        setCoachMessages((prev) => [...prev, aiMsg]);
       } else {
-        const res = await apiService.askAdvisor(text);
+        const res = await apiService.askAdvisor(messageText);
+        const replyText =
+          res?.response ||
+          res?.message ||
+          "Here is personalized investment guidance based on your risk profile:";
         const aiMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
           sender: "ai",
-          text: res.response || "Here is advice tailored for your portfolio:",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          investmentCard: res.recommendationCard || {
-            fundName: "HDFC Nifty 50 Index Fund",
-            risk: "Low Risk",
-            returnRate: "12.5% p.a.",
-            disclaimer: "Disclaimer: This AI tool is not a licensed financial advisor. Please conduct independent research before investing."
-          }
+          text: replyText,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          investmentCard: res?.recommendationCard,
         };
-        setAdvisorList((prev) => [...prev, aiMsg]);
+        setAdvisorMessages((prev) => [...prev, aiMsg]);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err) {
-      console.error("Chat API error:", err);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
-      const errorReply: ChatMessage = {
+    } catch (err: any) {
+      console.warn("Chat API error:", err);
+      const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         sender: "ai",
-        text: "I'm sorry, I ran into an error connecting to our AI server. Please try again.",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        text: "Could not reach the assistant. Please check your network or try again.",
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        isError: true,
       };
 
       if (activeMode === "coach") {
-        setCoachList((prev) => [...prev, errorReply]);
+        setCoachMessages((prev) => [...prev, errorMsg]);
       } else {
-        setAdvisorList((prev) => [...prev, errorReply]);
+        setAdvisorMessages((prev) => [...prev, errorMsg]);
       }
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleInvest = (fund: string) => {
-    triggerHaptic();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      "Investment Initialized",
-      `Would you like to allocate ₹5,000 into ${fund} directly from your SpareChange savings balance?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Confirm Buy", onPress: () => Alert.alert("Success", `Allocated ₹5,000 to ${fund}!`) }
-      ]
-    );
+  const handleRetryLast = () => {
+    const messages = activeMode === "coach" ? coachMessages : advisorMessages;
+    // Find last user message
+    const lastUser = [...messages].reverse().find((m) => m.sender === "user");
+    if (lastUser) {
+      handleSend(lastUser.text);
+    }
   };
 
-  useEffect(() => {
-    setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  }, [coachList, advisorList, isTyping, activeMode]);
-
-  const activeMessages = activeMode === "coach" ? coachList : advisorList;
+  const suggestionPrompts = activeMode === "coach" ? COACH_PROMPTS : ADVISOR_PROMPTS;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f7f9ff]">
-      {/* Header Bar */}
-      <View className="bg-white border-b border-slate-100 py-3.5 px-margin-mobile flex-col items-center">
-        {/* Toggle Controls */}
-        <View className="flex-row bg-slate-100 rounded-full p-1 w-64 justify-between">
-          <Pressable
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1 bg-cream"
+    >
+      {/* Top Controls Header */}
+      <View className="bg-surface border-b border-border pt-3 pb-2.5 px-4 shadow-card">
+        {/* Mode Switcher Tabs */}
+        <View className="flex-row bg-cream p-1 rounded-2xl border border-border justify-center max-w-sm mx-auto">
+          <TouchableOpacity
             onPress={() => {
               triggerHaptic();
               setActiveMode("coach");
             }}
-            className={`flex-1 py-1.5 rounded-full items-center ${activeMode === "coach" ? "bg-white shadow-sm" : ""}`}
+            activeOpacity={0.8}
+            className={`flex-1 py-2 px-3 rounded-xl items-center flex-row justify-center ${
+              activeMode === "coach" ? "bg-white shadow-button border border-border/40" : ""
+            }`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeMode === "coach" }}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${activeMode === "coach" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
-              AI Coach
+            <Sparkles
+              size={15}
+              color={activeMode === "coach" ? "#144a32" : "#666e69"}
+            />
+            <Text
+              className={`text-xs ml-1.5 font-sans ${
+                activeMode === "coach"
+                  ? "font-bold text-primary"
+                  : "font-semibold text-text-muted"
+              }`}
+            >
+              Savings Coach
             </Text>
-          </Pressable>
-          <Pressable
+          </TouchableOpacity>
+
+          <TouchableOpacity
             onPress={() => {
               triggerHaptic();
               setActiveMode("advisor");
             }}
-            className={`flex-1 py-1.5 rounded-full items-center ${activeMode === "advisor" ? "bg-white shadow-sm" : ""}`}
+            activeOpacity={0.8}
+            className={`flex-1 py-2 px-3 rounded-xl items-center flex-row justify-center ${
+              activeMode === "advisor" ? "bg-white shadow-button border border-border/40" : ""
+            }`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeMode === "advisor" }}
           >
-            <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold" }} className={`text-xs ${activeMode === "advisor" ? "text-[#005bbf] font-bold" : "text-slate-500"}`}>
-              AI Advisor
+            <ShieldCheck
+              size={15}
+              color={activeMode === "advisor" ? "#144a32" : "#666e69"}
+            />
+            <Text
+              className={`text-xs ml-1.5 font-sans ${
+                activeMode === "advisor"
+                  ? "font-bold text-primary"
+                  : "font-semibold text-text-muted"
+              }`}
+            >
+              Wealth Advisor
             </Text>
-          </Pressable>
+          </TouchableOpacity>
+        </View>
+
+        {/* AI Calculation Disclaimer Banner */}
+        <View className="flex-row items-center bg-sage-light/60 border border-border rounded-xl px-2.5 py-1.5 mt-2.5">
+          <Info size={13} color="#144a32" className="mt-0.5 mr-1.5" />
+          <Text className="text-[11px] text-primary font-sans flex-1 leading-4">
+            Financial figures are verified by Penny Pilot's calculation engine, not fabricated by the AI.
+          </Text>
         </View>
       </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
+      {/* Messages Scroll Area */}
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 20,
+          flexGrow: 1,
+        }}
+        className="flex-1"
       >
-        {/* Chat Feed */}
-        <ScrollView 
-          ref={scrollRef}
-          className="flex-1 px-margin-mobile"
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 150 }}
-        >
-          {activeMessages.map((c) => {
-            const isAI = c.sender === "ai";
-            return (
-              <View 
-                key={c.id} 
-                className={`flex-col mb-4 ${isAI ? "items-start" : "items-end"}`}
-              >
-                {/* Bubble */}
-                <View 
-                  style={[
-                    styles.bubble,
-                    isAI ? styles.bubbleAI : styles.bubbleUser
-                  ]}
-                  className="p-4 rounded-2xl max-w-[85%]"
+        {activeMessages.length === 0 ? (
+          <View className="flex-1 justify-center my-4">
+            <Card variant="default" padding="lg" className="shadow-card mb-4 items-center">
+              <View className="w-12 h-12 rounded-full bg-sage-light items-center justify-center mb-3 border border-border">
+                <Bot size={24} color="#144a32" />
+              </View>
+              <Text className="text-base font-bold text-text-primary font-sans text-center">
+                {activeMode === "coach"
+                  ? "Meet your Penny Pilot Coach"
+                  : "Welcome to Wealth Advisor"}
+              </Text>
+              <Text className="text-xs text-text-secondary font-sans text-center mt-1 leading-relaxed max-w-xs">
+                {activeMode === "coach"
+                  ? "Ask about your spending patterns, micro-savings streaks, or get tips on reaching your goals faster."
+                  : "Get educational guidance on index funds, long-term wealth compounding, and smart financial habits."}
+              </Text>
+            </Card>
+
+            {/* Quick Suggestion Chips */}
+            <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-2 px-1">
+              Suggested Questions:
+            </Text>
+            <View className="space-y-2">
+              {suggestionPrompts.map((prompt, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => handleSend(prompt)}
+                  activeOpacity={0.8}
+                  className="bg-white p-3 rounded-2xl border border-border shadow-card mb-2"
+                  accessibilityRole="button"
+                  accessibilityLabel={prompt}
                 >
-                  <Text 
-                    style={{ fontFamily: "WorkSans_400Regular" }} 
-                    className={`text-sm leading-relaxed ${isAI ? "text-slate-800" : "text-white"}`}
-                  >
-                    {c.text}
+                  <Text className="text-xs font-semibold text-text-primary font-sans">
+                    "{prompt}"
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <View className="space-y-3">
+            {activeMessages.map((msg) => {
+              const isUser = msg.sender === "user";
+
+              return (
+                <View
+                  key={msg.id}
+                  className={`flex-row mb-3 ${isUser ? "justify-end" : "justify-start"}`}
+                >
+                  {!isUser && (
+                    <View className="w-7 h-7 rounded-full bg-primary items-center justify-center mr-2 mt-1 shadow-button">
+                      <Bot size={14} color="#ffffff" />
+                    </View>
+                  )}
+
+                  <View className="max-w-[82%]">
+                    <View
+                      className={`p-3.5 rounded-2xl ${
+                        isUser
+                          ? "bg-primary rounded-tr-xs"
+                          : msg.isError
+                          ? "bg-danger-light border border-danger/30 rounded-tl-xs"
+                          : "bg-white border border-border shadow-card rounded-tl-xs"
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-sans leading-relaxed ${
+                          isUser
+                            ? "text-white font-medium"
+                            : msg.isError
+                            ? "text-danger font-medium"
+                            : "text-text-primary"
+                        }`}
+                      >
+                        {msg.text}
+                      </Text>
+
+                      {/* Optional Investment Recommendation Card */}
+                      {msg.investmentCard && (
+                        <View className="mt-2.5 p-3 rounded-xl bg-cream border border-border">
+                          <Text className="text-xs font-bold text-primary font-sans">
+                            {msg.investmentCard.fundName}
+                          </Text>
+                          <View className="flex-row items-center mt-1 space-x-2">
+                            <Chip
+                              label={msg.investmentCard.risk}
+                              variant="success"
+                              className="py-0 px-2 h-5 mr-2"
+                            />
+                            <Text className="text-[11px] font-bold text-gold font-sans">
+                              {msg.investmentCard.returnRate}
+                            </Text>
+                          </View>
+                          {msg.investmentCard.disclaimer && (
+                            <Text className="text-[10px] text-text-muted font-sans mt-2 italic">
+                              {msg.investmentCard.disclaimer}
+                            </Text>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Retry Button if error */}
+                      {msg.isError && (
+                        <TouchableOpacity
+                          onPress={handleRetryLast}
+                          className="flex-row items-center mt-2 self-start"
+                        >
+                          <RotateCcw size={12} color="#b3261e" />
+                          <Text className="text-[11px] font-bold text-danger ml-1 font-sans">
+                            Tap to retry
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <Text
+                      className={`text-[10px] text-text-muted font-sans mt-1 ${
+                        isUser ? "text-right mr-1" : "ml-1"
+                      }`}
+                    >
+                      {msg.time}
+                    </Text>
+                  </View>
+
+                  {isUser && (
+                    <View className="w-7 h-7 rounded-full bg-sage-light items-center justify-center ml-2 mt-1 border border-border">
+                      <User size={14} color="#144a32" />
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            {isTyping && (
+              <View className="flex-row items-center mb-3">
+                <View className="w-7 h-7 rounded-full bg-primary items-center justify-center mr-2 shadow-button">
+                  <Bot size={14} color="#ffffff" />
+                </View>
+                <View className="bg-white border border-border px-3.5 py-2.5 rounded-2xl rounded-tl-xs flex-row items-center space-x-1.5 shadow-card">
+                  <ActivityIndicator size="small" color="#144a32" />
+                  <Text className="text-xs text-text-muted font-sans ml-2">
+                    Penny Pilot is thinking...
                   </Text>
                 </View>
-
-                {/* Coach Goal Detail Card */}
-                {c.card && (
-                  <View 
-                    style={styles.card} 
-                    className="bg-white border border-outline-variant/30 p-4 rounded-2xl shadow-sm w-[85%] mt-2"
-                  >
-                    <View className="flex-row justify-between items-center mb-3">
-                      <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-slate-800">
-                        {c.card.title}
-                      </Text>
-                      <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-xs text-ob-primary">
-                        ₹{c.card.saved.toLocaleString("en-IN")} / ₹{c.card.target.toLocaleString("en-IN")}
-                      </Text>
-                    </View>
-                    <View className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <View 
-                        style={{ width: `${Math.round((c.card.saved / c.card.target) * 100)}%` }}
-                        className="h-full bg-blue-600 rounded-full"
-                      />
-                    </View>
-                    <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[10px] text-slate-500 italic mt-3 leading-relaxed">
-                      "{c.card.quote}"
-                    </Text>
-                  </View>
-                )}
-
-                {/* Advisor Investment Pick Card */}
-                {c.investmentCard && (
-                  <View 
-                    style={styles.card} 
-                    className="bg-white border border-outline-variant/30 rounded-2xl p-4 w-[85%] mt-2 flex-col space-y-3"
-                  >
-                    <View className="flex-row justify-between items-start">
-                      <View className="flex-1">
-                        <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[10px] text-slate-400 uppercase tracking-wider">
-                          Top Pick
-                        </Text>
-                        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-sm text-slate-800">
-                          {c.investmentCard.fundName}
-                        </Text>
-                      </View>
-                      <View className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                        <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-[9px] text-emerald-800 uppercase font-bold">
-                          {c.investmentCard.risk}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View className="flex-row items-end justify-between border-t border-slate-100 pt-3">
-                      <View>
-                        <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[10px] text-slate-500">
-                          Expected Return
-                        </Text>
-                        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-base text-emerald-600">
-                          {c.investmentCard.returnRate}
-                        </Text>
-                      </View>
-                      <Pressable
-                        onPress={() => handleInvest(c.investmentCard!.fundName)}
-                        style={({ pressed }) => [
-                          styles.investBtn,
-                          { opacity: pressed ? 0.8 : 1 }
-                        ]}
-                        className="bg-[#005bbf] rounded-full px-4 py-2"
-                      >
-                        <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-white">
-                          Invest Now
-                        </Text>
-                      </Pressable>
-                    </View>
-
-                    {/* Disclaimer Text */}
-                    <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[9px] text-slate-400 italic mt-2 border-t border-slate-100 pt-2 leading-tight">
-                      {c.investmentCard.disclaimer || "Disclaimer: This AI tool is not a licensed financial advisor. Please conduct independent research before investing."}
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-[9px] text-slate-400 mt-1 px-1">
-                  {c.time}
-                </Text>
               </View>
-            );
-          })}
-
-          {isTyping && (
-            <View className="flex-row items-center space-x-1.5 ml-2 mt-1">
-              <View className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
-              <View className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ marginHorizontal: 2 }} />
-              <View className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Input Bar */}
-        <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-margin-mobile">
-          {/* Quick Suggestions */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row pb-3">
-            {(activeMode === "coach"
-              ? ["How am I doing?", "Savings tips", "Analyze my coffee spend"]
-              : ["How do index funds work?", "What is Nifty 50?", "Other low risk options?"]
-            ).map((chip) => (
-              <Pressable
-                key={chip}
-                onPress={() => handleSend(chip)}
-                style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.95 : 1 }] }]}
-                className="px-4 py-2 border border-slate-200 bg-slate-50 rounded-full mr-2"
-              >
-                <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-slate-500">
-                  {chip}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          {/* Input Bar */}
-          <View className="flex-row items-center space-x-3">
-            <View className="flex-1 flex-row items-center bg-slate-100 rounded-full px-4 border border-slate-200/50">
-              <TextInput
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder={activeMode === "coach" ? "Ask your financial coach..." : "Ask your investment advisor..."}
-                placeholderTextColor="#94a3b8"
-                style={{ fontFamily: "WorkSans_400Regular", flex: 1, paddingVertical: 10 }}
-                className="text-sm text-slate-800"
-              />
-            </View>
-            <Pressable
-              onPress={() => handleSend(inputText)}
-              disabled={!inputText.trim()}
-              style={[
-                styles.sendBtn,
-                { backgroundColor: inputText.trim() ? "#005bbf" : "#adc7ff" }
-              ]}
-              className="w-10 h-10 rounded-full items-center justify-center shadow-sm"
-            >
-              <MaterialIcons name="send" size={18} color="#ffffff" />
-            </Pressable>
+            )}
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        )}
+      </ScrollView>
+
+      {/* Input Bar */}
+      <View className="bg-surface border-t border-border p-3 flex-row items-center">
+        <TextInput
+          value={inputText}
+          onChangeText={setInputText}
+          placeholder={
+            activeMode === "coach"
+              ? "Ask coach anything about your savings..."
+              : "Ask advisor about investments..."
+          }
+          placeholderTextColor="#707773"
+          className="flex-1 bg-cream border border-border rounded-2xl px-4 py-2.5 text-xs text-text-primary font-sans mr-2 min-h-[44px]"
+          multiline
+          maxLength={500}
+          onSubmitEditing={() => handleSend()}
+        />
+        <TouchableOpacity
+          onPress={() => handleSend()}
+          disabled={!inputText.trim() || isTyping}
+          className={`w-11 h-11 rounded-2xl items-center justify-center shadow-button ${
+            inputText.trim() && !isTyping ? "bg-primary" : "bg-text-muted/40"
+          }`}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
+        >
+          <Send size={18} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  bubble: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  bubbleAI: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#e8eaed",
-    borderBottomLeftRadius: 4,
-  },
-  bubbleUser: {
-    backgroundColor: "#1a73e8",
-    borderBottomRightRadius: 4,
-  },
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  investBtn: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  sendBtn: {
-    alignItems: "center",
-    justifyContent: "center",
-  }
-});
 
 export default ChatScreen;

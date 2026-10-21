@@ -1,135 +1,241 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, TextInput, Alert, ActivityIndicator, TouchableOpacity, RefreshControl } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, TouchableOpacity, Alert } from "react-native";
+import { ShoppingCart, ChevronRight, ArrowRight } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "../../hooks/useAuth";
 import { useIsFocused } from "@react-navigation/native";
 import { apiService } from "../../services/api";
-import { Card } from "../../components/Card";
-import { Button } from "../../components/Button";
+import {
+  ScreenContainer,
+  Header,
+  Card,
+  Input,
+  Button,
+  Chip,
+  ListItem,
+  ProgressBar,
+  Skeleton,
+  PottedPlantIcon,
+} from "../../components/ui";
 import { Transaction } from "../../types";
+
+const DEFAULT_CATEGORIES = ["Food", "Education", "Transport", "Shopping", "More"];
 
 export const HomeScreen = ({ navigation }: { navigation: any }) => {
   const { logout } = useAuth();
-  const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  // States for stats
-  const [totalSaved, setTotalSaved] = useState<number>(0);
-  const [roundupCount, setRoundupCount] = useState<number>(0);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-
-  // States for logging transaction
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("Coffee");
-  const [logLoading, setLogLoading] = useState(false);
-
-  // States for negotiator modal
   const isFocused = useIsFocused();
-  const [showNegotiator, setShowNegotiator] = useState(false);
-  const [hasCheckedSubscription, setHasCheckedSubscription] = useState(false);
-  const [suggestInfo, setSuggestInfo] = useState<{ name: string; amount: number; daysWithout: number; daysWith: number; text: string } | null>(null);
 
-  // States for roundup result modal / alert
-  const [roundupAlert, setRoundupAlert] = useState<{ amount: number; desc: string } | null>(null);
-
-  const loadData = async () => {
+  const triggerHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
     try {
-      setLoading(true);
-      const stats = await apiService.getRoundupStats();
-      setTotalSaved(Number(stats.total_saved));
-      setRoundupCount(stats.roundup_transactions_count);
-
-      const txs = await apiService.getTransactions();
-      setTransactions(txs.slice(0, 5)); // show top 5
-    } catch (e: any) {
-      console.warn("Failed to load dashboard data:", e.message);
-    } finally {
-      setLoading(false);
+      Haptics.impactAsync(style);
+    } catch {
+      // Ignore haptics error on web
     }
   };
 
+  // User info state
+  const [userName, setUserName] = useState<string>("Student");
+
+  // Loading & refresh states
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Backend stats states (zero client-side math)
+  const [totalSaved, setTotalSaved] = useState<number | null>(null);
+  const [roundupCount, setRoundupCount] = useState<number | null>(null);
+  const [activeGoal, setActiveGoal] = useState<{
+    goal_id: number;
+    goal_name: string;
+    saved: number;
+    target: number;
+    progress_percentage?: number;
+  } | null>(null);
+  const [goalsLoading, setGoalsLoading] = useState(true);
+
+  // Transactions state
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  // Simulation form states
+  const [desc, setDesc] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Food");
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [logLoading, setLogLoading] = useState(false);
+
+  // Roundup alert modal / banner state
+  const [roundupAlert, setRoundupAlert] = useState<{
+    amount: number;
+    newGoalAmount?: number;
+    explanation?: string;
+  } | null>(null);
+
+  // Load user profile name
+  const loadUser = useCallback(async () => {
+    try {
+      const user = await apiService.getCurrentUser();
+      if (user && user.full_name) {
+        const firstName = user.full_name.trim().split(" ")[0];
+        setUserName(firstName);
+      }
+    } catch {
+      // Fallback to default
+    }
+  }, []);
+
+  // Load stats, goals, transactions & categories from backend
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // 1. Fetch round-up stats from backend
+      try {
+        const stats = await apiService.getRoundupStats();
+        if (stats && stats.total_saved !== undefined) {
+          setTotalSaved(Number(stats.total_saved));
+          setRoundupCount(Number(stats.roundup_transactions_count || 0));
+        } else {
+          setTotalSaved(0);
+          setRoundupCount(0);
+        }
+      } catch (err) {
+        console.warn("Failed to load roundup stats:", err);
+        setTotalSaved(0);
+        setRoundupCount(0);
+      }
+
+      // 2. Fetch goals from backend (zero client-side math)
+      setGoalsLoading(true);
+      try {
+        const goalsList = await apiService.getGoals();
+        if (Array.isArray(goalsList) && goalsList.length > 0) {
+          const firstGoal = goalsList[0];
+          // Retrieve detailed goal including backend-calculated progress_percentage
+          try {
+            const detail = await apiService.getGoalById(firstGoal.goal_id);
+            setActiveGoal({
+              goal_id: detail.goal_id,
+              goal_name: detail.goal_name,
+              saved: detail.saved,
+              target: detail.target,
+              progress_percentage: detail.progress_percentage,
+            });
+          } catch {
+            setActiveGoal({
+              goal_id: firstGoal.goal_id,
+              goal_name: firstGoal.goal_name,
+              saved: firstGoal.saved,
+              target: firstGoal.target,
+            });
+          }
+        } else {
+          setActiveGoal(null);
+        }
+      } catch (err) {
+        console.warn("Failed to load goals:", err);
+      } finally {
+        setGoalsLoading(false);
+      }
+
+      // 3. Fetch recent transactions
+      try {
+        const txs = await apiService.getTransactions();
+        if (Array.isArray(txs)) {
+          setTransactions(txs.slice(0, 5));
+        }
+      } catch (err) {
+        console.warn("Failed to load transactions:", err);
+      }
+
+      // 4. Fetch dynamic categories from user's budgets if available
+      try {
+        const budgets = await apiService.getBudgets();
+        if (Array.isArray(budgets) && budgets.length > 0) {
+          const uniqueCats = Array.from(new Set(budgets.map((b: any) => b.category)));
+          if (uniqueCats.length > 0) {
+            setCategories(uniqueCats);
+            if (!uniqueCats.includes(category)) {
+              setCategory(uniqueCats[0]);
+            }
+          }
+        }
+      } catch {
+        // Keep DEFAULT_CATEGORIES
+      }
+    } catch (e: any) {
+      console.warn("Failed to load dashboard data:", e?.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [category]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadUser(), loadDashboardData()]);
     setRefreshing(false);
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadUser();
+    loadDashboardData();
+  }, [loadUser, loadDashboardData]);
 
-  // Contextual check for pausable subscription on screen focus
+  // Refetch when returning to screen
   useEffect(() => {
-    if (isFocused && !hasCheckedSubscription) {
-      const checkNegotiator = async () => {
-        try {
-          const subs = await apiService.getNegotiatorSubscriptions();
-          const pausable = Array.isArray(subs) ? subs.find((s: any) => s.pausable) : null;
-          if (pausable) {
-            const suggestData = await apiService.getNegotiatorSuggest({ subscription_name: pausable.name });
-            setSuggestInfo({
-              name: pausable.name,
-              amount: pausable.amount,
-              daysWithout: suggestData.days_without_pausing || 30,
-              daysWith: suggestData.days_with_pausing || 18,
-              text: suggestData.suggestion_text || `Struggling with your Laptop goal? Try pausing ${pausable.name} for a month.`
-            });
-            setShowNegotiator(true);
-            setHasCheckedSubscription(true);
-          }
-        } catch (e) {
-          console.warn("Negotiator focus check failed:", e);
-        }
-      };
-      checkNegotiator();
+    if (isFocused) {
+      loadDashboardData();
     }
-  }, [isFocused]);
+  }, [isFocused, loadDashboardData]);
 
+  // Handle transaction simulation & backend round-up calculation
   const handleLogTransaction = async () => {
-    if (!desc || !amount) {
-      Alert.alert("Error", "Please provide a description and amount.");
+    if (!desc.trim()) {
+      Alert.alert("Missing description", "Please enter a store or item name.");
       return;
     }
 
-    const numericAmount = parseFloat(amount);
+    const numericAmount = parseFloat(amount.trim());
     if (isNaN(numericAmount) || numericAmount <= 0) {
-      Alert.alert("Error", "Please provide a valid positive amount.");
+      Alert.alert("Invalid amount", "Please enter a valid positive amount in ₹.");
       return;
     }
 
     setLogLoading(true);
     try {
       const response = await apiService.createTransaction({
-        description: desc,
+        description: desc.trim(),
         amount: numericAmount,
         category: category,
-        merchant: desc,
-        type: "debit"
+        merchant: desc.trim(),
+        type: "debit",
       });
 
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+
       if (response.roundup_applied && response.roundup_details?.success) {
-        const amt = response.roundup_details.roundup_amount;
+        const amt = Number(response.roundup_details.roundup_amount || 0);
         const explanation = response.roundup_details.explanation;
-        
+        const newGoalAmt = response.roundup_details.new_goal_amount !== undefined
+          ? Number(response.roundup_details.new_goal_amount)
+          : undefined;
+
         setRoundupAlert({
-          amount: Number(amt),
-          desc: explanation
+          amount: amt,
+          newGoalAmount: newGoalAmt,
+          explanation: explanation,
         });
       } else {
-        Alert.alert("Success", "Transaction logged! No roundup applied this time.");
+        Alert.alert(
+          "Transaction Logged",
+          "Transaction logged successfully. No round-up was applied to this purchase."
+        );
       }
 
-      // Reset form
+      // Reset input form
       setDesc("");
       setAmount("");
-      
-      // Reload stats
-      loadData();
+
+      // Refresh stats from backend to update totals without client-side calculation
+      await loadDashboardData();
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to log transaction.");
     } finally {
@@ -137,160 +243,312 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
+  // Helper formatting for currency (zero arithmetic, string formatting only)
+  const formatINR = (val: number | null | undefined): string => {
+    if (val === null || val === undefined) return "--";
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(val);
+  };
+
   return (
-    <ScrollView 
-      className="flex-1 bg-surface px-4 pt-4"
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#005bbf" />
-      }
+    <ScreenContainer
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      className="pt-2"
     >
-      {/* Header */}
-      <View className="flex-row justify-between items-center mb-6">
-        <View>
-          <Text className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Welcome Student</Text>
-          <Text className="text-on-surface text-2xl font-black">SpareChange Dashboard</Text>
+      {/* Top Header with Brand and Notification Bell */}
+      <Header
+        title={`Good morning, ${userName} 👋`}
+        subtitle="Micro-savings active"
+        showLogo
+        showNotification
+        hasUnreadNotifications={true}
+        onNotificationPress={() => navigation.navigate("Notifications")}
+        className="px-0 mb-2"
+      />
+
+      {/* Main Stats Card: Total Auto-Saved & Active Goal */}
+      <Card variant="default" padding="none" className="mb-4 shadow-card-elevated">
+        <View className="p-4.5 bg-surface">
+          {/* Top Row: Total Auto-Saved with Plant Motif */}
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                Total Auto-Saved
+              </Text>
+              {loading && totalSaved === null ? (
+                <Skeleton width={130} height={32} className="my-1" />
+              ) : (
+                <Text className="text-3xl font-extrabold text-primary font-sans tracking-tight">
+                  ₹{formatINR(totalSaved)}
+                </Text>
+              )}
+              <Text className="text-xs text-text-muted mt-1 font-sans">
+                {roundupCount !== null
+                  ? `From ${roundupCount} round-ups`
+                  : "Calculating round-ups..."}
+              </Text>
+            </View>
+
+            {/* Plant Motif Illustration */}
+            <View className="w-14 h-14 rounded-full bg-sage-light items-center justify-center border border-border">
+              <PottedPlantIcon size={34} />
+            </View>
+          </View>
+
+          {/* Goal Progress Section */}
+          <View className="mt-4 pt-3.5 border-t border-border-light">
+            {goalsLoading ? (
+              <View className="py-2">
+                <Skeleton width="60%" height={14} className="mb-2" />
+                <Skeleton width="100%" height={8} className="rounded-full" />
+              </View>
+            ) : activeGoal ? (
+              <View>
+                <View className="flex-row justify-between items-center mb-1.5">
+                  <View className="flex-row items-center flex-1 pr-2">
+                    <Text
+                      className="text-xs font-bold text-text-primary font-sans"
+                      numberOfLines={1}
+                    >
+                      🎯 {activeGoal.goal_name}
+                    </Text>
+                  </View>
+                  <Text className="text-xs font-semibold text-text-secondary font-sans">
+                    ₹{formatINR(activeGoal.saved)} / ₹{formatINR(activeGoal.target)}
+                  </Text>
+                </View>
+
+                {/* Progress bar uses backend progress_percentage (never computed client-side) */}
+                {activeGoal.progress_percentage !== undefined ? (
+                  <View className="mt-1">
+                    <ProgressBar
+                      progress={activeGoal.progress_percentage}
+                      height={7}
+                      fillColor="bg-primary"
+                      trackColor="bg-cream"
+                    />
+                    <View className="flex-row justify-between items-center mt-1">
+                      <Text className="text-[11px] text-text-muted font-medium">
+                        Goal progress
+                      </Text>
+                      <Text className="text-[11px] font-bold text-primary">
+                        {Math.round(activeGoal.progress_percentage)}%
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <Skeleton width="100%" height={7} className="mt-1 rounded-full" />
+                )}
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => navigation.navigate("GoalCreation")}
+                className="flex-row items-center justify-between py-1"
+                accessibilityRole="button"
+                accessibilityLabel="Set your first savings goal"
+              >
+                <View>
+                  <Text className="text-xs font-bold text-primary">
+                    + Set your first savings goal
+                  </Text>
+                  <Text className="text-[11px] text-text-muted mt-0.5">
+                    Connect round-ups directly to what you care about
+                  </Text>
+                </View>
+                <ChevronRight size={16} color="#144a32" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        <TouchableOpacity 
-          onPress={logout}
-          className="bg-white border border-outline-variant py-2 px-4 rounded-xl"
-        >
-          <Text className="text-red-400 text-xs font-bold">Logout</Text>
-        </TouchableOpacity>
-      </View>
+      </Card>
 
-      {/* Stats Cards */}
-      <View className="flex-row gap-x-4 mb-6">
-        <Card className="flex-1 my-0 py-4 items-center">
-          <Text className="text-on-surface-variant text-xs font-semibold mb-1">Total Auto-Saved</Text>
-          {loading ? (
-            <ActivityIndicator size="small" color="#10B981" />
-          ) : (
-            <Text className="text-tertiary text-2xl font-black">₹{totalSaved.toFixed(2)}</Text>
-          )}
-        </Card>
-
-        <Card className="flex-1 my-0 py-4 items-center">
-          <Text className="text-on-surface-variant text-xs font-semibold mb-1">Round-Up Triggers</Text>
-          {loading ? (
-            <ActivityIndicator size="small" color="#4F46E5" />
-          ) : (
-            <Text className="text-ob-primary text-2xl font-black">{roundupCount}</Text>
-          )}
-        </Card>
-      </View>
-
-      {/* AI Roundup Alert Banner */}
+      {/* AI Roundup Alert Banner (Displays after purchase simulation) */}
       {roundupAlert && (
-        <View className="bg-tertiary-fixed border border-tertiary-fixed-dim p-5 rounded-2xl mb-6">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-on-tertiary-fixed-variant text-sm font-bold">🎉 Micro-savings automated!</Text>
-            <TouchableOpacity onPress={() => setRoundupAlert(null)}>
-              <Text className="text-on-surface-variant font-bold text-xs px-2">Dismiss</Text>
+        <Card variant="sage" padding="md" className="mb-4">
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-xs font-bold text-primary tracking-wide">
+              🎉 Micro-savings automated!
+            </Text>
+            <TouchableOpacity
+              onPress={() => setRoundupAlert(null)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text className="text-xs font-semibold text-text-secondary">
+                Dismiss
+              </Text>
             </TouchableOpacity>
           </View>
-          <Text className="text-on-surface text-xl font-black mb-1">+₹{roundupAlert.amount.toFixed(2)}</Text>
-          <Text className="text-on-surface-variant text-xs italic">"{roundupAlert.desc}"</Text>
-        </View>
+
+          <Text className="text-2xl font-black text-primary font-sans mb-1">
+            +₹{formatINR(roundupAlert.amount)}
+          </Text>
+
+          {/* New goal amount strictly from backend */}
+          {roundupAlert.newGoalAmount !== undefined && (
+            <Text className="text-xs font-bold text-text-primary mb-1">
+              New Goal Balance: ₹{formatINR(roundupAlert.newGoalAmount)}
+            </Text>
+          )}
+
+          {roundupAlert.explanation && (
+            <Text className="text-xs text-text-secondary italic mt-1 font-sans">
+              "{roundupAlert.explanation}"
+            </Text>
+          )}
+        </Card>
       )}
 
-      {/* AI Purchase Negotiator Banner */}
-      <TouchableOpacity 
+      {/* Peach AI Nudge Card */}
+      <TouchableOpacity
         onPress={() => {
-          triggerHaptic();
+          triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
           navigation.navigate("SubscriptionNegotiator");
         }}
-        className="bg-primary-fixed border border-primary-fixed-dim p-4 rounded-2xl mb-6 flex-row justify-between items-center"
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Thinking of buying something? Pause and see how it fits your goals."
+        className="mb-4"
       >
-        <View className="flex-1 pr-2">
-          <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-ob-primary text-sm">🤔 Thinking of buying something?</Text>
-          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-on-primary-fixed-variant text-xs mt-1">Let SpareChange AI evaluate the delay it will cause to your savings goals.</Text>
-        </View>
-        <MaterialIcons name="chevron-right" size={20} color="#005bbf" />
+        <Card variant="nudge" padding="md" className="flex-row items-center justify-between">
+          <View className="w-10 h-10 rounded-full bg-nudge-border/50 items-center justify-center mr-3">
+            <ShoppingCart size={18} color="#9a3412" />
+          </View>
+          <View className="flex-1 pr-2">
+            <Text className="text-xs font-bold text-nudge-text font-sans uppercase tracking-wider">
+              Thinking of buying something?
+            </Text>
+            <Text className="text-xs text-text font-medium mt-0.5">
+              Pause and see how it fits your goals. →
+            </Text>
+          </View>
+          <ChevronRight size={18} color="#9a3412" />
+        </Card>
       </TouchableOpacity>
 
-      {/* Log Transaction Section */}
-      <Card className="mb-6">
-        <Text style={{ fontFamily: "PlusJakartaSans_700Bold" }} className="text-on-surface text-lg mb-4">Simulate card swipe / purchase</Text>
-        
-        <View className="flex-row gap-x-4 mb-3">
-          <View className="flex-1">
-            <Text className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Store / Item</Text>
-            <TextInput
-              value={desc}
-              onChangeText={setDesc}
-              placeholder="e.g. Campus Coffee"
-              placeholderTextColor="#64748B"
-              className="bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-2.5 text-xs"
-            />
-          </View>
-
-          <View className="w-1/3">
-            <Text className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Amount ($)</Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="e.g. 4.25"
-              placeholderTextColor="#64748B"
-              keyboardType="decimal-pad"
-              className="bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-2.5 text-xs"
-            />
-          </View>
+      {/* Simulate Card Swipe / Purchase Card */}
+      <Card variant="default" padding="lg" className="mb-4 shadow-card">
+        <View className="mb-3.5">
+          <Text className="text-base font-bold text-text-primary font-sans">
+            Simulate card swipe / purchase
+          </Text>
+          <Text className="text-xs text-text-muted mt-0.5">
+            Test how Penny Pilot rounds up your daily campus spending
+          </Text>
         </View>
 
+        {/* Store / Item input */}
+        <Input
+          label="Store / Item"
+          placeholder="e.g. Campus Coffee, Bookstore, Canteen"
+          value={desc}
+          onChangeText={setDesc}
+          autoCapitalize="sentences"
+          required
+        />
+
+        {/* Amount input strictly in INR */}
+        <Input
+          label="Amount (₹)"
+          placeholder="e.g. 185.00"
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          required
+          helperText="All amounts processed strictly in Indian Rupees (₹)"
+        />
+
+        {/* Dynamic Category Chips */}
         <View className="mb-4">
-          <Text className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-2">Category</Text>
-          <View className="flex-row gap-x-2">
-            {["Coffee", "Dining", "Textbooks", "Entertainment"].map((cat) => (
-              <TouchableOpacity
+          <Text className="text-xs font-semibold text-text-primary tracking-wide mb-2">
+            Category
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {categories.map((cat) => (
+              <Chip
                 key={cat}
-                onPress={() => setCategory(cat)}
-                className={`py-1.5 px-3 rounded-lg border ${
-                  category === cat ? "bg-indigo-600/20 border-indigo-500" : "bg-slate-900 border-slate-700"
-                }`}
-              >
-                <Text className={`text-[10px] font-semibold ${category === cat ? "text-indigo-400" : "text-slate-400"}`}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
+                label={cat}
+                category={cat}
+                selected={category === cat}
+                onPress={() => {
+                  triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                  setCategory(cat);
+                }}
+              />
             ))}
           </View>
         </View>
 
-        <Button 
-          title="Swipe Card & Round-Up" 
-          onPress={handleLogTransaction} 
-          loading={logLoading} 
-          variant="secondary"
-          className="py-2.5"
+        {/* Primary CTA */}
+        <Button
+          title="Show round-up & new balance →"
+          variant="primary"
+          onPress={handleLogTransaction}
+          loading={logLoading}
         />
       </Card>
 
       {/* Recent Purchases List */}
-      <Card className="mb-10">
-        <Text className="text-on-surface text-lg font-bold mb-3">Recent Transactions</Text>
+      <Card variant="default" padding="md" className="mb-6 shadow-card">
+        <View className="flex-row items-center justify-between pb-2 mb-1 border-b border-border-light">
+          <Text className="text-base font-bold text-text-primary font-sans">
+            Recent Transactions
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+              navigation.navigate("RoundupTracker");
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            className="flex-row items-center"
+            accessibilityRole="button"
+            accessibilityLabel="See all transactions"
+          >
+            <Text className="text-xs font-bold text-primary mr-0.5">
+              See all
+            </Text>
+            <ArrowRight size={13} color="#144a32" />
+          </TouchableOpacity>
+        </View>
+
         {loading && transactions.length === 0 ? (
-          <ActivityIndicator size="small" color="#4F46E5" />
+          <View className="py-4">
+            <Skeleton width="100%" height={44} className="mb-2" />
+            <Skeleton width="100%" height={44} className="mb-2" />
+            <Skeleton width="100%" height={44} />
+          </View>
         ) : transactions.length === 0 ? (
-          <Text className="text-slate-400 text-xs italic text-center py-4">No recent swipes. Try logging one above!</Text>
+          <View className="py-6 items-center justify-center">
+            <Text className="text-xs text-text-muted italic text-center">
+              No recent swipes. Try logging a purchase above!
+            </Text>
+          </View>
         ) : (
-          transactions.map((t) => {
-            const date = new Date(t.date).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-            });
+          transactions.map((t, idx) => {
+            const dateStr = t.date
+              ? new Date(t.date).toLocaleDateString("en-IN", {
+                  month: "short",
+                  day: "numeric",
+                })
+              : "Recent";
+
             return (
-              <View key={t.trans_id} className="flex-row justify-between items-center py-3 border-b border-slate-700/60 last:border-b-0">
-                <View>
-                  <Text className="text-slate-100 text-sm font-semibold">{t.merchant || t.description}</Text>
-                  <Text className="text-slate-400 text-[10px]">{t.category} • {date}</Text>
-                </View>
-                <Text className="text-slate-300 font-bold text-sm">-${Number(t.amount).toFixed(2)}</Text>
-              </View>
+              <ListItem
+                key={t.trans_id || idx}
+                title={t.merchant || t.description || "Purchase"}
+                subtitle={`${t.category || "General"} • ${dateStr}`}
+                amount={t.amount}
+                isDebit={t.type !== "credit"}
+                category={t.category}
+                showDivider={idx < transactions.length - 1}
+              />
             );
           })
         )}
       </Card>
-    </ScrollView>
+    </ScreenContainer>
   );
 };
 

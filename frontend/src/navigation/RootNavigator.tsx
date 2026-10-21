@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useAuth } from "../hooks/useAuth";
+import { Home, Target, LineChart, MessageSquare, User, LayoutDashboard, TrendingUp, GraduationCap } from "lucide-react-native";
 
 // Authentication Screens
 import LoginScreen from "../screens/auth/LoginScreen";
@@ -17,7 +18,7 @@ import CreateGoalScreen from "../screens/student/CreateGoalScreen";
 
 // Student Screens
 import HomeScreen from "../screens/student/HomeScreen";
-import GoalsDashboardScreen from "../screens/student/GoalsDashboardScreen";
+import GoalsScreen from "../screens/student/GoalsScreen";
 import GoalDetailScreen from "../screens/student/GoalDetailScreen";
 import ChatScreen from "../screens/student/ChatScreen";
 import InsightsScreen from "../screens/student/InsightsScreen";
@@ -36,45 +37,70 @@ import LiteracyScreen from "../screens/educator/LiteracyScreen";
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const screenOptions = {
+const studentScreenOptions = {
   headerStyle: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fbf7ee",
   },
-  headerTintColor: "#005bbf",
+  headerTintColor: "#144a32",
   headerTitleStyle: {
     fontWeight: "bold" as const,
+    color: "#144a32",
   },
   tabBarStyle: {
     backgroundColor: "#ffffff",
-    borderTopColor: "#c1c6d6",
-    paddingBottom: 5,
-    paddingTop: 5,
-    height: 60,
+    borderTopColor: "#e8e4d9",
+    paddingBottom: 6,
+    paddingTop: 6,
+    height: 62,
   },
-  tabBarActiveTintColor: "#005bbf",
-  tabBarInactiveTintColor: "#727785",
+  tabBarActiveTintColor: "#144a32",
+  tabBarInactiveTintColor: "#666e69",
+  tabBarLabelStyle: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
 };
+
 
 // ==========================
 // STUDENT TABS (5 Bottom Tabs)
 // ==========================
 function StudentTabs() {
   return (
-    <Tab.Navigator screenOptions={screenOptions}>
+    <Tab.Navigator screenOptions={studentScreenOptions}>
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: "Home", tabBarLabel: "Home" }}
+        options={{
+          title: "Home",
+          tabBarLabel: "Home",
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Home size={size || 22} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Goals"
-        component={GoalsDashboardScreen}
-        options={{ title: "Goals", tabBarLabel: "Goals" }}
+        component={GoalsScreen}
+        options={{
+          title: "Goals",
+          tabBarLabel: "Goals",
+          tabBarIcon: ({ color, size }) => (
+            <Target size={size || 22} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Insights"
         component={InsightsScreen}
-        options={{ title: "Insights", tabBarLabel: "Insights" }}
+        options={{
+          title: "Insights",
+          tabBarLabel: "Insights",
+          tabBarIcon: ({ color, size }) => (
+            <LineChart size={size || 22} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Chat"
@@ -83,6 +109,9 @@ function StudentTabs() {
           title: "AI Chat",
           tabBarLabel: "Chat",
           headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <MessageSquare size={size || 22} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -92,6 +121,9 @@ function StudentTabs() {
           title: "Profile",
           tabBarLabel: "Profile",
           headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <User size={size || 22} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -165,13 +197,16 @@ function OnboardingStackScreen() {
 // ==========================
 function EducatorTabs() {
   return (
-    <Tab.Navigator screenOptions={screenOptions}>
+    <Tab.Navigator screenOptions={studentScreenOptions}>
       <Tab.Screen
         name="Overview"
         component={OverviewScreen}
         options={{
-          title: "Overview Dashboard",
+          title: "Educator Dashboard",
           tabBarLabel: "Overview",
+          tabBarIcon: ({ color, size }) => (
+            <LayoutDashboard size={size || 22} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -180,14 +215,20 @@ function EducatorTabs() {
         options={{
           title: "Cohort Trends",
           tabBarLabel: "Trends",
+          tabBarIcon: ({ color, size }) => (
+            <TrendingUp size={size || 22} color={color} />
+          ),
         }}
       />
       <Tab.Screen
         name="Literacy"
         component={LiteracyScreen}
         options={{
-          title: "Oversight Log",
+          title: "AI Quality Oversight",
           tabBarLabel: "Oversight",
+          tabBarIcon: ({ color, size }) => (
+            <GraduationCap size={size || 22} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -205,12 +246,12 @@ export const RootNavigator = () => {
       <View
         style={{
           flex: 1,
-          backgroundColor: "#f7f9ff",
+          backgroundColor: "#fbf7ee",
           justifyContent: "center",
           alignItems: "center",
         }}
       >
-        <ActivityIndicator size="large" color="#005bbf" />
+        <ActivityIndicator size="large" color="#144a32" />
       </View>
     );
   }

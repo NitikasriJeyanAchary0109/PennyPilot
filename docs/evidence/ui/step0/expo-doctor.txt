@@ -1,0 +1,13 @@
+Node.js (v20.11.0) is outdated and unsupported. Please update to a newer Node.js LTS version (required: >=22.13.0)
+Go to: https://nodejs.org/en/download
+
+Running 18 checks on your project...
+17/18 checks passed. 1 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+✖ Check for common project setup issues
+The .expo directory is not ignored by Git. It contains machine-specific device history and development server settings and should not be committed.
+Advice:
+Add ".expo/" to your .gitignore to avoid committing local Expo state.
+
+1 check failed, indicating possible issues with the project.

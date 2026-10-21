@@ -1,5 +1,5 @@
 """
-AI Engine — the ONLY module in SpareChange AI that communicates with the LLM.
+AI Engine — the ONLY module in Penny Pilot that communicates with the LLM.
 
 Architecture contract
 ---------------------
@@ -34,9 +34,9 @@ from app.config import settings
 
 # ---------------------------------------------------------------------------
 # Module logger — uses the same name as the root app logger so log aggregators
-# can filter by "sparechange_ai.ai_engine".
+# can filter by "pennypilot.ai_engine".
 # ---------------------------------------------------------------------------
-logger = logging.getLogger("sparechange_ai.ai_engine")
+logger = logging.getLogger("pennypilot.ai_engine")
 
 # ---------------------------------------------------------------------------
 # Runtime constants — change here; reflected everywhere automatically.
