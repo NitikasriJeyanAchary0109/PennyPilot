@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  SafeAreaView, 
-  StyleSheet, 
-  Image, 
-  Modal, 
-  Alert 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  StyleSheet,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import {
+  ArrowLeft,
+  UploadCloud,
+  ShieldCheck,
+  Sparkles,
+  FileSpreadsheet,
+  Info,
+  Loader2,
+} from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withRepeat, 
-  withTiming, 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
   Easing,
-  runOnJS
+  runOnJS,
 } from "react-native-reanimated";
 import { apiService } from "../../services/api";
+import { ScreenContainer } from "../../components/ui/ScreenContainer";
+import { Card } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
 
 export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
   const [loading, setLoading] = useState(false);
@@ -41,11 +49,15 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
       );
       // Simulate file upload progress
       progressWidth.value = 0;
-      progressWidth.value = withTiming(1, { duration: 3000, easing: Easing.out(Easing.quad) }, (finished) => {
-        if (finished) {
-          runOnJS(uploadComplete)();
+      progressWidth.value = withTiming(
+        1,
+        { duration: 2800, easing: Easing.out(Easing.quad) },
+        (finished) => {
+          if (finished) {
+            runOnJS(uploadComplete)();
+          }
         }
-      });
+      );
     } else {
       spinnerRotation.value = 0;
       progressWidth.value = 0;
@@ -53,11 +65,11 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
   }, [loading]);
 
   const spinnerStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spinnerRotation.value}deg` }]
+    transform: [{ rotate: `${spinnerRotation.value}deg` }],
   }));
 
   const progressStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value * 100}%`
+    width: `${progressWidth.value * 100}%`,
   }));
 
   // Update progress text periodically in JS thread
@@ -71,15 +83,19 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
             clearInterval(interval);
             return 100;
           }
-          return Math.min(prev + Math.floor(Math.random() * 15) + 5, 100);
+          return Math.min(prev + Math.floor(Math.random() * 15) + 8, 100);
         });
-      }, 300);
+      }, 250);
     }
     return () => clearInterval(interval);
   }, [loading]);
 
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Haptics optional on web
+    }
   };
 
   const handlePickDocument = async () => {
@@ -87,7 +103,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["text/comma-separated-values", "text/csv", "*/*"],
-        copyToCacheDirectory: true
+        copyToCacheDirectory: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -113,175 +129,161 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const uploadComplete = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // noop
+    }
     setLoading(false);
     navigation.navigate("CreateGoal");
   };
 
+  const showFormatHelp = () => {
+    triggerHaptic();
+    Alert.alert(
+      "CSV Statement Format",
+      "Your CSV file should include columns for:\n• Date (YYYY-MM-DD)\n• Description\n• Amount (negative for expense, positive for income)\n• Category\n\nExample:\n2026-07-30, Campus Bookstore, -450.00, Books\n2026-07-31, Monthly Allowance, 10000.00, Income"
+    );
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* TopAppBar */}
-      <View className="flex-row justify-between items-center px-margin-mobile py-stack-md border-b border-slate-100">
-        <View className="flex-row items-center space-x-3">
-          {/* Back button */}
-          <Pressable 
-            onPress={() => {
-              triggerHaptic();
-              navigation.goBack();
-            }}
-            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-            className="p-1"
-          >
-            <MaterialIcons name="arrow-back" size={24} color="#181c20" />
-          </Pressable>
-          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-xl text-ob-primary">
-            Penny Pilot
-          </Text>
-        </View>
-        <Pressable 
-          onPress={() => {
-            triggerHaptic();
-            navigation.navigate("Login");
-          }}
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 border border-slate-100"
+    <ScreenContainer scrollable={true} className="py-2">
+      {/* Header */}
+      <View className="flex-row items-center py-3 mb-2">
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.7}
+          className="p-2 -ml-2 mr-2 rounded-full active:bg-surface-cream"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <MaterialIcons name="settings" size={20} color="#5c5f60" />
-        </Pressable>
+          <ArrowLeft size={22} color="#144a32" />
+        </TouchableOpacity>
+        <Text className="font-sans font-bold text-lg text-primary">
+          Connect Your Spending
+        </Text>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
-        {/* Header Text */}
-        <View className="mb-6">
-          <Text style={{ fontFamily: "Inter_700Bold" }} className="text-2xl text-on-surface mb-2">
-            Connect your spending
-          </Text>
-          <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-sm text-on-surface-variant">
-            Upload your transaction history to let Penny Pilot find your hidden savings opportunities.
-          </Text>
-        </View>
+      {/* Intro */}
+      <View className="mb-6">
+        <Text className="font-sans font-extrabold text-2xl text-text tracking-tight">
+          Upload statement history
+        </Text>
+        <Text className="mt-2 font-sans text-sm text-text-secondary leading-relaxed">
+          Import your bank statement to automatically uncover recurring expenses, subscriptions, and spare change savings.
+        </Text>
+      </View>
 
-        {/* Upload Card */}
-        <View style={styles.card} className="bg-white border border-outline-variant rounded-2xl p-5 mb-6">
-          <Pressable 
-            onPress={handlePickDocument}
-            style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.98 : 1 }] }]}
-            className="border-2 border-dashed border-outline-variant rounded-2xl py-12 flex flex-col items-center justify-center bg-slate-50/50"
+      {/* Upload Drop Zone Card */}
+      <Card variant="default" className="p-6 mb-6">
+        <TouchableOpacity
+          onPress={handlePickDocument}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Tap to select CSV transactions file"
+          className="border-2 border-dashed border-primary/20 rounded-2xl py-10 items-center justify-center bg-primary-tint/30 active:bg-primary-tint/50"
+        >
+          <View className="w-16 h-16 rounded-full bg-primary-tint items-center justify-center mb-3">
+            <UploadCloud size={32} color="#144a32" />
+          </View>
+          <Text className="font-sans font-bold text-base text-text text-center px-4">
+            Tap to select transactions.csv
+          </Text>
+          <Text className="font-sans text-xs text-text-secondary mt-1">
+            Supports standard CSV and banking export formats
+          </Text>
+        </TouchableOpacity>
+
+        <View className="mt-4 items-center">
+          <TouchableOpacity
+            onPress={showFormatHelp}
+            hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+            activeOpacity={0.7}
+            className="flex-row items-center py-2 px-3 rounded-full active:bg-surface-cream"
+            accessibilityRole="button"
+            accessibilityLabel="View CSV sample format"
           >
-            <View className="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-4">
-              <MaterialIcons name="cloud-upload" size={32} color="#1a73e8" />
-            </View>
-            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-base text-on-surface text-center px-4">
-              Tap to upload transactions.csv
+            <Info size={14} color="#856529" className="mr-1.5" />
+            <Text className="font-sans font-semibold text-xs text-gold-text">
+              View sample format & requirements
             </Text>
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant mt-1">
-              Supports standard banking formats
-            </Text>
-          </Pressable>
-
-          <View className="mt-4 items-center">
-            <Pressable 
-              onPress={() => {
-                triggerHaptic();
-                Alert.alert(
-                  "Sample Format",
-                  "CSV files should contain columns: Date, Description, Amount, Category.\nExample:\n2026-07-30, Starbucks, -7.50, Food"
-                );
-              }}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-              className="flex-row items-center space-x-1 py-2 px-4"
-            >
-              <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-ob-primary">
-                View sample format
-              </Text>
-              <MaterialIcons name="open-in-new" size={14} color="#005bbf" />
-            </Pressable>
-          </View>
+          </TouchableOpacity>
         </View>
+      </Card>
 
-        {/* Bento Grid */}
-        <View className="flex-row space-x-4">
-          {/* Card 1 */}
-          <View style={styles.gridCard} className="flex-1 bg-surface-container-low p-4 rounded-xl">
-            <MaterialIcons name="security" size={24} color="#005bbf" className="mb-2" />
-            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-sm text-on-surface mb-1 mt-1">
-              Privacy first
-            </Text>
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-5">
-              Your data is processed locally and never sold to third parties.
-            </Text>
-          </View>
+      {/* Trust & Insight Features */}
+      <View className="flex-row gap-3 mb-6">
+        <Card variant="default" className="flex-1 p-4">
+          <ShieldCheck size={22} color="#144a32" className="mb-2" />
+          <Text className="font-sans font-bold text-xs text-text mb-1">
+            Bank-Level Privacy
+          </Text>
+          <Text className="font-sans text-[11px] text-text-secondary leading-relaxed">
+            Data is parsed locally and never shared with third parties.
+          </Text>
+        </Card>
 
-          {/* Card 2 */}
-          <View style={styles.gridCard} className="flex-1 bg-surface-container-low p-4 rounded-xl">
-            <MaterialIcons name="auto-awesome" size={24} color="#006d2a" className="mb-2" />
-            <Text style={{ fontFamily: "Inter_600SemiBold" }} className="text-sm text-on-surface mb-1 mt-1">
-              AI Insights
-            </Text>
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant leading-5">
-              We'll automatically categorize and tag your spending habits.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
+        <Card variant="default" className="flex-1 p-4">
+          <Sparkles size={22} color="#856529" className="mb-2" />
+          <Text className="font-sans font-bold text-xs text-text mb-1">
+            AI Categorization
+          </Text>
+          <Text className="font-sans text-[11px] text-text-secondary leading-relaxed">
+            Automatically clusters expenses into clear student budgets.
+          </Text>
+        </Card>
+      </View>
 
-      {/* Loading Overlay Modal */}
+      {/* Manual Fallback Action */}
+      <View className="w-full mb-6">
+        <Button
+          title="Prefer Manual Entry Instead"
+          onPress={() => navigation.navigate("ManualIncomeExpense")}
+          variant="secondary"
+          size="md"
+          accessibilityLabel="Switch to manual entry"
+        />
+      </View>
+
+      {/* Loading Modal */}
       <Modal visible={loading} transparent animationType="fade">
-        <View style={styles.overlayBg} className="flex-1 items-center justify-center px-8">
-          <View style={styles.modalContent} className="bg-white rounded-3xl p-8 w-full max-w-xs items-center">
-            {/* Spinning Loader */}
-            <Animated.View style={spinnerStyle} className="mb-6">
-              <MaterialIcons name="sync" size={48} color="#1a73e8" />
+        <View style={styles.modalOverlay} className="flex-1 items-center justify-center px-6">
+          <Card variant="elevated" className="p-8 w-full max-w-sm items-center bg-surface border border-border">
+            <Animated.View style={spinnerStyle} className="mb-5">
+              <UploadCloud size={44} color="#144a32" />
             </Animated.View>
 
-            <Text style={{ fontFamily: "Inter_700Bold" }} className="text-lg text-on-surface text-center mb-2">
-              Analyzing spending...
+            <Text className="font-sans font-bold text-lg text-text text-center mb-1">
+              Analyzing Transactions…
             </Text>
-            <Text style={{ fontFamily: "WorkSans_400Regular" }} className="text-xs text-on-surface-variant text-center mb-6">
-              Our AI is crunching the numbers to build your savings roadmap.
+            <Text className="font-sans text-xs text-text-secondary text-center mb-5 leading-relaxed">
+              Penny Pilot is parsing categories and calculating your personalized savings opportunities.
             </Text>
 
-            {/* Progress Bar Container */}
-            <View className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-2">
-              {/* Filling bar */}
+            <View className="h-2 w-full bg-border rounded-full overflow-hidden mb-2">
               <Animated.View style={[progressStyle, styles.progressBar]} />
             </View>
-            <Text style={{ fontFamily: "WorkSans_500Medium" }} className="text-xs text-on-surface-variant/80">
+
+            <Text className="font-sans font-semibold text-xs text-primary">
               {progressVal}% complete
             </Text>
-          </View>
+          </Card>
         </View>
       </Modal>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  gridCard: {
-    minHeight: 120,
-  },
-  overlayBg: {
-    backgroundColor: "rgba(255,255,255,0.75)",
-  },
-  modalContent: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+  modalOverlay: {
+    backgroundColor: "rgba(13, 58, 43, 0.4)",
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#1a73e8",
-    borderRadius: 3,
-  }
+    backgroundColor: "#144a32",
+    borderRadius: 999,
+  },
 });
 
 export default CSVUploadScreen;

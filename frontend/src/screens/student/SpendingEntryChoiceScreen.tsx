@@ -1,21 +1,113 @@
 import React from "react";
-import { Pressable, SafeAreaView, Text, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { View, Text, TouchableOpacity } from "react-native";
+import { Edit3, FileSpreadsheet, ChevronRight, ShieldCheck, ArrowLeft } from "lucide-react-native";
+import { ScreenContainer } from "../../components/ui/ScreenContainer";
+import { Card } from "../../components/ui/Card";
 
-function OptionCard({ icon, title, detail, onPress }: { icon: keyof typeof MaterialIcons.glyphMap; title: string; detail: string; onPress: () => void }) {
-  return <Pressable onPress={onPress} className="mb-4 flex-row items-center rounded-3xl border border-outline-variant bg-white p-5">
-    <View className="mr-4 h-14 w-14 items-center justify-center rounded-2xl bg-teal-50"><MaterialIcons name={icon} size={27} color="#0f766e" /></View>
-    <View className="flex-1"><Text className="font-jakarta-bold text-base text-on-surface">{title}</Text><Text className="mt-1 font-worksans text-sm leading-5 text-on-surface-variant">{detail}</Text></View>
-    <MaterialIcons name="chevron-right" size={24} color="#727785" />
-  </Pressable>;
+interface OptionCardProps {
+  icon: React.ReactNode;
+  badgeBg: string;
+  title: string;
+  detail: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+}
+
+function OptionCard({
+  icon,
+  badgeBg,
+  title,
+  detail,
+  onPress,
+  accessibilityLabel,
+}: OptionCardProps) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      className="mb-4"
+    >
+      <Card variant="default" className="p-5 flex-row items-center">
+        <View className={`mr-4 w-12 h-12 rounded-2xl items-center justify-center ${badgeBg}`}>
+          {icon}
+        </View>
+        <View className="flex-1 pr-2">
+          <Text className="font-sans font-bold text-base text-text">
+            {title}
+          </Text>
+          <Text className="mt-1 font-sans text-xs text-text-secondary leading-relaxed">
+            {detail}
+          </Text>
+        </View>
+        <ChevronRight size={20} color="#525956" />
+      </Card>
+    </TouchableOpacity>
+  );
 }
 
 export default function SpendingEntryChoiceScreen({ navigation }: { navigation: any }) {
-  return <SafeAreaView className="flex-1 bg-surface">
-    <View className="flex-row items-center border-b border-surface-container-high bg-white px-margin-mobile py-stack-md"><Pressable onPress={() => navigation.goBack()} className="mr-4"><MaterialIcons name="arrow-back" size={24} color="#181c20" /></Pressable><Text className="font-jakarta-semibold text-lg text-ob-primary">Your spending</Text></View>
-    <View className="flex-1 px-margin-mobile pt-stack-xl"><Text className="font-jakarta-bold text-2xl text-on-surface">Tell us about spending</Text><Text className="mt-2 mb-stack-xl font-worksans text-base text-on-surface-variant">Choose the quickest way to give your plan a starting point.</Text>
-      <OptionCard icon="edit" title="Manual entry" detail="Add monthly income and the recurring costs you already know." onPress={() => navigation.navigate("ManualIncomeExpense")} />
-      <OptionCard icon="upload-file" title="Upload CSV" detail="Upload a transaction history and we’ll use the existing importer." onPress={() => navigation.navigate("CSVUpload")} />
-    </View>
-  </SafeAreaView>;
+  return (
+    <ScreenContainer scrollable={true} className="py-2">
+      {/* Top Navigation Bar */}
+      <View className="flex-row items-center py-3 mb-4">
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.7}
+          className="p-2 -ml-2 mr-2 rounded-full active:bg-surface-cream"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <ArrowLeft size={22} color="#144a32" />
+        </TouchableOpacity>
+        <Text className="font-sans font-bold text-lg text-primary">
+          Your Spending
+        </Text>
+      </View>
+
+      {/* Screen Title & Description */}
+      <View className="mb-6">
+        <Text className="font-sans font-extrabold text-2xl text-text tracking-tight">
+          Tell us about your spending
+        </Text>
+        <Text className="mt-2 font-sans text-sm text-text-secondary leading-relaxed">
+          Choose the quickest way to give your budget and savings plan an accurate starting point.
+        </Text>
+      </View>
+
+      {/* Choice Options */}
+      <OptionCard
+        icon={<Edit3 size={22} color="#144a32" />}
+        badgeBg="bg-primary-tint"
+        title="Manual entry"
+        detail="Add your monthly allowance/income and the recurring costs you already know."
+        onPress={() => navigation.navigate("ManualIncomeExpense")}
+        accessibilityLabel="Manual entry: Add monthly income and recurring costs"
+      />
+
+      <OptionCard
+        icon={<FileSpreadsheet size={22} color="#856529" />}
+        badgeBg="bg-gold-light"
+        title="Upload CSV statement"
+        detail="Upload a transaction history file to automatically import and categorize spending."
+        onPress={() => navigation.navigate("CSVUpload")}
+        accessibilityLabel="Upload CSV: Import transaction history file"
+      />
+
+      {/* Privacy Notice Card */}
+      <Card variant="cream" className="p-4 mt-4 flex-row items-start">
+        <ShieldCheck size={20} color="#144a32" className="mt-0.5 mr-3" />
+        <View className="flex-1">
+          <Text className="font-sans font-semibold text-xs text-text">
+            Your data is strictly private
+          </Text>
+          <Text className="mt-0.5 font-sans text-[11px] text-text-secondary leading-relaxed">
+            Penny Pilot processes your financial information securely to personalize your savings insights.
+          </Text>
+        </View>
+      </Card>
+    </ScreenContainer>
+  );
 }

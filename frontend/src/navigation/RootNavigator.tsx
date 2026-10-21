@@ -61,24 +61,6 @@ const studentScreenOptions = {
   },
 };
 
-const screenOptions = {
-  headerStyle: {
-    backgroundColor: "#ffffff",
-  },
-  headerTintColor: "#005bbf",
-  headerTitleStyle: {
-    fontWeight: "bold" as const,
-  },
-  tabBarStyle: {
-    backgroundColor: "#ffffff",
-    borderTopColor: "#c1c6d6",
-    paddingBottom: 5,
-    paddingTop: 5,
-    height: 60,
-  },
-  tabBarActiveTintColor: "#005bbf",
-  tabBarInactiveTintColor: "#727785",
-};
 
 // ==========================
 // STUDENT TABS (5 Bottom Tabs)
@@ -264,12 +246,12 @@ export const RootNavigator = () => {
       <View
         style={{
           flex: 1,
-          backgroundColor: "#f7f9ff",
+          backgroundColor: "#fbf7ee",
           justifyContent: "center",
           alignItems: "center",
         }}
       >
-        <ActivityIndicator size="large" color="#005bbf" />
+        <ActivityIndicator size="large" color="#144a32" />
       </View>
     );
   }

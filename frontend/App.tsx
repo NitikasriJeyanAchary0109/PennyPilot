@@ -29,7 +29,7 @@ export default function App() {
   if (!fontsLoaded && !fontError) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <ActivityIndicator size="large" color="#144a32" />
       </View>
     );
   }
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: "#fbf7ee",
     alignItems: "center",
     justifyContent: "center",
   },

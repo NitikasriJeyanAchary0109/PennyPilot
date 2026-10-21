@@ -1,50 +1,232 @@
 import React, { useMemo, useState } from "react";
-import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView } from "react-native";
+import {
+  ArrowLeft,
+  Home,
+  GraduationCap,
+  Utensils,
+  Zap,
+  Bus,
+  Check,
+  Info,
+  IndianRupee,
+  PlusCircle,
+} from "lucide-react-native";
 import { apiService } from "../../services/api";
+import { ScreenContainer } from "../../components/ui/ScreenContainer";
+import { Card } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
 
-const expenses = [
-  { name: "Rent", amount: 8000, icon: "home" },
-  { name: "Tuition", amount: 12000, icon: "school" },
-  { name: "Food", amount: 3000, icon: "restaurant" },
-  { name: "Utilities", amount: 1500, icon: "bolt" },
-  { name: "Transport", amount: 1000, icon: "directions-bus" },
-] as const;
+interface ExpenseItem {
+  id: string;
+  name: string;
+  amount: number;
+  icon: React.ComponentType<{ size: number; color: string }>;
+}
+
+const PRESET_EXPENSES: ExpenseItem[] = [
+  { id: "rent", name: "Rent & Housing", amount: 8000, icon: Home },
+  { id: "tuition", name: "Tuition & Books", amount: 12000, icon: GraduationCap },
+  { id: "food", name: "Food & Groceries", amount: 3000, icon: Utensils },
+  { id: "utilities", name: "Utilities & Wifi", amount: 1500, icon: Zap },
+  { id: "transport", name: "Transport & Transit", amount: 1000, icon: Bus },
+];
 
 export default function ManualIncomeExpenseScreen({ navigation }: { navigation: any }) {
   const [income, setIncome] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const total = useMemo(() => expenses.filter((item) => selected.includes(item.name)).reduce((sum, item) => sum + item.amount, 0), [selected]);
-  const toggle = (name: string) => setSelected((items) => items.includes(name) ? items.filter((item) => item !== name) : [...items, name]);
 
-  const continueToGoal = async () => {
+  const totalRecurring = useMemo(() => {
+    return PRESET_EXPENSES
+      .filter((item) => selectedIds.includes(item.id))
+      .reduce((sum, item) => sum + item.amount, 0);
+  }, [selectedIds]);
+
+  const toggleExpense = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleContinue = async () => {
     const monthlyIncome = Number(income.replace(/,/g, ""));
     if (!Number.isFinite(monthlyIncome) || monthlyIncome <= 0) {
-      Alert.alert("Enter monthly income", "Please enter an amount greater than zero.");
+      Alert.alert(
+        "Monthly Income Required",
+        "Please enter your expected monthly allowance or income greater than ₹0."
+      );
       return;
     }
+
     setSaving(true);
     try {
-      await apiService.createTransaction({ amount: monthlyIncome, category: "Income", merchant: "Monthly income", type: "credit", description: "Added during onboarding" });
-      await Promise.all(expenses.filter((item) => selected.includes(item.name)).map((item) => apiService.createTransaction({ amount: item.amount, category: item.name, merchant: item.name, type: "debit", description: "Recurring expense added during onboarding" })));
+      // 1. Record the baseline income credit
+      await apiService.createTransaction({
+        amount: monthlyIncome,
+        category: "Income",
+        merchant: "Monthly Income / Allowance",
+        type: "credit",
+        description: "Initial baseline added during onboarding",
+      });
+
+      // 2. Record selected recurring expenses
+      const selectedExpenses = PRESET_EXPENSES.filter((item) => selectedIds.includes(item.id));
+      await Promise.all(
+        selectedExpenses.map((item) =>
+          apiService.createTransaction({
+            amount: item.amount,
+            category: item.name,
+            merchant: item.name,
+            type: "debit",
+            description: "Recurring monthly cost added during onboarding",
+          })
+        )
+      );
+
       navigation.navigate("CreateGoal");
     } catch (error: any) {
-      Alert.alert("Could not save spending", error?.response?.data?.detail || "Please try again.");
+      Alert.alert(
+        "Could Not Save Setup",
+        error?.response?.data?.detail || "An error occurred while saving. Please try again."
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  return <SafeAreaView className="flex-1 bg-white">
-    <View className="flex-row items-center border-b border-surface-container-high px-margin-mobile py-stack-md"><Pressable onPress={() => navigation.goBack()} className="mr-4"><MaterialIcons name="arrow-back" size={24} color="#181c20" /></Pressable><Text className="font-jakarta-semibold text-lg text-ob-primary">Penny Pilot</Text></View>
-    <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 40 }}>
-      <View className="items-center"><Text className="font-worksans-medium text-xs uppercase tracking-wider text-on-surface-variant">Enter your monthly income</Text><View className="mt-2 flex-row items-center"><Text className="font-jakarta-extrabold text-4xl text-on-surface">₹</Text><TextInput value={income} onChangeText={(value) => setIncome(value.replace(/[^0-9]/g, ""))} keyboardType="number-pad" placeholder="0" placeholderTextColor="#c1c6d6" className="min-w-[150px] font-jakarta-extrabold text-4xl text-on-surface" /></View></View>
-      <View className="mt-stack-xl rounded-3xl border border-outline-variant bg-surface-container-lowest p-5"><View className="flex-row items-center justify-between"><Text className="font-jakarta-semibold text-lg text-on-surface">Add recurring expenses</Text><MaterialIcons name="info-outline" size={20} color="#005bbf" /></View><Text className="mt-1 font-worksans text-sm text-on-surface-variant">Tap any costs you expect every month.</Text>
-        <View className="mt-5 flex-row flex-wrap gap-2">{expenses.map((item) => { const active = selected.includes(item.name); return <Pressable key={item.name} onPress={() => toggle(item.name)} className={`flex-row items-center rounded-full border px-4 py-2.5 ${active ? "border-teal-700 bg-teal-700" : "border-outline-variant bg-surface-container"}`}><MaterialIcons name={item.icon} size={17} color={active ? "#fff" : "#414754"} /><Text className={`ml-1.5 font-worksans-medium text-sm ${active ? "text-white" : "text-on-surface-variant"}`}>{item.name}</Text></Pressable>; })}</View>
-        <View className="mt-5 flex-row justify-between border-t border-outline-variant pt-4"><Text className="font-worksans text-sm text-on-surface-variant">Recurring expenses</Text><Text className="font-jakarta-bold text-lg text-on-surface">₹{total.toLocaleString("en-IN")}</Text></View>
+  return (
+    <ScreenContainer scrollable={true} className="py-2">
+      {/* Top Header */}
+      <View className="flex-row items-center py-3 mb-2">
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.7}
+          className="p-2 -ml-2 mr-2 rounded-full active:bg-surface-cream"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <ArrowLeft size={22} color="#144a32" />
+        </TouchableOpacity>
+        <Text className="font-sans font-bold text-lg text-primary">
+          Step 1: Income & Expenses
+        </Text>
       </View>
-      <Pressable disabled={saving} onPress={continueToGoal} className={`mt-stack-xl h-14 items-center justify-center rounded-full ${saving ? "bg-primary-fixed-dim" : "bg-primary-container"}`}><Text className="font-jakarta-semibold text-base text-white">{saving ? "Saving…" : "Continue to your goal"}</Text></Pressable>
-    </ScrollView>
-  </SafeAreaView>;
+
+      {/* Income Card */}
+      <Card variant="default" className="p-5 mb-5">
+        <Text className="font-sans font-semibold text-xs text-text-secondary uppercase tracking-wider mb-2">
+          Monthly Income / Allowance
+        </Text>
+        <Text className="font-sans text-xs text-text-secondary mb-3 leading-relaxed">
+          How much money comes into your student account each month?
+        </Text>
+
+        <View className="flex-row items-center bg-surface-cream rounded-input border border-border px-4 py-2">
+          <Text className="font-sans font-extrabold text-3xl text-primary mr-1">
+            ₹
+          </Text>
+          <TextInput
+            value={income}
+            onChangeText={(val) => setIncome(val.replace(/[^0-9]/g, ""))}
+            keyboardType="number-pad"
+            placeholder="15000"
+            placeholderTextColor="#707773"
+            className="flex-1 font-sans font-bold text-2xl text-text py-2"
+            accessibilityLabel="Monthly income input in Rupees"
+          />
+        </View>
+      </Card>
+
+      {/* Recurring Expenses Card */}
+      <Card variant="default" className="p-5 mb-6">
+        <View className="flex-row items-center justify-between mb-1">
+          <Text className="font-sans font-bold text-base text-text">
+            Recurring Expenses
+          </Text>
+          <View className="flex-row items-center bg-primary-tint/60 px-2.5 py-1 rounded-full">
+            <Info size={12} color="#144a32" className="mr-1" />
+            <Text className="font-sans text-[11px] font-semibold text-primary">
+              Tap to select
+            </Text>
+          </View>
+        </View>
+        <Text className="font-sans text-xs text-text-secondary mb-4 leading-relaxed">
+          Select typical monthly commitments you expect to pay.
+        </Text>
+
+        <View className="gap-2.5">
+          {PRESET_EXPENSES.map((item) => {
+            const isSelected = selectedIds.includes(item.id);
+            const Icon = item.icon;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => toggleExpense(item.id)}
+                activeOpacity={0.8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isSelected }}
+                accessibilityLabel={`${item.name}, ₹${item.amount.toLocaleString("en-IN")} per month`}
+                className={`flex-row items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                  isSelected
+                    ? "bg-primary-tint border-primary shadow-sm"
+                    : "bg-surface border-border active:bg-surface-cream"
+                }`}
+              >
+                <View className="flex-row items-center flex-1 pr-2">
+                  <View
+                    className={`w-9 h-9 rounded-xl items-center justify-center mr-3 ${
+                      isSelected ? "bg-primary" : "bg-surface-cream"
+                    }`}
+                  >
+                    <Icon size={18} color={isSelected ? "#ffffff" : "#144a32"} />
+                  </View>
+                  <View>
+                    <Text className="font-sans font-semibold text-sm text-text">
+                      {item.name}
+                    </Text>
+                    <Text className="font-sans text-xs text-text-secondary">
+                      ₹{item.amount.toLocaleString("en-IN")}/mo
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  className={`w-6 h-6 rounded-full items-center justify-center border ${
+                    isSelected ? "bg-primary border-primary" : "border-border bg-surface"
+                  }`}
+                >
+                  {isSelected && <Check size={14} color="#ffffff" strokeWidth={3} />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Total Summary Footer */}
+        <View className="mt-5 pt-4 border-t border-border flex-row items-center justify-between">
+          <Text className="font-sans text-xs font-medium text-text-secondary">
+            Estimated Monthly Costs
+          </Text>
+          <Text className="font-sans font-extrabold text-base text-primary">
+            ₹{totalRecurring.toLocaleString("en-IN")}
+          </Text>
+        </View>
+      </Card>
+
+      {/* Action Button */}
+      <View className="w-full mb-6">
+        <Button
+          title={saving ? "Saving Setup…" : "Continue to Your Goal"}
+          onPress={handleContinue}
+          loading={saving}
+          disabled={saving}
+          variant="primary"
+          size="lg"
+          accessibilityLabel="Continue to Your Goal"
+        />
+      </View>
+    </ScreenContainer>
+  );
 }

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, SafeAreaView } from "react-native";
-import { Button } from "../components/Button";
-import { Card } from "../components/Card";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
 
 export const TestStyleScreen: React.FC<{ onDismiss?: () => void }> = ({ onDismiss }) => {
   const [testInput, setTestInput] = useState("");
@@ -99,7 +99,7 @@ export const TestStyleScreen: React.FC<{ onDismiss?: () => void }> = ({ onDismis
           <Button
             title="Outline Button"
             onPress={() => {}}
-            variant="outline"
+            variant="secondary"
           />
         </Card>
 

@@ -1,4 +1,0 @@
-import React from "react";
-import { Pressable, Text, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-export default function TopAppBar({ title, onSettingsPress }: { title: string; onSettingsPress?: () => void }) { return <View className="flex-row items-center justify-between border-b border-surface-container-high bg-white px-margin-mobile py-stack-md"><View className="flex-row items-center"><View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-primary-fixed"><MaterialIcons name="savings" size={21} color="#005bbf" /></View><Text className="font-jakarta-bold text-lg text-ob-primary">{title}</Text></View><Pressable onPress={onSettingsPress} className="h-10 w-10 items-center justify-center rounded-full bg-surface-container"><MaterialIcons name="settings" size={20} color="#414754" /></Pressable></View>; }
