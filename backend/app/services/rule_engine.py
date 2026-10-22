@@ -394,6 +394,161 @@ def format_accelerated_options(options: list[dict]) -> str:
 
 
 # ===========================================================================
+# 4b. SPENDING PROFILE (analysis of past behaviour)
+# ===========================================================================
+
+# A merchant is "recurring" when it is charged in at least this many different
+# months at similar amounts (largest ≤ smallest × RECURRING_AMOUNT_SPREAD).
+RECURRING_MIN_MONTHS = 2
+RECURRING_AMOUNT_SPREAD = Decimal("1.25")
+# Suggested budgets are the typical month rounded up to a friendly step.
+BUDGET_ROUNDING_STEP = Decimal("50")
+TOP_CATEGORY_LIMIT = 8
+
+
+def _round_up_to_step(value: Decimal, step: Decimal) -> Decimal:
+    steps = (value / step).to_integral_value(rounding="ROUND_CEILING")
+    return steps * step
+
+
+def spending_profile(transactions: list) -> dict:
+    """
+    Summarise a student's past transactions.
+
+    Args:
+        transactions: iterable of dicts with keys `date` (datetime/date),
+            `amount` (Decimal), `type` ("debit"/"credit"), `category`, `merchant`.
+
+    Everything is derived from the rows given — averages are per *calendar month
+    that has data*, so a three-month statement gives a three-month average.
+    All money values are Decimals with 2 dp; shares are percentages with 1 dp.
+    """
+    rows = list(transactions)
+    debits = [r for r in rows if r["type"] == "debit"]
+    credits = [r for r in rows if r["type"] == "credit"]
+
+    if not rows:
+        return {"has_data": False}
+
+    def month_key(row):
+        return (row["date"].year, row["date"].month)
+
+    months = {month_key(r) for r in rows}
+    months_covered = len(months)
+    divisor = Decimal(months_covered)
+    zero = Decimal("0.00")
+    cents = Decimal("0.01")
+
+    def money(value: Decimal) -> Decimal:
+        return value.quantize(cents, rounding=ROUND_HALF_UP)
+
+    total_income = sum((r["amount"] for r in credits), zero)
+    total_spend = sum((r["amount"] for r in debits), zero)
+
+    # --- categories ------------------------------------------------------
+    by_category: dict = {}
+    for r in debits:
+        by_category[r["category"]] = by_category.get(r["category"], zero) + r["amount"]
+    categories = []
+    for name, total in sorted(by_category.items(), key=lambda kv: kv[1], reverse=True)[
+        :TOP_CATEGORY_LIMIT
+    ]:
+        monthly = total / divisor
+        categories.append(
+            {
+                "category": name,
+                "total": money(total),
+                "monthly_average": money(monthly),
+                "share_percent": (
+                    (total / total_spend * 100).quantize(
+                        Decimal("0.1"), rounding=ROUND_HALF_UP
+                    )
+                    if total_spend > 0
+                    else Decimal("0.0")
+                ),
+                "suggested_budget": money(
+                    _round_up_to_step(monthly, BUDGET_ROUNDING_STEP)
+                ),
+            }
+        )
+
+    # --- recurring merchants --------------------------------------------
+    by_merchant: dict = {}
+    for r in debits:
+        by_merchant.setdefault(r["merchant"].strip().lower(), []).append(r)
+    recurring = []
+    for rows_for_merchant in by_merchant.values():
+        merchant_months = {month_key(r) for r in rows_for_merchant}
+        amounts = sorted(r["amount"] for r in rows_for_merchant)
+        if (
+            len(merchant_months) >= RECURRING_MIN_MONTHS
+            and amounts[-1] <= amounts[0] * RECURRING_AMOUNT_SPREAD
+        ):
+            latest = max(rows_for_merchant, key=lambda r: r["date"])
+            recurring.append(
+                {
+                    "merchant": latest["merchant"],
+                    "category": latest["category"],
+                    "typical_amount": money(amounts[len(amounts) // 2]),
+                    "months_seen": len(merchant_months),
+                }
+            )
+    recurring.sort(key=lambda item: item["typical_amount"], reverse=True)
+
+    # --- behaviour -----------------------------------------------------------
+    weekend_spend = sum((r["amount"] for r in debits if r["date"].weekday() >= 5), zero)
+    largest = max(debits, key=lambda r: r["amount"]) if debits else None
+    potential = sum((calculate_roundup(r["amount"]) for r in debits), zero)
+
+    first = min(r["date"] for r in rows)
+    last = max(r["date"] for r in rows)
+
+    return {
+        "has_data": True,
+        "period_start": first.date() if hasattr(first, "date") else first,
+        "period_end": last.date() if hasattr(last, "date") else last,
+        "months_covered": months_covered,
+        "transaction_count": len(rows),
+        "total_income": money(total_income),
+        "total_spend": money(total_spend),
+        "average_monthly_income": money(total_income / divisor),
+        "average_monthly_spend": money(total_spend / divisor),
+        "average_monthly_net": money((total_income - total_spend) / divisor),
+        "spend_to_income_percent": (
+            (total_spend / total_income * 100).quantize(
+                Decimal("0.1"), rounding=ROUND_HALF_UP
+            )
+            if total_income > 0
+            else None
+        ),
+        "top_categories": categories,
+        "recurring_merchants": recurring,
+        "weekend_spend_percent": (
+            (weekend_spend / total_spend * 100).quantize(
+                Decimal("0.1"), rounding=ROUND_HALF_UP
+            )
+            if total_spend > 0
+            else Decimal("0.0")
+        ),
+        "largest_purchase": (
+            {
+                "merchant": largest["merchant"],
+                "category": largest["category"],
+                "amount": money(largest["amount"]),
+                "date": (
+                    largest["date"].date()
+                    if hasattr(largest["date"], "date")
+                    else largest["date"]
+                ),
+            }
+            if largest
+            else None
+        ),
+        "estimated_monthly_roundup": money(potential / divisor),
+    }
+
+
+# ===========================================================================
 # 5. STRESS SCORE
 # ===========================================================================
 

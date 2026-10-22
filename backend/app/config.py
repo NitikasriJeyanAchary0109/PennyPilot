@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     # ==========================
     JWT_SECRET: str = "dev-secret-key"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 Day
+    # Short-lived: clients renew it with a rotating refresh token (/auth/refresh).
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # ==========================
@@ -31,6 +32,11 @@ class Settings(BaseSettings):
     # Max tokens per reply. Replies cut off by this limit are trimmed to the last
     # complete sentence rather than shown mid-word.
     OLLAMA_NUM_PREDICT: int = 160
+
+    # ==========================
+    # Bank simulation (sandbox: no real bank is connected)
+    # ==========================
+    BANK_SIMULATION_ENABLED: bool = True
 
     # ==========================
     # Server Configuration

@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
@@ -89,16 +91,20 @@ def create_refresh_token(data: dict):
 # =====================================
 
 
-def decode_token(token: str):
+def decode_token(token: str, verify_exp: bool = True):
     """
     Decode any valid JWT token.
     Returns payload if valid, otherwise None.
+
+    `verify_exp=False` still verifies the signature; it is only for actions that
+    must work with an expired access token, such as logging out.
     """
     try:
         return jwt.decode(
             token,
             settings.JWT_SECRET,
             algorithms=[settings.JWT_ALGORITHM],
+            options={"verify_exp": verify_exp},
         )
     except JWTError:
         return None
@@ -134,6 +140,21 @@ def decode_refresh_token(token: str):
         return None
 
     return payload
+
+
+# =====================================
+# Opaque refresh tokens
+# =====================================
+
+
+def generate_refresh_token() -> str:
+    """Random, unguessable refresh token (the server only stores its hash)."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(token: str) -> str:
+    """SHA-256 is enough for a 384-bit random secret (no need for bcrypt)."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 # =====================================

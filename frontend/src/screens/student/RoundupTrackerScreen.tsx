@@ -26,6 +26,7 @@ interface TransactionActivity {
   category: string;
   amount: number;
   roundup: number;
+  simulated: boolean;
 }
 
 const FILTERS: { label: string; sinceDays?: number }[] = [
@@ -75,6 +76,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
           category: t.category || "General",
           amount: Number(t.amount) || 0,
           roundup: Number(t.round_up_amount) || 0,
+          simulated: t.source === "bank_simulation",
         }))
       );
       setError(null);
@@ -259,6 +261,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
                     </Text>
                     <Text className="text-[11px] text-text-muted font-sans mt-0.5">
                       {item.category} • {item.time}
+                      {item.simulated ? " • Simulated" : ""}
                     </Text>
                   </View>
                 </View>

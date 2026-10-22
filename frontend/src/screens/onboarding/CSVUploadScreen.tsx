@@ -12,14 +12,12 @@ import { ArrowLeft, UploadCloud, ShieldCheck, FileSpreadsheet, Info } from "luci
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import { apiService, getErrorMessage } from "../../services/api";
-import { useAuth } from "../../hooks/useAuth";
 import { ScreenContainer } from "../../components/ui/ScreenContainer";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 
 export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
   const [loading, setLoading] = useState(false);
-  const { hasCompletedOnboarding } = useAuth();
 
   const triggerHaptic = () => {
     try {
@@ -29,14 +27,9 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
-  // During onboarding the next step is creating a goal; later, just go back.
-  const goNext = () => {
-    if (hasCompletedOnboarding) {
-      navigation.goBack();
-    } else {
-      navigation.navigate("CreateGoal");
-    }
-  };
+  // After an import, show what the student's past spending looks like. (That
+  // screen then continues to goal creation during onboarding.)
+  const goNext = () => navigation.navigate("SpendingAnalysis");
 
   const handlePickDocument = async () => {
     triggerHaptic();
@@ -101,7 +94,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
           .filter(Boolean)
           .join("\n\n");
 
-        Alert.alert("Import complete", details, [{ text: "Continue", onPress: goNext }]);
+        Alert.alert("Import complete", details, [{ text: "See my spending", onPress: goNext }]);
       } catch (apiErr: any) {
         Alert.alert(
           "Import failed",
@@ -120,7 +113,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
     triggerHaptic();
     Alert.alert(
       "CSV Statement Format",
-      "Your CSV needs a header row with these columns:\n• amount (positive number)\n• category\n• description\n\nOptional columns:\n• transaction_date (or date), e.g. 2026-07-30\n• type: debit (default) or credit for money coming in\n\nExample:\namount,category,description,date,type\n450.00,Books,Campus Bookstore,2026-07-30,debit\n10000.00,Income,Monthly Allowance,2026-07-31,credit"
+      "Bank statements from HDFC, ICICI, SBI and similar banks work as they are (Date, Narration, Withdrawal / Deposit columns); categories are worked out from the narration.\n\nOr use this layout. Your CSV needs a header row with these columns:\n• amount (positive number)\n• category\n• description\n\nOptional columns:\n• transaction_date (or date), e.g. 2026-07-30\n• type: debit (default) or credit for money coming in\n\nExample:\namount,category,description,date,type\n450.00,Books,Campus Bookstore,2026-07-30,debit\n10000.00,Income,Monthly Allowance,2026-07-31,credit"
     );
   };
 
@@ -149,7 +142,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
           Upload statement history
         </Text>
         <Text className="mt-2 font-sans text-sm text-text-secondary leading-relaxed">
-          Import a CSV of your transactions to track spending, find subscriptions and start rounding up.
+          Import a bank statement CSV to see where your money goes, find subscriptions and start rounding up.
         </Text>
       </View>
 
@@ -169,7 +162,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
             Tap to select transactions.csv
           </Text>
           <Text className="font-sans text-xs text-text-secondary mt-1">
-            CSV with amount, category and description columns
+            Bank statement or amount / category / description CSV
           </Text>
         </TouchableOpacity>
 
@@ -205,10 +198,10 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
         <Card variant="default" className="flex-1 p-4">
           <FileSpreadsheet size={22} color="#856529" className="mb-2" />
           <Text className="font-sans font-bold text-xs text-text mb-1">
-            Uses your categories
+            Sorted for you
           </Text>
           <Text className="font-sans text-[11px] text-text-secondary leading-relaxed">
-            Each row keeps the category from your file, so budgets match what you tracked.
+            Rows without a category are matched by keyword (Swiggy → Food). Check them later in your transactions.
           </Text>
         </Card>
       </View>

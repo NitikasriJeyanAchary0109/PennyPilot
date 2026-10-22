@@ -58,6 +58,16 @@ class Token(BaseModel):
     token_type: str
     role: str
     has_completed_onboarding: bool
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None  # access-token lifetime in seconds
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=20)
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: Optional[str] = None
 
 
 class TokenData(BaseModel):
@@ -315,6 +325,7 @@ class TransactionUpdate(BaseModel):
 class TransactionResponse(TransactionBase):
     id: int
     user_id: int
+    source: str = "manual"
     transaction_date: datetime
     round_up_amount: Decimal
     is_round_up_applied: bool

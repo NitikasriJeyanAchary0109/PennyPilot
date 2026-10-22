@@ -63,26 +63,13 @@ jobs:
         run: |
           PYTHONPATH=backend pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
-      - name: Verify migrations build a working PostgreSQL schema
+      - name: Verify migrations build exactly the schema the models expect (PostgreSQL)
         env:
           DATABASE_URL: "postgresql://postgres:password123@localhost:5432/sparechange"
         run: |
           cd backend
           python scripts/migrate.py
-          python - <<'PY'
-          # The migrated schema must match the ORM models (no missing tables/columns).
-          from sqlalchemy import inspect
-          from app.database import Base, engine
-          import app.models.models  # noqa: F401
-          insp = inspect(engine)
-          missing = [
-              f"{t.name}.{c.name}"
-              for t in Base.metadata.sorted_tables
-              for c in t.columns
-              if c.name not in {col["name"] for col in insp.get_columns(t.name)}
-          ]
-          assert not missing, f"columns missing after migrations: {missing}"
-          PY
+          python scripts/check_schema.py
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

@@ -44,6 +44,8 @@ For many college students, managing personal finances is intimidating, opaque, a
 **Penny Pilot bridges this gap through an empathetic, student-centric platform:**
 
 - **Automated Round-Up Engine**: Automatically calculates spare change on debit/UPI transactions to the nearest ₹10, ₹50, or ₹100 and channels the difference directly into targeted savings goals.
+- **Bank Statement Import & Spending Analysis**: Upload a bank statement CSV (HDFC/ICICI/SBI-style columns work as-is; see `docs/samples/bank_statement_sample.csv`). Categories are inferred from narrations, and Penny Pilot shows your typical month, where it goes, repeating charges, suggested budgets and what round-ups would have saved.
+- **Bank Sandbox**: No real bank is connected. "Simulate a payment" creates the next transaction a bank feed might deliver, modelled on your own imported history, and runs it through round-ups and budget alerts (labelled *Simulated*).
 - **Deterministic Progress Tracking**: Goals, balances, and savings forecasts are calculated securely by the backend engine, preventing confusing rounding discrepancies on client devices.
 - **Private AI Financial Coach**: Students converse with an empathetic, local AI coach that offers clear, non-judgmental guidance and personalized spending insights grounded in your own transactions, goals and budgets.
 - **Impulse Spending Monitor**: Replaces guilt-inducing metrics with actionable behavioral nudges that identify emotional spending triggers before budgets break.

@@ -84,6 +84,7 @@ export interface Transaction {
   description?: string;
   round_up_amount?: number;
   is_round_up_applied?: boolean;
+  source?: string; // "manual" | "csv_import" | "bank_simulation"
 }
 
 export interface Budget {
@@ -113,6 +114,8 @@ export interface AuditLog {
 
 export interface TokenResponse {
   access_token: string;
+  refresh_token: string;
+  expires_in: number;
   token_type: string;
   role: "student";
   has_completed_onboarding: boolean;

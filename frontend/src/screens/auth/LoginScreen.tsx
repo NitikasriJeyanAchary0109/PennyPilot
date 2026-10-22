@@ -20,7 +20,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { login, loginWithToken } = useAuth();
+  const { login, loginWithRefreshToken } = useAuth();
 
   // Listen for incoming deep link URLs
   useEffect(() => {
@@ -40,18 +40,18 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
     };
   }, []);
 
-  const parseAndLoginFromUrl = (url: string) => {
+  const parseAndLoginFromUrl = async (url: string) => {
     try {
       const parsed = Linking.parse(url);
-      const token = parsed.queryParams?.token as string;
-      const completed = parsed.queryParams?.has_completed_onboarding === "true";
+      const refreshToken = parsed.queryParams?.refresh_token as string;
 
-      if (token) {
-        loginWithToken(token, "student", completed);
+      if (refreshToken) {
         WebBrowser.dismissBrowser();
+        await loginWithRefreshToken(refreshToken);
       }
-    } catch (e) {
-      console.error("Deep link parsing failed", e);
+    } catch (e: any) {
+      console.error("Deep link sign-in failed", e);
+      setErrorMsg(e?.message || "Google sign-in could not be completed.");
     }
   };
 

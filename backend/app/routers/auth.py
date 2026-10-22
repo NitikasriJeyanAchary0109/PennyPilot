@@ -1,16 +1,26 @@
 import datetime
+from typing import Optional, Tuple
 
 from app.config import settings
 from app.database import get_db
-from app.middleware.auth_middleware import get_current_user, oauth2_scheme
+from app.middleware.auth_middleware import get_current_user, optional_oauth2_scheme
 from app.models.models import SecurityEvent, User, UserSession
-from app.schemas.schemas import Token, UserCreate, UserLogin, UserResponse
+from app.schemas.schemas import (
+    LogoutRequest,
+    RefreshRequest,
+    Token,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 from app.services.google_auth import verify_google_id_token
 from app.utils.rate_limit import login_limiter
 from app.utils.security import (
     create_access_token,
-    decode_access_token,
+    decode_token,
+    generate_refresh_token,
     get_password_hash,
+    hash_refresh_token,
     verify_password,
 )
 from authlib.integrations.starlette_client import OAuth
@@ -41,37 +51,53 @@ def _find_user_by_email(db: Session, email: str):
     )
 
 
-def issue_session(db: Session, user: User, request: Request) -> str:
-    """
-    Create the access token for a successful sign-in and record the session.
-
-    The token's `jti` is stored on the session row so the token can later be
-    revoked (logout) and the middleware can reject it.
-    """
-    access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "user_id": user.user_id}
+def _new_access_token(user: User, session_id: int) -> str:
+    return create_access_token(
+        data={
+            "sub": user.email,
+            "role": user.role,
+            "user_id": user.user_id,
+            "sid": session_id,
+        }
     )
-    claims = decode_access_token(access_token) or {}
 
+
+def _refresh_deadline() -> datetime.datetime:
+    return datetime.datetime.utcnow() + datetime.timedelta(
+        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )
+
+
+def issue_session(db: Session, user: User, request: Request) -> Tuple[str, str]:
+    """
+    Record a sign-in and return (access_token, refresh_token).
+
+    The access token is short-lived (see ACCESS_TOKEN_EXPIRE_MINUTES) and carries
+    the session id; the refresh token is an opaque random secret of which only a
+    hash is stored. Revoking the session (logout) kills both.
+    """
     client_host = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     now = datetime.datetime.utcnow()
 
+    refresh_token = generate_refresh_token()
     session = UserSession(
         user_id=user.user_id,
-        jwt_token_id=claims.get("jti"),
         ip_address=client_host,
         device=user_agent,
         login_at=now,
-        expires_at=(
-            datetime.datetime.utcfromtimestamp(claims["exp"])
-            if claims.get("exp")
-            else None
-        ),
+        refresh_token_hash=hash_refresh_token(refresh_token),
+        refresh_expires_at=_refresh_deadline(),
     )
     db.add(session)
-    db.commit()
-    db.refresh(session)
+    db.flush()  # assigns session_id, which goes into the access token
+
+    access_token = _new_access_token(user, session.session_id)
+    claims = decode_token(access_token) or {}
+    session.jwt_token_id = claims.get("jti")
+    session.expires_at = (
+        datetime.datetime.utcfromtimestamp(claims["exp"]) if claims.get("exp") else None
+    )
 
     db.add(
         SecurityEvent(
@@ -85,7 +111,7 @@ def issue_session(db: Session, user: User, request: Request) -> str:
         )
     )
     db.commit()
-    return access_token
+    return access_token, refresh_token
 
 
 def _login_key(request: Request, email: str) -> str:
@@ -158,9 +184,11 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 
-def _token_response(user: User, access_token: str) -> dict:
+def _token_response(user: User, access_token: str, refresh_token: str) -> dict:
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "token_type": "bearer",
         "role": user.role,
         "has_completed_onboarding": user.has_completed_onboarding,
@@ -175,46 +203,150 @@ def login_for_access_token(
 ):
     """OAuth2 compatible token login, returns access_token."""
     user = _authenticate(request, db, form_data.username, form_data.password)
-    return _token_response(user, issue_session(db, user, request))
+    return _token_response(user, *issue_session(db, user, request))
 
 
 @router.post("/login/json", response_model=Token)
 def login_json(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """JSON-body login endpoint for easy API clients (like mobile axios)."""
     user = _authenticate(request, db, user_data.email, user_data.password)
-    return _token_response(user, issue_session(db, user, request))
+    return _token_response(user, *issue_session(db, user, request))
+
+
+def _revoke_session(db: Session, session: UserSession, event_type: str, severity: str):
+    now = datetime.datetime.utcnow()
+    if session.revoked_at is None:
+        session.revoked_at = now
+        session.logout_at = now
+    db.add(
+        SecurityEvent(
+            session_id=session.session_id,
+            user_id=session.user_id,
+            event_type=event_type,
+            severity=severity,
+            created_at=now,
+        )
+    )
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_tokens(
+    payload: RefreshRequest, request: Request, db: Session = Depends(get_db)
+):
+    """
+    Exchange a refresh token for a new access token and a NEW refresh token.
+
+    Refresh tokens are single-use. Presenting one that was already rotated means
+    it was copied (or replayed), so the whole session is revoked.
+    """
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Session expired. Please sign in again.",
+    )
+    digest = hash_refresh_token(payload.refresh_token)
+    now = datetime.datetime.utcnow()
+
+    session = (
+        db.query(UserSession).filter(UserSession.refresh_token_hash == digest).first()
+    )
+    if session is None:
+        replayed = (
+            db.query(UserSession)
+            .filter(UserSession.previous_refresh_token_hash == digest)
+            .first()
+        )
+        if replayed is not None and replayed.revoked_at is None:
+            _revoke_session(db, replayed, "refresh_token_reuse", "high")
+            db.commit()
+        raise invalid
+
+    if (
+        session.revoked_at is not None
+        or session.refresh_expires_at is None
+        or session.refresh_expires_at <= now
+    ):
+        raise invalid
+
+    user = db.query(User).filter(User.user_id == session.user_id).first()
+    if user is None:
+        raise invalid
+
+    new_refresh = generate_refresh_token()
+    session.previous_refresh_token_hash = digest
+    session.refresh_token_hash = hash_refresh_token(new_refresh)
+    session.refresh_expires_at = _refresh_deadline()
+
+    access_token = _new_access_token(user, session.session_id)
+    claims = decode_token(access_token) or {}
+    session.jwt_token_id = claims.get("jti")
+    session.expires_at = (
+        datetime.datetime.utcfromtimestamp(claims["exp"]) if claims.get("exp") else None
+    )
+    db.commit()
+    return _token_response(user, access_token, new_refresh)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
-    token: str = Depends(oauth2_scheme),
-    current_user: User = Depends(get_current_user),
+    payload: Optional[LogoutRequest] = None,
+    token: Optional[str] = Depends(optional_oauth2_scheme),
     db: Session = Depends(get_db),
 ):
-    """Revoke the presented access token so it can't be used again."""
-    claims = decode_access_token(token) or {}
-    session = (
+    """
+    End the current login session (access token AND refresh token).
+
+    Works even if the access token has expired: the session is found from the
+    token's signed session id, or from the refresh token in the body.
+    """
+    session = None
+    if token:
+        claims = decode_token(token, verify_exp=False) or {}
+        if claims.get("sid") is not None:
+            session = (
+                db.query(UserSession)
+                .filter(
+                    UserSession.session_id == claims["sid"],
+                    UserSession.user_id == claims.get("user_id"),
+                )
+                .first()
+            )
+    if session is None and payload and payload.refresh_token:
+        digest = hash_refresh_token(payload.refresh_token)
+        session = (
+            db.query(UserSession)
+            .filter(
+                (UserSession.refresh_token_hash == digest)
+                | (UserSession.previous_refresh_token_hash == digest)
+            )
+            .first()
+        )
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not identify the session to sign out.",
+        )
+    if session.revoked_at is None:
+        _revoke_session(db, session, "logout", "low")
+        db.commit()
+    return None
+
+
+@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+def logout_everywhere(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Sign this account out on every device."""
+    sessions = (
         db.query(UserSession)
         .filter(
             UserSession.user_id == current_user.user_id,
-            UserSession.jwt_token_id == claims.get("jti"),
+            UserSession.revoked_at.is_(None),
         )
-        .first()
+        .all()
     )
-    if session and session.revoked_at is None:
-        now = datetime.datetime.utcnow()
-        session.logout_at = now
-        session.revoked_at = now
-        db.add(
-            SecurityEvent(
-                session_id=session.session_id,
-                user_id=current_user.user_id,
-                event_type="logout",
-                severity="low",
-                created_at=now,
-            )
-        )
-        db.commit()
+    for session in sessions:
+        _revoke_session(db, session, "logout_all", "medium")
+    db.commit()
     return None
 
 
@@ -283,7 +415,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
 
-    access_token = issue_session(db, user, request)
+    _access_token, refresh_token = issue_session(db, user, request)
 
     # HTML Redirection payload to automatically route back into the mobile app's deep linking
     html_content = f"""
@@ -291,11 +423,11 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
       <head>
         <title>Authentication Successful</title>
         <script>
-          const token = "{access_token}";
+          const refreshToken = "{refresh_token}";
           const role = "{user.role}";
           // Deep link redirect
           const onboardingComplete = "{str(user.has_completed_onboarding).lower()}";
-          const url = "pennypilot://oauth?token=" + token + "&role=" + role + "&has_completed_onboarding=" + onboardingComplete;
+          const url = "pennypilot://oauth?refresh_token=" + refreshToken + "&role=" + role + "&has_completed_onboarding=" + onboardingComplete;
           window.location.href = url;
         </script>
       </head>
@@ -303,7 +435,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         <div style="text-align: center; padding: 30px; border: 1px solid #334155; border-radius: 20px; background-color: #1E293B; max-width: 400px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);">
           <h2 style="color: #10B981; margin-bottom: 10px;">Login Successful!</h2>
           <p style="font-size: 14px; margin-bottom: 20px;">We've authenticated your Google account. Redirecting you back to Penny Pilot...</p>
-          <p style="font-size: 11px; color: #94A3B8;">If you are not redirected automatically, <a href="pennypilot://oauth?token={access_token}&role={user.role}&has_completed_onboarding={str(user.has_completed_onboarding).lower()}" style="color: #6366F1; font-weight: bold; text-decoration: none;">click here to resume</a>.</p>
+          <p style="font-size: 11px; color: #94A3B8;">If you are not redirected automatically, <a href="pennypilot://oauth?refresh_token={refresh_token}&role={user.role}&has_completed_onboarding={str(user.has_completed_onboarding).lower()}" style="color: #6366F1; font-weight: bold; text-decoration: none;">click here to resume</a>.</p>
         </div>
       </body>
     </html>
@@ -357,4 +489,4 @@ def google_auth_post(
         db.commit()
         db.refresh(user)
 
-    return _token_response(user, issue_session(db, user, request))
+    return _token_response(user, *issue_session(db, user, request))

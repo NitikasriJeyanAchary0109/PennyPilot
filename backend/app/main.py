@@ -6,7 +6,9 @@ from app.config import assert_production_ready, settings
 from app.database import Base, engine, get_db
 from app.routers import (
     advisor,
+    analysis,
     auth,
+    bank,
     budgets,
     calculations,
     chat,
@@ -127,6 +129,8 @@ app.include_router(dream.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(advisor.router, prefix="/api")
+app.include_router(analysis.router, prefix="/api")
+app.include_router(bank.router, prefix="/api")
 
 # ==========================
 # Run Server

@@ -65,19 +65,66 @@ api.interceptors.request.use(
   }
 );
 
-// Response Interceptor: an expired / invalid token signs the user out of the UI
+// Response Interceptor. A 401 means the short-lived access token expired (or the
+// session was revoked): try ONE silent refresh with the stored refresh token and
+// replay the request; only if that fails is the user signed out.
+const AUTH_PATHS = ["/auth/login", "/auth/refresh", "/auth/logout"];
+let refreshInFlight: Promise<string | null> | null = null;
+
+/** Swap the refresh token for a new token pair. Concurrent callers share one call. */
+export const refreshSession = (): Promise<string | null> => {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const refreshToken = await tokenStorage.getRefresh();
+        if (!refreshToken) return null;
+        // A bare axios call: this request must not go through the interceptors.
+        const response = await axios.post(
+          `${API_URL}/auth/refresh`,
+          { refresh_token: refreshToken },
+          { timeout: 15000 }
+        );
+        await tokenStorage.setTokens(
+          response.data.access_token,
+          response.data.refresh_token
+        );
+        return response.data.access_token as string;
+      } catch (e) {
+        return null;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+};
+
+const endSession = async () => {
+  try {
+    await tokenStorage.clear();
+    await AsyncStorage.multiRemove(["userRole", "hasCompletedOnboarding"]);
+  } catch (e) {
+    console.error("Storage clear failure in response interceptor", e);
+  }
+  unauthorizedHandler?.();
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response && error.response.status === 401) {
-      console.warn("Unauthorized API call detected, logging out...");
-      try {
-        await tokenStorage.clear();
-        await AsyncStorage.multiRemove(["userRole", "hasCompletedOnboarding"]);
-      } catch (e) {
-        console.error("Storage clear failure in response interceptor", e);
+    const original = error.config;
+    const isAuthCall = AUTH_PATHS.some((p) => original?.url?.includes(p));
+
+    if (error.response?.status === 401 && original && !isAuthCall && !original._retried) {
+      original._retried = true;
+      const newAccessToken = await refreshSession();
+      if (newAccessToken) {
+        original.headers = original.headers ?? {};
+        original.headers.Authorization = `Bearer ${newAccessToken}`;
+        return api(original);
       }
-      unauthorizedHandler?.();
+      console.warn("Session could not be renewed, logging out...");
+      await endSession();
     }
     return Promise.reject(error);
   }
@@ -112,7 +159,43 @@ const mapTransaction = (t: any) => ({
   description: t.description,
   round_up_amount: Number(t.round_up_amount ?? 0),
   is_round_up_applied: Boolean(t.is_round_up_applied),
+  source: (t.source ?? "manual") as string,
 });
+
+export interface SpendingAnalysis {
+  has_data: boolean;
+  period_start?: string | null;
+  period_end?: string | null;
+  months_covered: number;
+  transaction_count: number;
+  total_income: string | number;
+  total_spend: string | number;
+  average_monthly_income: string | number;
+  average_monthly_spend: string | number;
+  average_monthly_net: string | number;
+  spend_to_income_percent?: string | number | null;
+  top_categories: {
+    category: string;
+    total: string | number;
+    monthly_average: string | number;
+    share_percent: string | number;
+    suggested_budget: string | number;
+  }[];
+  recurring_merchants: {
+    merchant: string;
+    category: string;
+    typical_amount: string | number;
+    months_seen: number;
+  }[];
+  weekend_spend_percent: string | number;
+  largest_purchase?: {
+    merchant: string;
+    category: string;
+    amount: string | number;
+    date: string;
+  } | null;
+  estimated_monthly_roundup: string | number;
+}
 
 export const apiService = {
   // Auth / profile
@@ -120,9 +203,14 @@ export const apiService = {
     const response = await api.patch("/users/me/onboarding-complete");
     return response.data;
   },
-  // Best-effort: revokes the token server-side so a copy of it stops working.
+  // Ends the whole login session on the server (access AND refresh token). The
+  // refresh token is sent too so this works even if the access token expired.
   logout: async () => {
-    await api.post("/auth/logout");
+    const refreshToken = await tokenStorage.getRefresh();
+    await api.post("/auth/logout", { refresh_token: refreshToken });
+  },
+  logoutEverywhere: async () => {
+    await api.post("/auth/logout-all");
   },
   getCurrentUser: async () => {
     const response = await api.get("/auth/me");
@@ -240,6 +328,23 @@ export const apiService = {
       timeout: AI_TIMEOUT_MS,
     });
     return response.data;
+  },
+
+  // Bank statement analysis & sandbox
+  getSpendingAnalysis: async (months = 12) => {
+    const response = await api.get("/analysis/spending", { params: { months } });
+    return response.data as SpendingAnalysis;
+  },
+  simulateBankTransaction: async () => {
+    const response = await api.post("/bank/simulate", undefined, {
+      timeout: AI_TIMEOUT_MS,
+    });
+    return {
+      ...mapTransaction(response.data.transaction),
+      roundup_applied: response.data.roundup_applied as boolean,
+      roundup_details: response.data.roundup_details,
+      based_on_purchases: response.data.based_on_purchases as number,
+    };
   },
 
   // Roundups & savings

@@ -11,6 +11,10 @@ from sqlalchemy.orm import Session
 # OAuth2PasswordBearer extracts the bearer token from the Authorization header.
 # Point it to the login path.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+# For endpoints that must also work without a (valid) access token, e.g. logout.
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="api/auth/login", auto_error=False
+)
 
 
 async def get_current_user(
@@ -39,10 +43,25 @@ async def get_current_user(
 
     token_data = TokenData(email=email, role=role, user_id=user_id)
 
-    # A token whose session was revoked (logout) is no longer valid. Tokens with
-    # no session row (issued before sessions were tracked) stay valid until expiry.
+    # The token belongs to a login session; once that session is revoked (logout,
+    # or a detected refresh-token replay) every access token it issued is dead,
+    # not just the latest one.
+    sid = payload.get("sid")
+    if sid is not None:
+        session = (
+            db.query(UserSession.user_id, UserSession.revoked_at)
+            .filter(UserSession.session_id == sid)
+            .first()
+        )
+        if session is None or session.revoked_at is not None:
+            raise credentials_exception
+        if session.user_id != user_id:
+            raise credentials_exception
+
+    # Tokens issued before sessions carried an id (`sid`) are still checked by
+    # their token id until they expire.
     jti = payload.get("jti")
-    if jti:
+    if sid is None and jti:
         revoked = (
             db.query(UserSession.session_id)
             .filter(

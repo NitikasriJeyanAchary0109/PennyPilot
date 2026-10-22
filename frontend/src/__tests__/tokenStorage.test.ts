@@ -33,10 +33,13 @@ beforeEach(() => {
 describe("tokenStorage on a device", () => {
   it("stores the token in the secure store, not AsyncStorage", async () => {
     const { tokens, AsyncStorage } = loadWithPlatform("ios");
-    await tokens.set("abc");
+    await tokens.setTokens("abc", "refresh-abc");
     expect(secureStore.userToken).toBe("abc");
+    expect(secureStore.refreshToken).toBe("refresh-abc");
     expect(await AsyncStorage.getItem("userToken")).toBeNull();
+    expect(await AsyncStorage.getItem("refreshToken")).toBeNull();
     expect(await tokens.get()).toBe("abc");
+    expect(await tokens.getRefresh()).toBe("refresh-abc");
   });
 
   it("moves a token saved by an older version into the secure store", async () => {
@@ -49,18 +52,21 @@ describe("tokenStorage on a device", () => {
 
   it("clear removes it everywhere", async () => {
     const { tokens, AsyncStorage } = loadWithPlatform("ios");
-    await tokens.set("abc");
+    await tokens.setTokens("abc", "refresh-abc");
     await AsyncStorage.setItem("userToken", "stale");
     await tokens.clear();
     expect(await tokens.get()).toBeNull();
+    expect(await tokens.getRefresh()).toBeNull();
+    expect(secureStore.refreshToken).toBeUndefined();
   });
 });
 
 describe("tokenStorage on web", () => {
   it("falls back to AsyncStorage", async () => {
     const { tokens, AsyncStorage } = loadWithPlatform("web");
-    await tokens.set("web-token");
+    await tokens.setTokens("web-token", "web-refresh");
     expect(await AsyncStorage.getItem("userToken")).toBe("web-token");
+    expect(await AsyncStorage.getItem("refreshToken")).toBe("web-refresh");
     expect(secureStore.userToken).toBeUndefined();
     await tokens.clear();
     expect(await tokens.get()).toBeNull();

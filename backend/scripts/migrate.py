@@ -3,8 +3,9 @@ Bring the database schema up to date; run before the API starts.
 
 - Fresh database                      → `alembic upgrade head`.
 - Database created earlier by the app's
-  `create_all` (tables, no alembic_version) → `alembic stamp head`: its tables
-  already match the models, and re-running 001-007 would fail on existing tables.
+  `create_all` (tables, no alembic_version) → stamp revision 007, then upgrade:
+  its tables already contain everything up to 007, and re-running 001-007
+  would fail on existing tables. Later migrations are written to be idempotent.
 - Already managed by Alembic          → `alembic upgrade head`.
 
 Usage (from the backend directory):  python scripts/migrate.py
@@ -22,16 +23,18 @@ from alembic.config import Config  # noqa: E402
 from app.database import engine  # noqa: E402
 from sqlalchemy import inspect  # noqa: E402
 
+# Last revision whose changes the old `create_all` start-up already produced.
+BASELINE_FOR_UNVERSIONED_DATABASES = "007_sync_schema_with_models"
+
 
 def main() -> None:
     tables = set(inspect(engine).get_table_names())
     config = Config(os.path.join(BACKEND_DIR, "alembic.ini"))
 
     if "alembic_version" not in tables and "users" in tables:
-        print("Existing unversioned schema found: stamping it as up to date.")
-        command.stamp(config, "head")
-    else:
-        command.upgrade(config, "head")
+        print("Existing unversioned schema found: stamping it at 007.")
+        command.stamp(config, BASELINE_FOR_UNVERSIONED_DATABASES)
+    command.upgrade(config, "head")
 
 
 if __name__ == "__main__":

@@ -76,7 +76,9 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
     amount: number;
     newGoalAmount?: number;
     explanation?: string;
+    note?: string;
   } | null>(null);
+  const [simulating, setSimulating] = useState(false);
 
   // Quick-pick categories: the defaults plus any the student has budgeted.
   const categories = Array.from(new Set([...DEFAULT_CATEGORIES, ...budgetCategories]));
@@ -178,6 +180,53 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
       loadDashboardData();
     }
   }, [isFocused, loadDashboardData]);
+
+  // Sandbox: ask the backend for the next transaction a bank feed might deliver,
+  // based on this student's own imported history. It goes through the normal
+  // round-up / budget pipeline and is stored as "Simulated".
+  const handleSimulateBankTransaction = async () => {
+    setSimulating(true);
+    try {
+      const res = await apiService.simulateBankTransaction();
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      const what = `₹${formatINR(res.amount)} at ${res.merchant}`;
+      const basis = `Simulated bank debit, modelled on your ${res.based_on_purchases} past purchase${
+        res.based_on_purchases === 1 ? "" : "s"
+      } there.`;
+
+      if (res.roundup_applied && res.roundup_details?.success) {
+        setRoundupAlert({
+          amount: Number(res.roundup_details.roundup_amount || 0),
+          newGoalAmount:
+            res.roundup_details.new_goal_amount !== undefined
+              ? Number(res.roundup_details.new_goal_amount)
+              : undefined,
+          explanation: res.roundup_details.explanation,
+          note: `${what}. ${basis}`,
+        });
+      } else {
+        Alert.alert(
+          "Simulated bank transaction",
+          `${what}. ${basis}\n\n${
+            res.roundup_details?.reason ||
+            (activeGoal ? "No round-up was applied." : "Set a savings goal to start rounding up.")
+          }`
+        );
+      }
+      await loadDashboardData();
+    } catch (e: any) {
+      if (e?.response?.status === 409) {
+        Alert.alert("Nothing to base it on yet", getErrorMessage(e), [
+          { text: "Not now", style: "cancel" },
+          { text: "Import a statement", onPress: () => navigation.navigate("CSVUpload") },
+        ]);
+      } else {
+        Alert.alert("Couldn't simulate", getErrorMessage(e));
+      }
+    } finally {
+      setSimulating(false);
+    }
+  };
 
   // Log a purchase; the backend computes the round-up
   const handleLogTransaction = async () => {
@@ -390,6 +439,12 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
             </TouchableOpacity>
           </View>
 
+          {roundupAlert.note && (
+            <Text className="text-[11px] text-text-secondary font-sans mb-1">
+              {roundupAlert.note}
+            </Text>
+          )}
+
           <Text className="text-2xl font-black text-primary font-sans mb-1">
             +₹{formatINR(roundupAlert.amount)}
           </Text>
@@ -435,6 +490,45 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
           <ChevronRight size={18} color="#9a3412" />
         </Card>
       </TouchableOpacity>
+
+      {/* Bank sandbox */}
+      <Card variant="default" padding="md" className="mb-4 shadow-card">
+        <Text className="text-base font-bold text-text-primary font-sans">
+          Bank sandbox
+        </Text>
+        <Text className="text-xs text-text-muted mt-0.5 mb-3">
+          Penny Pilot isn't connected to a real bank. Import a statement, then simulate a
+          payment arriving to watch it round up. Simulated payments are labelled and not
+          counted in your spending analysis.
+        </Text>
+        <View className="flex-row gap-2">
+          <View className="flex-1 mr-1">
+            <Button
+              title="Import statement"
+              variant="secondary"
+              onPress={() => navigation.navigate("CSVUpload")}
+            />
+          </View>
+          <View className="flex-1 ml-1">
+            <Button
+              title="Simulate a payment"
+              variant="primary"
+              onPress={handleSimulateBankTransaction}
+              loading={simulating}
+            />
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("SpendingAnalysis")}
+          className="mt-3 self-start"
+          accessibilityRole="button"
+          accessibilityLabel="See my spending habits"
+        >
+          <Text className="text-xs font-bold text-primary font-sans">
+            See my spending habits →
+          </Text>
+        </TouchableOpacity>
+      </Card>
 
       {/* Simulate Card Swipe / Purchase Card */}
       <Card variant="default" padding="lg" className="mb-4 shadow-card">
@@ -603,7 +697,9 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
               <ListItem
                 key={t.trans_id || idx}
                 title={t.merchant || t.description || "Purchase"}
-                subtitle={`${t.category || "General"} • ${dateStr}`}
+                subtitle={`${t.category || "General"} • ${dateStr}${
+                  t.source === "bank_simulation" ? " • Simulated" : ""
+                }`}
                 amount={t.amount}
                 isDebit={t.type !== "credit"}
                 category={t.category}

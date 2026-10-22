@@ -3,7 +3,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { API_URL } from "../config";
 import { TokenResponse } from "../types";
-import { apiService, getErrorMessage, setUnauthorizedHandler } from "../services/api";
+import {
+  apiService,
+  getErrorMessage,
+  refreshSession,
+  setUnauthorizedHandler,
+} from "../services/api";
 import { tokenStorage } from "../services/tokenStorage";
 
 interface AuthContextType {
@@ -13,7 +18,7 @@ interface AuthContextType {
   hasCompletedOnboarding: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (fullName: string, email: string, password: string, role?: string) => Promise<void>;
-  loginWithToken: (token: string, role?: string, hasCompletedOnboarding?: boolean) => Promise<void>;
+  loginWithRefreshToken: (refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 }
@@ -80,9 +85,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
       });
 
-      const { access_token, has_completed_onboarding } = response.data;
+      const { access_token, refresh_token, has_completed_onboarding } = response.data;
 
-      await tokenStorage.set(access_token);
+      await tokenStorage.setTokens(access_token, refresh_token);
       await AsyncStorage.setItem("userRole", "student");
       await AsyncStorage.setItem("hasCompletedOnboarding", String(has_completed_onboarding));
 
@@ -109,17 +114,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const loginWithToken = async (token: string, _role = "student", completed = false) => {
+  // Google sign-in hands the app a single-use refresh token in the deep link;
+  // redeeming it right away yields real tokens and makes the URL value useless.
+  const loginWithRefreshToken = async (refreshToken: string) => {
     try {
       setIsLoading(true);
-      await tokenStorage.set(token);
+      await tokenStorage.setRefresh(refreshToken);
+      const accessToken = await refreshSession();
+      if (!accessToken) throw new Error("Google sign-in could not be completed.");
+
+      setUserToken(accessToken);
+      setUserRole("student");
+      const user = await apiService.getCurrentUser();
+      const completed = Boolean(user?.has_completed_onboarding);
       await AsyncStorage.setItem("userRole", "student");
       await AsyncStorage.setItem("hasCompletedOnboarding", String(completed));
-      setUserToken(token);
-      setUserRole("student");
       setHasCompletedOnboarding(completed);
     } catch (e) {
-      console.error("Failed to store credentials during OAuth login", e);
+      await tokenStorage.clear();
+      throw e;
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       hasCompletedOnboarding, 
       login, 
       register, 
-      loginWithToken, 
+      loginWithRefreshToken,
       logout,
       completeOnboarding
     }}>

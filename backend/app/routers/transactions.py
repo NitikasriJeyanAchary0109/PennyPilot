@@ -127,15 +127,18 @@ async def _roundup_explanation(transaction: Transaction, goal) -> tuple:
         )
 
 
-@router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
-async def create_transaction(
+async def record_transaction(
+    db: Session,
+    current_user: User,
     transaction_data: TransactionCreate,
-    current_user: User = Depends(require_student),
-    db: Session = Depends(get_db),
-):
+    source: str = "manual",
+) -> dict:
     """
-    Creates a new transaction for the authenticated student.
-    Triggers automated roundups and logs audits.
+    Save a transaction for `current_user` and run the standard pipeline:
+    audit log, round-up into the active goal, budget alert.
+
+    Shared by manual entry and the bank simulation so both behave identically.
+    `source` records where the row came from.
     """
     # Create the transaction
     db_transaction = Transaction(
@@ -146,6 +149,7 @@ async def create_transaction(
         type=transaction_data.type,
         transaction_date=transaction_data.transaction_date or datetime.utcnow(),
         description=transaction_data.description or transaction_data.merchant,
+        source=source,
         is_round_up_applied=False,
         round_up_amount=Decimal("0.00"),
         is_deleted=False,
@@ -213,12 +217,26 @@ async def create_transaction(
             "description": db_transaction.description,
             "round_up_amount": db_transaction.round_up_amount,
             "is_round_up_applied": db_transaction.is_round_up_applied,
+            "source": db_transaction.source,
             "created_at": db_transaction.created_at,
             "is_deleted": db_transaction.is_deleted,
         },
         "roundup_applied": roundup_applied,
         "roundup_details": roundup_result,
     }
+
+
+@router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def create_transaction(
+    transaction_data: TransactionCreate,
+    current_user: User = Depends(require_student),
+    db: Session = Depends(get_db),
+):
+    """
+    Creates a new transaction for the authenticated student.
+    Triggers automated roundups and logs audits.
+    """
+    return await record_transaction(db, current_user, transaction_data, "manual")
 
 
 @router.get("/{id}", response_model=TransactionResponse)
@@ -441,6 +459,7 @@ async def upload_bank_statement(
                 type=tx_type,
                 transaction_date=tx["transaction_date"],
                 description=tx["description"],
+                source="csv_import",
                 is_round_up_applied=False,
                 round_up_amount=Decimal("0.00"),
                 is_deleted=False,

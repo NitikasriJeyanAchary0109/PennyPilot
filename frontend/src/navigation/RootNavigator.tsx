@@ -15,6 +15,7 @@ import OnboardingSetupScreen from "../screens/student/OnboardingSetupScreen";
 import SpendingEntryChoiceScreen from "../screens/student/SpendingEntryChoiceScreen";
 import ManualIncomeExpenseScreen from "../screens/student/ManualIncomeExpenseScreen";
 import CreateGoalScreen from "../screens/student/CreateGoalScreen";
+import SpendingAnalysisScreen from "../screens/student/SpendingAnalysisScreen";
 
 // Student Screens
 import HomeScreen from "../screens/student/HomeScreen";
@@ -150,6 +151,10 @@ function StudentStackScreen() {
         name="CSVUpload" 
         component={CSVUploadScreen} 
       />
+      <StudentStackNavigator.Screen
+        name="SpendingAnalysis"
+        component={SpendingAnalysisScreen}
+      />
       <StudentStackNavigator.Screen 
         name="SubscriptionNegotiator" 
         component={SubscriptionNegotiatorScreen} 
@@ -183,6 +188,7 @@ function OnboardingStackScreen() {
       <OnboardingStackNavigator.Screen name="SpendingEntryChoice" component={SpendingEntryChoiceScreen} />
       <OnboardingStackNavigator.Screen name="ManualIncomeExpense" component={ManualIncomeExpenseScreen} />
       <OnboardingStackNavigator.Screen name="CSVUpload" component={CSVUploadScreen} />
+      <OnboardingStackNavigator.Screen name="SpendingAnalysis" component={SpendingAnalysisScreen} />
       <OnboardingStackNavigator.Screen name="CreateGoal" component={CreateGoalScreen} />
     </OnboardingStackNavigator.Navigator>
   );
