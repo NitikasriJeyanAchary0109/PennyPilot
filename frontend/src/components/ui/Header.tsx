@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   subtitle,
   showLogo = true,
   showNotification = true,
-  hasUnreadNotifications = true,
+  hasUnreadNotifications = false,
   onNotificationPress,
   rightAction,
   className = "",

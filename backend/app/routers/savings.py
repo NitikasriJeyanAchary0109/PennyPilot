@@ -1,5 +1,6 @@
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
 from app.database import get_db
 from app.middleware.auth_middleware import require_student
@@ -8,8 +9,10 @@ from app.schemas.schemas import (
     SavingsCreate,
     SavingsResponse,
     SavingsSummaryResponse,
+    SavingsTrendResponse,
     SavingsUpdate,
 )
+from app.services.ledger import SAVING_SOURCES, sync_goal_status
 from app.services.rule_engine import savings_summary
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -23,6 +26,12 @@ def create_savings(
     current_user: User = Depends(require_student),
     db: Session = Depends(get_db),
 ):
+    if savings_data.amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Savings amount must be greater than 0.",
+        )
+
     if savings_data.goal_id is not None:
         goal = (
             db.query(Goal)
@@ -42,6 +51,7 @@ def create_savings(
             )
 
         goal.current_amount += savings_data.amount
+        sync_goal_status(db, goal)
 
     db_savings = Savings(
         user_id=current_user.user_id,
@@ -69,7 +79,49 @@ def get_savings(
     if goal_id:
         query = query.filter(Savings.goal_id == goal_id)
 
-    return query.all()
+    return query.order_by(Savings.created_at.desc(), Savings.id.desc()).all()
+
+
+@router.get("/trend", response_model=SavingsTrendResponse)
+def get_savings_trend(
+    weeks: int = Query(4, ge=1, le=26),
+    current_user: User = Depends(require_student),
+    db: Session = Depends(get_db),
+):
+    """
+    Amount deposited (round-ups, manual savings, transfers) in each of the last
+    `weeks` 7-day windows, oldest first. Withdrawals are not netted off. Computed
+    here so the client only has to draw it.
+    """
+    today = datetime.utcnow().date()
+    window_start = today - timedelta(days=7 * weeks - 1)
+    rows = (
+        db.query(Savings.amount, Savings.created_at, Savings.source)
+        .filter(
+            Savings.user_id == current_user.user_id,
+            Savings.created_at >= datetime.combine(window_start, datetime.min.time()),
+            Savings.source.in_(SAVING_SOURCES),
+        )
+        .all()
+    )
+
+    buckets: List[Dict[str, Any]] = []
+    for i in range(weeks):
+        start = window_start + timedelta(days=7 * i)
+        buckets.append(
+            {
+                "week_start": start,
+                "week_end": start + timedelta(days=6),
+                "saved": Decimal("0.00"),
+            }
+        )
+    for amount, created_at, _source in rows:
+        index = (created_at.date() - window_start).days // 7
+        if 0 <= index < weeks:
+            buckets[index]["saved"] += Decimal(str(amount))
+
+    total = sum((b["saved"] for b in buckets), Decimal("0.00"))
+    return {"weeks": buckets, "total": total}
 
 
 @router.get("/summary", response_model=SavingsSummaryResponse)
@@ -105,6 +157,19 @@ def update_savings(
     # Calculate what changes
     update_data = savings_update.model_dump(exclude_unset=True)
 
+    if "amount" in update_data and (
+        update_data["amount"] is None or update_data["amount"] <= 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Savings amount must be greater than 0.",
+        )
+    if savings_record.source in ("withdrawal", "goal_reallocation"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Withdrawal and reallocation entries can't be edited.",
+        )
+
     old_goal_id = savings_record.goal_id
     new_goal_id = update_data.get("goal_id", old_goal_id)
 
@@ -122,7 +187,10 @@ def update_savings(
                 .first()
             )
             if old_goal:
-                old_goal.current_amount -= old_amount
+                old_goal.current_amount = max(
+                    old_goal.current_amount - old_amount, Decimal("0.00")
+                )
+                sync_goal_status(db, old_goal)
 
         # Add to new goal
         if new_goal_id is not None:
@@ -142,6 +210,7 @@ def update_savings(
                     detail="New goal not found or does not belong to the user.",
                 )
             new_goal.current_amount += new_amount
+            sync_goal_status(db, new_goal)
 
     # Apply updates
     for key, value in update_data.items():
@@ -181,7 +250,10 @@ def delete_savings(
         )
 
         if goal:
-            goal.current_amount -= savings_record.amount
+            goal.current_amount = max(
+                goal.current_amount - savings_record.amount, Decimal("0.00")
+            )
+            sync_goal_status(db, goal)
 
     db.delete(savings_record)
     db.commit()
@@ -226,6 +298,7 @@ def create_manual_savings(
             )
 
         goal.current_amount += savings_data.amount
+        sync_goal_status(db, goal)
 
     db_savings = Savings(
         user_id=current_user.user_id,

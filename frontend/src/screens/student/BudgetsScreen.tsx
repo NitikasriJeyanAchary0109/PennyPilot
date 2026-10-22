@@ -26,7 +26,8 @@ import {
   CheckCircle2,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
+import { DEFAULT_CATEGORIES } from "../../constants/categories";
 import {
   ScreenContainer,
   Card,
@@ -51,10 +52,14 @@ export const BudgetsScreen = () => {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBudget, setEditingBudget] = useState<any>(null);
-  const [category, setCategory] = useState("Coffee");
+  const [category, setCategory] = useState(DEFAULT_CATEGORIES[0]);
+  const [customCategory, setCustomCategory] = useState("");
   const [limitAmount, setLimitAmount] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const categories = ["Coffee", "Dining", "Textbooks", "Entertainment", "Shopping"];
+  // Budgets only track spending whose category matches, so the picks are the
+  // same list the purchase form uses; students can also type their own.
+  const categories = DEFAULT_CATEGORIES;
 
   const triggerHaptic = () => {
     try {
@@ -75,9 +80,11 @@ export const BudgetsScreen = () => {
           total_spent: Number(res.total_spent) || 0,
           remaining: Number(res.remaining) || 0,
         });
+        setLoadError(null);
       }
     } catch (e: any) {
       console.warn("Failed to load budgets:", e?.message);
+      setLoadError(getErrorMessage(e, "Couldn't load your budgets."));
     } finally {
       setLoading(false);
     }
@@ -103,7 +110,8 @@ export const BudgetsScreen = () => {
   const handleOpenCreate = () => {
     triggerHaptic();
     setEditingBudget(null);
-    setCategory("Coffee");
+    setCategory(DEFAULT_CATEGORIES[0]);
+    setCustomCategory("");
     setLimitAmount("");
     setModalVisible(true);
   };
@@ -123,6 +131,8 @@ export const BudgetsScreen = () => {
       return;
     }
 
+    const chosenCategory = customCategory.trim() || category;
+
     triggerHaptic();
     setLoading(true);
     setModalVisible(false);
@@ -134,7 +144,7 @@ export const BudgetsScreen = () => {
         });
       } else {
         await apiService.createBudget({
-          category,
+          category: chosenCategory,
           limit_amount: amountVal,
           period: "monthly",
         });
@@ -148,7 +158,7 @@ export const BudgetsScreen = () => {
     } catch (e: any) {
       Alert.alert(
         "Action Failed",
-        e?.message || "Failed to save budget changes. Please try again."
+        getErrorMessage(e, "Failed to save budget changes. Please try again.")
       );
     } finally {
       setLoading(false);
@@ -171,7 +181,7 @@ export const BudgetsScreen = () => {
               await apiService.deleteBudget(budget.id);
               await loadBudgetData();
             } catch (e: any) {
-              Alert.alert("Error", e?.message || "Failed to delete budget.");
+              Alert.alert("Error", getErrorMessage(e, "Failed to delete budget."));
             } finally {
               setLoading(false);
             }
@@ -184,8 +194,8 @@ export const BudgetsScreen = () => {
   const getCategoryIcon = (catName: string) => {
     const c = (catName || "").toLowerCase();
     if (c === "coffee") return <Coffee size={16} color="#144a32" />;
-    if (c === "dining") return <Utensils size={16} color="#144a32" />;
-    if (c === "textbooks") return <BookOpen size={16} color="#144a32" />;
+    if (c === "dining" || c === "food") return <Utensils size={16} color="#144a32" />;
+    if (c === "textbooks" || c === "education") return <BookOpen size={16} color="#144a32" />;
     if (c === "entertainment") return <Film size={16} color="#144a32" />;
     if (c === "shopping") return <ShoppingBag size={16} color="#144a32" />;
     return <Tag size={16} color="#144a32" />;
@@ -265,6 +275,12 @@ export const BudgetsScreen = () => {
         </View>
       </Card>
 
+      {loadError && (
+        <Card variant="peach" padding="md" className="mb-3">
+          <Text className="text-xs text-text-secondary font-sans">{loadError}</Text>
+        </Card>
+      )}
+
       {/* Budgets List */}
       <View className="mb-2">
         <Text className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans mb-3">
@@ -277,7 +293,7 @@ export const BudgetsScreen = () => {
             <Skeleton width="100%" height={90} className="rounded-card mb-3" />
             <Skeleton width="100%" height={90} className="rounded-card" />
           </View>
-        ) : budgets.length === 0 ? (
+        ) : budgets.length === 0 && !loadError ? (
           <Card variant="default" padding="lg" className="items-center shadow-card my-4">
             <EmptyState
               title="No budgets set yet"
@@ -419,12 +435,13 @@ export const BudgetsScreen = () => {
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {categories.map((cat) => {
-                    const isSelected = category === cat;
+                    const isSelected = !customCategory.trim() && category === cat;
                     return (
                       <TouchableOpacity
                         key={cat}
                         onPress={() => {
                           triggerHaptic();
+                          setCustomCategory("");
                           setCategory(cat);
                         }}
                         className={`px-3 py-2 rounded-xl border mb-1.5 ${
@@ -446,6 +463,15 @@ export const BudgetsScreen = () => {
                     );
                   })}
                 </View>
+                <TextInput
+                  value={customCategory}
+                  onChangeText={setCustomCategory}
+                  placeholder="Or type your own category (e.g. Gym)"
+                  placeholderTextColor="#707773"
+                  maxLength={50}
+                  className="mt-2 bg-cream border border-border rounded-2xl px-4 py-3 text-xs text-text-primary font-sans min-h-[44px]"
+                  accessibilityLabel="Custom budget category"
+                />
               </View>
             ) : (
               <View className="mb-4">

@@ -42,7 +42,7 @@ export const Card: React.FC<CardProps> = ({
   } else if (padding === "lg") {
     baseStyles += "p-6 ";
   } else {
-    baseStyles += "p-4.5 "; // 18px
+    baseStyles += "p-5 "; // 20px comfortable padding
   }
 
   return (

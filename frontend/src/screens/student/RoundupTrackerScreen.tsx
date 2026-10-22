@@ -9,14 +9,12 @@ import {
   Car,
   Utensils,
   Receipt,
-  Sparkles,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
 import {
   ScreenContainer,
   Card,
-  Chip,
   Skeleton,
   EmptyState,
 } from "../../components/ui";
@@ -30,13 +28,20 @@ interface TransactionActivity {
   roundup: number;
 }
 
+const FILTERS: { label: string; sinceDays?: number }[] = [
+  { label: "All Time" },
+  { label: "Last 30 Days", sinceDays: 30 },
+  { label: "Past 7 Days", sinceDays: 7 },
+];
+
 export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
-  const [selectedFilter, setSelectedFilter] = useState("All Time");
+  const [selectedFilter, setSelectedFilter] = useState(FILTERS[0]);
   const [activities, setActivities] = useState<TransactionActivity[]>([]);
   const [totalSaved, setTotalSaved] = useState<number>(0);
   const [roundupCount, setRoundupCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const triggerHaptic = () => {
     try {
@@ -49,45 +54,37 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      const { sinceDays } = selectedFilter;
 
-      // Load server-calculated statistics (zero arithmetic rule)
-      const stats = await apiService.getRoundupStats();
-      if (stats) {
-        setTotalSaved(Number(stats.total_saved) || 0);
-        setRoundupCount(Number(stats.roundup_count) || 0);
-      }
+      // Totals and the list are both filtered and computed by the backend.
+      const [stats, txs] = await Promise.all([
+        apiService.getRoundupStats(sinceDays),
+        apiService.getTransactions({ hasRoundup: true, sinceDays, limit: 100 }),
+      ]);
 
-      // Load real transactions
-      const txs = await apiService.getTransactions();
-      if (Array.isArray(txs)) {
-        const mapped: TransactionActivity[] = txs.map((t: any) => {
-          const rUp = Number(t.round_up_amount) || 0;
-          const txDate = t.date ? new Date(t.date) : new Date();
-          const formattedTime = txDate.toLocaleDateString("en-IN", {
+      setTotalSaved(Number(stats.total_saved) || 0);
+      setRoundupCount(Number(stats.roundup_transactions_count) || 0);
+      setActivities(
+        txs.map((t: any) => ({
+          id: String(t.trans_id),
+          merchant: t.merchant || "Purchase",
+          time: new Date(t.date).toLocaleDateString("en-IN", {
             month: "short",
             day: "numeric",
-          });
-
-          return {
-            id: (t.trans_id || t.id || Math.random()).toString(),
-            merchant: t.merchant || "Purchase",
-            time: formattedTime,
-            category: t.category || "General",
-            amount: Number(t.amount) || 0,
-            roundup: rUp,
-          };
-        });
-        setActivities(mapped);
-      } else {
-        setActivities([]);
-      }
+          }),
+          category: t.category || "General",
+          amount: Number(t.amount) || 0,
+          roundup: Number(t.round_up_amount) || 0,
+        }))
+      );
+      setError(null);
     } catch (e: any) {
       console.warn("Failed to load roundups activity:", e?.message);
-      setActivities([]);
+      setError(getErrorMessage(e, "Couldn't load your round-ups."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedFilter]);
 
   useEffect(() => {
     loadData();
@@ -148,11 +145,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
             Round-up Accumulator
           </Text>
         </View>
-        <Chip
-          label="Active"
-          variant="success"
-          icon={<Sparkles size={12} color="#144a32" />}
-        />
+        <View className="w-10" />
       </View>
 
       {/* Hero Forest Card */}
@@ -170,21 +163,13 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
         </View>
 
         {/* Split Stats Sub-cards */}
-        <View className="flex-row space-x-3 pt-3 border-t border-white/10">
-          <View className="flex-1 bg-white/10 rounded-xl p-3 mr-1.5">
-            <Text className="text-[10px] font-bold text-sage-light uppercase tracking-wider font-sans">
-              Multiplier
-            </Text>
-            <Text className="text-base font-bold text-gold font-sans mt-0.5">
-              1x Standard
-            </Text>
-          </View>
-          <View className="flex-1 bg-white/10 rounded-xl p-3 ml-1.5">
+        <View className="pt-3 border-t border-white/10">
+          <View className="bg-white/10 rounded-xl p-3">
             <Text className="text-[10px] font-bold text-sage-light uppercase tracking-wider font-sans">
               Micro-Deposits
             </Text>
             <Text className="text-base font-bold text-white font-sans mt-0.5">
-              {roundupCount} swipes
+              {roundupCount} round-up{roundupCount === 1 ? "" : "s"}
             </Text>
           </View>
         </View>
@@ -192,11 +177,11 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
 
       {/* Filter Tabs */}
       <View className="flex-row mb-4 space-x-2">
-        {["All Time", "This Month", "Past 7 Days"].map((filter) => {
-          const isSelected = selectedFilter === filter;
+        {FILTERS.map((filter) => {
+          const isSelected = selectedFilter.label === filter.label;
           return (
             <TouchableOpacity
-              key={filter}
+              key={filter.label}
               onPress={() => {
                 triggerHaptic();
                 setSelectedFilter(filter);
@@ -217,7 +202,7 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
                     : "font-semibold text-text-secondary"
                 }`}
               >
-                {filter}
+                {filter.label}
               </Text>
             </TouchableOpacity>
           );
@@ -230,23 +215,29 @@ export const RoundupTrackerScreen = ({ navigation }: { navigation: any }) => {
           Micro-Deposit Activity
         </Text>
 
+        {error && (
+          <Card variant="peach" padding="md" className="mb-3">
+            <Text className="text-xs text-text-secondary font-sans">{error}</Text>
+          </Card>
+        )}
+
         {loading && activities.length === 0 ? (
           <View className="space-y-3 py-2">
             <Skeleton width="100%" height={70} className="rounded-card mb-3" />
             <Skeleton width="100%" height={70} className="rounded-card mb-3" />
             <Skeleton width="100%" height={70} className="rounded-card" />
           </View>
-        ) : activities.length === 0 ? (
+        ) : activities.length === 0 && !error ? (
           <Card variant="default" padding="lg" className="items-center shadow-card my-4">
             <EmptyState
-              title="No round-up transactions yet"
-              description="Make a simulated purchase from the Home screen to see your round-up micro-deposits accumulate."
+              title="No round-ups in this period"
+              description="Log a purchase from the Home screen (with an active savings goal) to see round-up micro-deposits here."
               actionTitle="Go to Home →"
               onAction={() => navigation.navigate("Home")}
               icon={<Coins size={32} color="#144a32" />}
             />
           </Card>
-        ) : (
+        ) : activities.length === 0 ? null : (
           <View className="space-y-2.5">
             {activities.map((item) => (
               <Card

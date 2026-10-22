@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { ArrowLeft, Bell, CheckCheck, Clock } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
 import { Notification } from "../../types";
 import {
   ScreenContainer,
@@ -18,6 +18,7 @@ export const NotificationsScreen = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const triggerHaptic = () => {
     try {
@@ -31,14 +32,11 @@ export const NotificationsScreen = () => {
     try {
       setLoading(true);
       const res = await apiService.getNotifications();
-      if (Array.isArray(res)) {
-        setNotifications(res);
-      } else {
-        setNotifications([]);
-      }
+      setNotifications(Array.isArray(res) ? res : []);
+      setError(null);
     } catch (e: any) {
       console.warn("Failed to load notifications:", e.message);
-      setNotifications([]);
+      setError(getErrorMessage(e, "Couldn't load your notifications."));
     } finally {
       setLoading(false);
     }
@@ -72,11 +70,7 @@ export const NotificationsScreen = () => {
     triggerHaptic();
     try {
       setNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
-      // Mark each unread notification
-      const unread = notifications.filter((n) => n.status !== "read");
-      await Promise.all(
-        unread.map((n) => apiService.markNotificationRead(n.notif_id))
-      );
+      await apiService.markAllNotificationsRead();
     } catch (e: any) {
       console.warn("Failed to mark all as read:", e.message);
       loadNotifications();
@@ -135,21 +129,27 @@ export const NotificationsScreen = () => {
       </View>
 
       {/* Content */}
+      {error && (
+        <Card variant="peach" padding="md" className="mb-3">
+          <Text className="text-xs text-text-secondary font-sans">{error}</Text>
+        </Card>
+      )}
+
       {loading && notifications.length === 0 ? (
         <View className="space-y-3 py-4">
           <Skeleton width="100%" height={88} className="rounded-card mb-3" />
           <Skeleton width="100%" height={88} className="rounded-card mb-3" />
           <Skeleton width="100%" height={88} className="rounded-card" />
         </View>
-      ) : notifications.length === 0 ? (
+      ) : notifications.length === 0 && !error ? (
         <Card variant="default" padding="lg" className="my-6 shadow-card">
           <EmptyState
             title="All caught up!"
-            description="You don't have any unread notifications. Real-time updates about round-ups and goal milestones will appear here."
+            description="You have no notifications. You'll be alerted here when a goal is reached, a budget is exceeded, or a withdrawal is recorded."
             icon={<Bell size={32} color="#144a32" />}
           />
         </Card>
-      ) : (
+      ) : notifications.length === 0 ? null : (
         <View className="space-y-3">
           {notifications.map((item) => {
             const isUnread = item.status !== "read";

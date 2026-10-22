@@ -33,6 +33,9 @@ export interface Goal {
   target: number;
   saved: number;
   deadline?: string;
+  status?: string;
+  progress_percentage?: number;
+  projected_completion_date?: string | null;
 }
 
 export interface Savings {
@@ -46,6 +49,7 @@ export interface Savings {
 export interface Notification {
   notif_id: number;
   user_id: number;
+  type?: string | null;
   title: string;
   message: string;
   status: "unread" | "read";
@@ -78,6 +82,8 @@ export interface Transaction {
   type: string;  // credit or debit
   date: string;
   description?: string;
+  round_up_amount?: number;
+  is_round_up_applied?: boolean;
 }
 
 export interface Budget {

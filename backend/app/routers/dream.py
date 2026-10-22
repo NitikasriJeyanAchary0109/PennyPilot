@@ -31,8 +31,9 @@ from typing import Optional
 
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
-from app.models.models import Goal, Savings, User
+from app.models.models import Goal, User
 from app.services.ai_engine import AIEngineError, call_llama
+from app.services.ledger import recent_savings_amounts
 from app.services.rule_engine import (
     calculate_accelerated_savings_options,
     format_accelerated_options,
@@ -47,11 +48,6 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger("pennypilot.dream")
 
 router = APIRouter(prefix="/goal", tags=["Dream Engine"])
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-_VELOCITY_LOOKBACK_SAVINGS = 60  # max recent Savings rows to read for velocity
 
 # ---------------------------------------------------------------------------
 # Pydantic response model
@@ -123,6 +119,7 @@ async def get_goal_forecast(
         .filter(
             Goal.id == goal_id,
             Goal.user_id == uid,  # enforces ownership — 404 on mismatch
+            Goal.is_deleted == False,
         )
         .first()
     )
@@ -144,21 +141,14 @@ async def get_goal_forecast(
     )
 
     # ── 2. Rule Engine — savings velocity ────────────────────────────────
-    recent_savings = (
-        db.query(Savings)
-        .filter(Savings.user_id == uid)
-        .order_by(Savings.created_at.desc())
-        .limit(_VELOCITY_LOOKBACK_SAVINGS)
-        .all()
-    )
-    amounts = [Decimal(str(s.amount)) for s in recent_savings]
+    amounts = recent_savings_amounts(db, uid, 30, goal_id=goal.id)
     velocity = savings_velocity(amounts, period_days=30)
 
     # ── 3. Rule Engine — projected date ──────────────────────────────────
     raw_forecast = goal_forecast(target, current, velocity)
 
     # Convert sentinel (9999-12-31) to None for the response
-    if raw_forecast >= datetime.date(9999, 1, 1):
+    if raw_forecast is None or raw_forecast >= datetime.date(9999, 1, 1):
         forecast_date: Optional[datetime.date] = None
     else:
         forecast_date = raw_forecast

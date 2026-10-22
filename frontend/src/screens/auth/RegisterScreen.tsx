@@ -33,8 +33,8 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
       setErrorMsg("Please complete all fields to create your account.");
       return;
     }
-    if (password.length < 6) {
-      setErrorMsg("Password must be at least 6 characters long.");
+    if (password.length < 8) {
+      setErrorMsg("Password must be at least 8 characters long.");
       return;
     }
 
@@ -114,7 +114,7 @@ export const RegisterScreen = ({ navigation }: { navigation: any }) => {
           label="Password"
           value={password}
           onChangeText={setPassword}
-          placeholder="At least 6 characters"
+          placeholder="At least 8 characters"
           secureTextEntry
           autoCapitalize="none"
           className="mb-6"

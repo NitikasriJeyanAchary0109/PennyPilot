@@ -1,13 +1,22 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
 from app.database import get_db
 from app.middleware.auth_middleware import require_student
 from app.models.models import Budget, Goal, Savings, Transaction, User
-from app.services.rule_engine import calculate_roundup, savings_velocity, stress_score
+from app.services.ledger import (
+    calculate_spent_amount,
+    recent_debit_total,
+    recent_savings_amounts,
+)
+from app.services.rule_engine import savings_velocity, stress_score
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+# Round-up projections average the last few months of actual round-up deposits.
+ROUNDUP_LOOKBACK_DAYS = 90
 
 router = APIRouter(prefix="/calculations", tags=["Calculations"])
 
@@ -74,25 +83,29 @@ def get_round_up_projection(
     current_user: User = Depends(require_student),
     db: Session = Depends(get_db),
 ):
-    transactions = (
-        db.query(Transaction)
+    """
+    Projects future round-up savings from the student's *actual* round-up
+    deposits: average monthly round-up over the last 90 days (or since their
+    first round-up, if that's more recent) × `months`.
+    """
+    now = datetime.utcnow()
+    since = now - timedelta(days=ROUNDUP_LOOKBACK_DAYS)
+    rows = (
+        db.query(Savings.amount, Savings.created_at)
         .filter(
-            Transaction.user_id == current_user.user_id,
-            Transaction.is_deleted == False,
+            Savings.user_id == current_user.user_id,
+            Savings.source == "round_up",
+            Savings.created_at >= since,
         )
         .all()
     )
 
-    # Simple linear projection:
-    # projected_roundup_savings = average_monthly_roundup × months
-    # where average_monthly_roundup is estimated from the user's historical
-    # transaction volume over all available transactions.
-    monthly_roundup_total = Decimal("0.00")
-    for tx in transactions:
-        monthly_roundup_total += calculate_roundup(Decimal(str(tx.amount)))
-
-    if transactions:
-        avg_monthly_roundup = monthly_roundup_total / Decimal(len(transactions))
+    if rows:
+        total = sum((Decimal(str(r[0])) for r in rows), Decimal("0.00"))
+        first = min(r[1] for r in rows)
+        observed_days = max((now - first).days, 1)
+        months_observed = max(Decimal(observed_days) / Decimal("30"), Decimal("1"))
+        avg_monthly_roundup = total / months_observed
     else:
         avg_monthly_roundup = Decimal("0.00")
 
@@ -110,58 +123,43 @@ def get_stress_score(
     current_user: User = Depends(require_student),
     db: Session = Depends(get_db),
 ):
+    """Stress score from the last 30 days of savings, spending and budgets."""
     budgets = (
         db.query(Budget)
         .filter(Budget.user_id == current_user.user_id, Budget.is_deleted == False)
         .all()
     )
-    transactions = (
-        db.query(Transaction)
-        .filter(
-            Transaction.user_id == current_user.user_id,
-            Transaction.is_deleted == False,
-        )
-        .all()
-    )
-    goals = (
-        db.query(Goal)
+    goal_count = (
+        db.query(func.count(Goal.id))
         .filter(Goal.user_id == current_user.user_id, Goal.is_deleted == False)
-        .all()
+        .scalar()
     )
 
-    savings_records = (
-        db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
-    )
     monthly_savings = savings_velocity(
-        [Decimal(str(record.amount)) for record in savings_records],
-        30,
+        recent_savings_amounts(db, current_user.user_id, 30), 30
     )
+    monthly_spend = recent_debit_total(db, current_user.user_id, 30)
 
-    spend_velocity = sum(
-        (Decimal(str(tx.amount)) for tx in transactions if tx.type == "debit"),
-        Decimal("0.00"),
-    )
     budget_overruns = 0
     for budget in budgets:
-        spent = sum(
-            (
-                Decimal(str(tx.amount))
-                for tx in transactions
-                if tx.category == budget.category and tx.type == "debit"
-            ),
-            Decimal("0.00"),
+        spent = calculate_spent_amount(
+            db,
+            current_user.user_id,
+            budget.category,
+            budget.period,
+            budget.start_date,
         )
         if spent > Decimal(str(budget.limit_amount)):
             budget_overruns += 1
 
-    score = stress_score(monthly_savings, spend_velocity, budget_overruns)
+    score = stress_score(monthly_savings, monthly_spend, budget_overruns)
 
     return {
         "stress_score": score,
         "monthly_savings": _money(monthly_savings),
-        "monthly_spend": _money(spend_velocity),
+        "monthly_spend": _money(monthly_spend),
         "budget_overruns": budget_overruns,
-        "goal_count": len(goals),
+        "goal_count": goal_count,
     }
 
 
@@ -186,11 +184,8 @@ def get_goal_feasibility(
     if not goal.target_date:
         raise HTTPException(status_code=400, detail="Goal target_date is required")
 
-    savings_records = (
-        db.query(Savings).filter(Savings.user_id == current_user.user_id).all()
-    )
     monthly_savings = savings_velocity(
-        [Decimal(str(record.amount)) for record in savings_records], 30
+        recent_savings_amounts(db, current_user.user_id, 30, goal_id=goal.id), 30
     )
 
     remaining = Decimal(str(goal.target_amount)) - Decimal(str(goal.current_amount))

@@ -1,9 +1,9 @@
-import React, { createContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useState, useEffect, useCallback, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { API_URL } from "../config";
 import { TokenResponse } from "../types";
-import { apiService } from "../services/api";
+import { apiService, getErrorMessage, setUnauthorizedHandler } from "../services/api";
 
 interface AuthContextType {
   userToken: string | null;
@@ -14,7 +14,6 @@ interface AuthContextType {
   register: (fullName: string, email: string, password: string, role?: string) => Promise<void>;
   loginWithToken: (token: string, role?: string, hasCompletedOnboarding?: boolean) => Promise<void>;
   logout: () => Promise<void>;
-  loginAsGuest: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 }
 
@@ -26,19 +25,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check if token and onboarding state exist in storage on app start
+  const clearSession = useCallback(() => {
+    setUserToken(null);
+    setUserRole(null);
+    setHasCompletedOnboarding(false);
+  }, []);
+
+  // Any 401 from the API (expired / revoked token) signs the user out of the UI too.
+  useEffect(() => {
+    setUnauthorizedHandler(clearSession);
+    return () => setUnauthorizedHandler(null);
+  }, [clearSession]);
+
+  // Restore the session on app start and confirm it with the server.
   useEffect(() => {
     const bootstrapAsync = async () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
-        const completed = await AsyncStorage.getItem("hasCompletedOnboarding");
-        
-        if (token) {
-          setUserToken(token);
-          setUserRole("student");
-        }
-        if (completed === "true") {
-          setHasCompletedOnboarding(true);
+        if (!token) return;
+
+        const storedCompleted = await AsyncStorage.getItem("hasCompletedOnboarding");
+        setUserToken(token);
+        setUserRole("student");
+        setHasCompletedOnboarding(storedCompleted === "true");
+
+        try {
+          const user = await apiService.getCurrentUser();
+          // The server is the source of truth for onboarding state.
+          const completed = Boolean(user?.has_completed_onboarding);
+          setHasCompletedOnboarding(completed);
+          await AsyncStorage.setItem("hasCompletedOnboarding", String(completed));
+        } catch (e: any) {
+          // 401 → the interceptor already cleared the session. Anything else
+          // (e.g. offline) keeps the stored session so the app still opens.
+          if (e?.response?.status !== 401) {
+            console.warn("Could not verify session with server", e?.message);
+          }
         }
       } catch (e) {
         console.error("Failed to load auth credentials from storage", e);
@@ -52,7 +74,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      setIsLoading(true);
       const response = await axios.post<TokenResponse>(`${API_URL}/auth/login/json`, {
         email,
         password,
@@ -70,14 +91,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       const errMsg = error.response?.data?.detail || "Authentication login failed.";
       throw new Error(errMsg);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const register = async (fullName: string, email: string, password: string, _role = "student") => {
     try {
-      setIsLoading(true);
       await axios.post(`${API_URL}/auth/register`, {
         full_name: fullName,
         email,
@@ -85,10 +103,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         role: "student",
       });
     } catch (error: any) {
-      const errMsg = error.response?.data?.detail || "Registration failed.";
+      const errMsg = getErrorMessage(error, "Registration failed.");
       throw new Error(errMsg);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -108,32 +124,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const loginAsGuest = async () => {
-    try {
-      setIsLoading(true);
-      await AsyncStorage.setItem("userToken", "guest");
-      await AsyncStorage.setItem("userRole", "student");
-      await AsyncStorage.setItem("hasCompletedOnboarding", "true");
-      setUserToken("guest");
-      setUserRole("student");
-      setHasCompletedOnboarding(true);
-    } catch (e) {
-      console.error("Failed to log in as guest", e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Throws on failure so callers can tell the user — silently marking onboarding
+  // complete locally would send them back to onboarding on the next sign-in.
   const completeOnboarding = async () => {
-    try {
-      if (userToken && userToken !== "guest") {
-        await apiService.completeOnboarding();
-      }
-      await AsyncStorage.setItem("hasCompletedOnboarding", "true");
-      setHasCompletedOnboarding(true);
-    } catch (e) {
-      console.error("Failed to complete onboarding", e);
-    }
+    await apiService.completeOnboarding();
+    await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+    setHasCompletedOnboarding(true);
   };
 
   const logout = async () => {
@@ -162,7 +158,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       register, 
       loginWithToken, 
       logout,
-      loginAsGuest,
       completeOnboarding
     }}>
       {children}

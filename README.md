@@ -45,7 +45,7 @@ For many college students, managing personal finances is intimidating, opaque, a
 
 - **Automated Round-Up Engine**: Automatically calculates spare change on debit/UPI transactions to the nearest ₹10, ₹50, or ₹100 and channels the difference directly into targeted savings goals.
 - **Deterministic Progress Tracking**: Goals, balances, and savings forecasts are calculated securely by the backend engine, preventing confusing rounding discrepancies on client devices.
-- **Private AI Financial Coach**: Students converse with an empathetic, local AI coach that offers clear, non-judgmental guidance, personalized spending insights, and pre-drafted subscription cancellation letters.
+- **Private AI Financial Coach**: Students converse with an empathetic, local AI coach that offers clear, non-judgmental guidance and personalized spending insights grounded in your own transactions, goals and budgets.
 - **Impulse Spending Monitor**: Replaces guilt-inducing metrics with actionable behavioral nudges that identify emotional spending triggers before budgets break.
 - **Emergency Vault Protection**: Locks emergency cushions with multi-step confirmation modals to protect rainy-day funds from casual withdrawal.
 
@@ -112,7 +112,7 @@ A conversational AI partner powered by on-device LLaMA 3 provides contextual fin
 | AI Financial Coach Chat | Subscription Negotiator |
 | :---: | :---: |
 | ![AI Coach](docs/screenshots/07_ai_coach.png) | ![Subscription Negotiator](docs/screenshots/10_subscription_negotiator.png) |
-| *Conversational advice with prompt disclaimer banners and quick suggestion chips.* | *Automated recurring bill detection with pre-drafted negotiation and cancellation scripts.* |
+| *Conversational advice with prompt disclaimer banners and quick suggestion chips.* | *Subscriptions detected from your own transactions, with the effect of pausing them on your goal date.* |
 
 ---
 
@@ -241,7 +241,7 @@ ollama pull llama3
 # Verify Ollama is listening
 curl http://localhost:11434/api/generate
 ```
-*Note: If Ollama is not running, Penny Pilot automatically activates graceful fallback heuristics so the application remains fully functional.*
+*Note: If Ollama is not running, AI features (coach, money-basics Q&A, purchase advice, goal narration) return a clear "temporarily unavailable" message — nothing is made up. Deterministic features (round-ups, budgets, scores, forecasts dates) keep working, and the round-up explanation and wellness summary fall back to plain factual sentences built from your real figures.*
 
 ---
 

@@ -41,7 +41,7 @@ logger = logging.getLogger("pennypilot.ai_engine")
 # ---------------------------------------------------------------------------
 # Runtime constants — change here; reflected everywhere automatically.
 # ---------------------------------------------------------------------------
-_REQUEST_TIMEOUT_SECONDS: float = 30.0  # per-attempt wall-clock timeout
+_REQUEST_TIMEOUT_SECONDS: float = 60.0  # per-attempt wall-clock timeout
 _MAX_RETRIES: int = 1  # retry once on timeout or 5xx, then raise
 
 
@@ -108,7 +108,7 @@ class AIEngineError(Exception):
 async def call_llama(
     system_prompt: str,
     user_prompt: str,
-    model: str = "llama3",
+    model: Optional[str] = None,
 ) -> str:
     """
     Send a chat-style request to Ollama and return the assistant's reply as a
@@ -134,7 +134,7 @@ async def call_llama(
     Args:
         system_prompt: Persona/role instructions for the LLM.
         user_prompt:   The actual question or narration request.
-        model:         Ollama model tag (default: "llama3").
+        model:         Ollama model tag (default: settings.OLLAMA_MODEL).
 
     Returns:
         The assistant's response text, stripped of leading/trailing whitespace.
@@ -144,6 +144,7 @@ async def call_llama(
                        unexpected network error.
     """
     url = _chat_url()
+    model = model or settings.OLLAMA_MODEL
     payload = {
         "model": model,
         "messages": [
@@ -151,6 +152,11 @@ async def call_llama(
             {"role": "user", "content": user_prompt},
         ],
         "stream": False,
+        "keep_alive": -1,
+        "options": {
+            "num_predict": 120,
+            "temperature": 0.4,
+        },
     }
 
     last_error: Optional[Exception] = None

@@ -5,7 +5,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from app.models.models import Budget, Goal, Savings
+from app.models.models import Budget, Goal, Savings, Transaction
 from app.services.csv_parser import parse_transactions_csv
 from app.utils.prompts import (
     coach_system_prompt,
@@ -646,3 +646,100 @@ def test_migration_006_upgrade_module_with_legacy_roundup_row(
     assert r_stats.status_code == 200
     stats = r_stats.json()
     assert Decimal(str(stats["total_saved"])) >= Decimal("33.25")
+
+
+def _add_tx(db, user, **kw):
+    defaults = dict(
+        user_id=user.user_id,
+        type="debit",
+        category="Subscriptions",
+        transaction_date=datetime.datetime.utcnow(),
+        is_deleted=False,
+    )
+    defaults.update(kw)
+    tx = Transaction(**defaults)
+    db.add(tx)
+    db.commit()
+    return tx
+
+
+def test_negotiator_subscriptions_come_only_from_user_transactions(
+    client, db, student_user, student_token
+):
+    headers = {"Authorization": f"Bearer {student_token}"}
+
+    # A student with no matching transactions sees no subscriptions (nothing invented).
+    res = client.get("/api/negotiator/subscriptions", headers=headers)
+    assert res.status_code == 200
+    assert res.json() == []
+
+    # Two Netflix charges + one custom subscription.
+    _add_tx(
+        db,
+        student_user,
+        amount=Decimal("500.00"),
+        merchant="Netflix",
+        transaction_date=datetime.datetime.utcnow() - datetime.timedelta(days=40),
+    )
+    _add_tx(db, student_user, amount=Decimal("649.00"), merchant="Netflix")
+    _add_tx(db, student_user, amount=Decimal("99.00"), merchant="Notion Plus")
+
+    res = client.get("/api/negotiator/subscriptions", headers=headers)
+    subs = {s["merchant"]: s for s in res.json()}
+    assert set(subs) == {"Netflix", "Notion Plus"}
+    # One row per merchant, using the most recent charge.
+    assert Decimal(str(subs["Netflix"]["amount"])) == Decimal("649.00")
+
+    # "Sync" is read-only: it must not create transactions.
+    before = db.query(Transaction).count()
+    res_sync = client.post("/api/negotiator/subscriptions/sync", headers=headers)
+    assert res_sync.status_code == 200
+    assert res_sync.json()["synced_count"] == 2
+    assert db.query(Transaction).count() == before
+
+
+@pytest.mark.anyio
+async def test_negotiator_pause_mode_and_no_budget(
+    client, db, student_user, student_token
+):
+    headers = {"Authorization": f"Bearer {student_token}"}
+    db.add(
+        Goal(
+            user_id=student_user.user_id,
+            title="Laptop",
+            target_amount=Decimal("10000"),
+            current_amount=Decimal("1000"),
+            status="active",
+        )
+    )
+    db.add(
+        Savings(
+            user_id=student_user.user_id,
+            amount=Decimal("300"),
+            source="manual",
+            created_at=datetime.datetime.utcnow(),
+        )
+    )
+    db.commit()
+
+    with patch(
+        "app.routers.negotiator.call_llama", new_callable=AsyncMock
+    ) as mock_llama:
+        mock_llama.return_value = "Pausing it frees up money."
+        resp = client.post(
+            "/api/negotiator/evaluate",
+            json={
+                "price": 649.0,
+                "category": "Subscriptions",
+                "description": "Netflix",
+                "kind": "pause",
+            },
+            headers=headers,
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    # No budget exists for the category: reported as such, not as "safe".
+    assert body["budget_status"] == "no_budget"
+    assert "sooner" in body["goal_impact"]
+    prompt_used = mock_llama.call_args.kwargs["user_prompt"]
+    assert "pausing" in prompt_used.lower()

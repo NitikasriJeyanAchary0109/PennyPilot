@@ -1,3 +1,5 @@
+> **⚠️ Superseded (2026-10-23).** This inventory predates the audit and refers to screens that no longer exist. The current, verified list of fabricated/hard-coded data and its fixes is in [`docs/AUDIT_REPORT.md`](../AUDIT_REPORT.md) §3.3.
+
 # Penny Pilot: Mock Data & Financial Figures Inventory
 
 This document maps all screens and components in the frontend that currently utilize hardcoded mock data, fallback structures, or client-side financial calculations. This inventory serves as the transition specification for the production redesign.

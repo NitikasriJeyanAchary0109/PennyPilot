@@ -19,8 +19,8 @@ import {
   Info,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
-import { apiService } from "../../services/api";
-import { Card, Chip } from "../../components/ui";
+import { apiService, getErrorMessage } from "../../services/api";
+import { Card } from "../../components/ui";
 
 interface ChatMessage {
   id: string;
@@ -28,13 +28,14 @@ interface ChatMessage {
   text: string;
   time: string;
   isError?: boolean;
-  investmentCard?: {
-    fundName: string;
-    risk: string;
-    returnRate: string;
-    disclaimer?: string;
-  };
+  disclaimer?: string;
 }
+
+const formatTime = (value?: string | Date): string =>
+  (value ? new Date(value) : new Date()).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 const COACH_PROMPTS = [
   "How do micro-savings and round-ups work?",
@@ -66,6 +67,38 @@ export const ChatScreen = () => {
 
   const activeMessages = activeMode === "coach" ? coachMessages : advisorMessages;
 
+  // Restore the saved coach conversation (the backend persists every turn).
+  useEffect(() => {
+    let cancelled = false;
+    apiService
+      .getCoachHistory(20)
+      .then((items) => {
+        if (cancelled) return;
+        const restored: ChatMessage[] = [];
+        // API returns newest first; show oldest first.
+        [...items].reverse().forEach((item) => {
+          const time = formatTime(item.created_at);
+          restored.push({
+            id: `hist-q-${item.chat_id}`,
+            sender: "user",
+            text: item.question,
+            time,
+          });
+          restored.push({
+            id: `hist-a-${item.chat_id}`,
+            sender: "ai",
+            text: item.response,
+            time,
+          });
+        });
+        setCoachMessages((prev) => (prev.length === 0 ? restored : prev));
+      })
+      .catch((e) => console.warn("Could not load chat history:", e?.message));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
@@ -79,77 +112,50 @@ export const ChatScreen = () => {
     triggerHaptic();
     setInputText("");
 
-    const timestamp = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       sender: "user",
       text: messageText,
-      time: timestamp,
+      time: formatTime(),
     };
 
-    if (activeMode === "coach") {
-      setCoachMessages((prev) => [...prev, userMsg]);
-    } else {
-      setAdvisorMessages((prev) => [...prev, userMsg]);
-    }
+    const mode = activeMode;
+    const append = (msg: ChatMessage) =>
+      mode === "coach"
+        ? setCoachMessages((prev) => [...prev, msg])
+        : setAdvisorMessages((prev) => [...prev, msg]);
 
+    append(userMsg);
     setIsTyping(true);
 
     try {
-      if (activeMode === "coach") {
+      if (mode === "coach") {
         const res = await apiService.chatWithCoach(messageText);
-        const replyText =
-          res?.response || res?.message || "Keep building your daily savings streak!";
-        const aiMsg: ChatMessage = {
+        append({
           id: `ai-${Date.now()}`,
           sender: "ai",
-          text: replyText,
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        };
-        setCoachMessages((prev) => [...prev, aiMsg]);
+          text: res.response,
+          time: formatTime(),
+        });
       } else {
         const res = await apiService.askAdvisor(messageText);
-        const replyText =
-          res?.response ||
-          res?.message ||
-          "Here is personalized investment guidance based on your risk profile:";
-        const aiMsg: ChatMessage = {
+        append({
           id: `ai-${Date.now()}`,
           sender: "ai",
-          text: replyText,
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          investmentCard: res?.recommendationCard,
-        };
-        setAdvisorMessages((prev) => [...prev, aiMsg]);
+          text: res.response,
+          time: formatTime(),
+          disclaimer: res.disclaimer,
+        });
       }
     } catch (err: any) {
-      console.warn("Chat API error:", err);
-      const errorMsg: ChatMessage = {
+      console.warn("Chat API error:", err?.message);
+      append({
         id: `err-${Date.now()}`,
         sender: "ai",
-        text: "Could not reach the assistant. Please check your network or try again.",
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        text: getErrorMessage(err, "Could not reach the assistant. Please try again."),
+        time: formatTime(),
         isError: true,
-      };
-
-      if (activeMode === "coach") {
-        setCoachMessages((prev) => [...prev, errorMsg]);
-      } else {
-        setAdvisorMessages((prev) => [...prev, errorMsg]);
-      }
+      });
     } finally {
       setIsTyping(false);
     }
@@ -225,7 +231,7 @@ export const ChatScreen = () => {
                   : "font-semibold text-text-muted"
               }`}
             >
-              Wealth Advisor
+              Money Basics
             </Text>
           </TouchableOpacity>
         </View>
@@ -234,7 +240,9 @@ export const ChatScreen = () => {
         <View className="flex-row items-center bg-sage-light/60 border border-border rounded-xl px-2.5 py-1.5 mt-2.5">
           <Info size={13} color="#144a32" className="mt-0.5 mr-1.5" />
           <Text className="text-[11px] text-primary font-sans flex-1 leading-4">
-            Financial figures are verified by Penny Pilot's calculation engine, not fabricated by the AI.
+            {activeMode === "coach"
+              ? "Figures about your money come from Penny Pilot's calculation engine; the AI only explains them."
+              : "General education only — not personalised investment advice. No product recommendations."}
           </Text>
         </View>
       </View>
@@ -259,12 +267,12 @@ export const ChatScreen = () => {
               <Text className="text-base font-bold text-text-primary font-sans text-center">
                 {activeMode === "coach"
                   ? "Meet your Penny Pilot Coach"
-                  : "Welcome to Wealth Advisor"}
+                  : "Welcome to Money Basics"}
               </Text>
               <Text className="text-xs text-text-secondary font-sans text-center mt-1 leading-relaxed max-w-xs">
                 {activeMode === "coach"
                   ? "Ask about your spending patterns, micro-savings streaks, or get tips on reaching your goals faster."
-                  : "Get educational guidance on index funds, long-term wealth compounding, and smart financial habits."}
+                  : "Learn how saving, compounding, emergency funds and index funds work. This is education, not investment advice."}
               </Text>
             </Card>
 
@@ -327,28 +335,10 @@ export const ChatScreen = () => {
                         {msg.text}
                       </Text>
 
-                      {/* Optional Investment Recommendation Card */}
-                      {msg.investmentCard && (
-                        <View className="mt-2.5 p-3 rounded-xl bg-cream border border-border">
-                          <Text className="text-xs font-bold text-primary font-sans">
-                            {msg.investmentCard.fundName}
-                          </Text>
-                          <View className="flex-row items-center mt-1 space-x-2">
-                            <Chip
-                              label={msg.investmentCard.risk}
-                              variant="success"
-                              className="py-0 px-2 h-5 mr-2"
-                            />
-                            <Text className="text-[11px] font-bold text-gold font-sans">
-                              {msg.investmentCard.returnRate}
-                            </Text>
-                          </View>
-                          {msg.investmentCard.disclaimer && (
-                            <Text className="text-[10px] text-text-muted font-sans mt-2 italic">
-                              {msg.investmentCard.disclaimer}
-                            </Text>
-                          )}
-                        </View>
+                      {msg.disclaimer && (
+                        <Text className="text-[10px] text-text-muted font-sans mt-2 italic">
+                          {msg.disclaimer}
+                        </Text>
                       )}
 
                       {/* Retry Button if error */}
@@ -408,7 +398,7 @@ export const ChatScreen = () => {
           placeholder={
             activeMode === "coach"
               ? "Ask coach anything about your savings..."
-              : "Ask advisor about investments..."
+              : "Ask a money-basics question..."
           }
           placeholderTextColor="#707773"
           className="flex-1 bg-cream border border-border rounded-2xl px-4 py-2.5 text-xs text-text-primary font-sans mr-2 min-h-[44px]"

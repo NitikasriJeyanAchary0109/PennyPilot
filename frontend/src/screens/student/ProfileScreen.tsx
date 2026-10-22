@@ -4,8 +4,6 @@ import {
   User,
   Bell,
   PieChart,
-  Shield,
-  HelpCircle,
   LogOut,
   ChevronRight,
 } from "lucide-react-native";
@@ -153,7 +151,7 @@ export const ProfileScreen = () => {
             navigation.navigate("Budgets");
           }}
           activeOpacity={0.7}
-          className="flex-row items-center justify-between p-3.5 border-b border-border/50 min-h-[50px]"
+          className="flex-row items-center justify-between p-3.5 min-h-[50px]"
           accessibilityRole="button"
           accessibilityLabel="Budgets and Spending Limits"
         >
@@ -168,43 +166,6 @@ export const ProfileScreen = () => {
           <ChevronRight size={18} color="#707773" />
         </TouchableOpacity>
 
-        {/* Security & Password */}
-        <TouchableOpacity
-          onPress={triggerHaptic}
-          activeOpacity={0.7}
-          className="flex-row items-center justify-between p-3.5 border-b border-border/50 min-h-[50px]"
-          accessibilityRole="button"
-          accessibilityLabel="Security and Privacy"
-        >
-          <View className="flex-row items-center">
-            <View className="w-8 h-8 rounded-full bg-sage-light items-center justify-center mr-3">
-              <Shield size={16} color="#144a32" />
-            </View>
-            <Text className="text-sm font-semibold text-text-primary font-sans">
-              Security & Privacy
-            </Text>
-          </View>
-          <ChevronRight size={18} color="#707773" />
-        </TouchableOpacity>
-
-        {/* Help & Support */}
-        <TouchableOpacity
-          onPress={triggerHaptic}
-          activeOpacity={0.7}
-          className="flex-row items-center justify-between p-3.5 min-h-[50px]"
-          accessibilityRole="button"
-          accessibilityLabel="Help and Support"
-        >
-          <View className="flex-row items-center">
-            <View className="w-8 h-8 rounded-full bg-sage-light items-center justify-center mr-3">
-              <HelpCircle size={16} color="#144a32" />
-            </View>
-            <Text className="text-sm font-semibold text-text-primary font-sans">
-              Help & FAQ
-            </Text>
-          </View>
-          <ChevronRight size={18} color="#707773" />
-        </TouchableOpacity>
       </Card>
 
       {/* Logout Row */}

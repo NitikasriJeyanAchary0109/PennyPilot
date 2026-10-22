@@ -10,6 +10,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Budgets track the *current* period, so fixtures are built relative to now.
+_NOW = datetime.datetime.utcnow().replace(microsecond=0)
+_MONTH_START = _NOW.replace(day=1, hour=0, minute=0, second=0)
+
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_budgets.db"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
@@ -88,7 +92,7 @@ def test_create_and_list_budgets_with_spending_summary():
             "category": "Food",
             "limit_amount": "100.00",
             "period": "monthly",
-            "start_date": "2026-08-01T00:00:00",
+            "start_date": _MONTH_START.isoformat(),
         },
     )
     assert response.status_code == 201
@@ -105,7 +109,7 @@ def test_create_and_list_budgets_with_spending_summary():
         category="Food",
         merchant="Cafe",
         type="debit",
-        transaction_date=datetime.datetime(2026, 8, 2, 10, 0, 0),
+        transaction_date=_NOW,
         is_deleted=False,
     )
     db.add(tx)
@@ -127,7 +131,7 @@ def test_duplicate_active_budget_returns_conflict():
             "category": "Travel",
             "limit_amount": "50.00",
             "period": "weekly",
-            "start_date": "2026-08-01T00:00:00",
+            "start_date": _MONTH_START.isoformat(),
         },
     )
     assert first.status_code == 201
@@ -138,7 +142,7 @@ def test_duplicate_active_budget_returns_conflict():
             "category": "Travel",
             "limit_amount": "70.00",
             "period": "weekly",
-            "start_date": "2026-08-01T00:00:00",
+            "start_date": _MONTH_START.isoformat(),
         },
     )
     assert duplicate.status_code == 409
@@ -151,7 +155,7 @@ def test_get_single_budget_and_update_and_delete_soft_delete():
             "category": "Groceries",
             "limit_amount": "120.00",
             "period": "monthly",
-            "start_date": "2026-08-01T00:00:00",
+            "start_date": _MONTH_START.isoformat(),
         },
     )
     budget_id = create_response.json()["id"]
@@ -163,7 +167,7 @@ def test_get_single_budget_and_update_and_delete_soft_delete():
         category="Groceries",
         merchant="Whole Foods",
         type="debit",
-        transaction_date=datetime.datetime(2026, 8, 5, 9, 0, 0),
+        transaction_date=_NOW,
         is_deleted=False,
     )
     db.add(tx)

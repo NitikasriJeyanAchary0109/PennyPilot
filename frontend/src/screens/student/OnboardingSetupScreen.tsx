@@ -1,13 +1,22 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
+import { View, Text, Image, TouchableOpacity, Alert } from "react-native";
 import { TrendingUp, Coins, Target, ArrowRight } from "lucide-react-native";
 import { useAuth } from "../../hooks/useAuth";
+import { getErrorMessage } from "../../services/api";
 import { ScreenContainer } from "../../components/ui/ScreenContainer";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 
 export default function OnboardingSetupScreen({ navigation }: { navigation: any }) {
   const { completeOnboarding } = useAuth();
+
+  const handleSkip = async () => {
+    try {
+      await completeOnboarding();
+    } catch (e: any) {
+      Alert.alert("Couldn't continue", getErrorMessage(e, "Please try again."));
+    }
+  };
 
   return (
     <ScreenContainer scrollable={true} className="justify-between py-6">
@@ -93,7 +102,7 @@ export default function OnboardingSetupScreen({ navigation }: { navigation: any 
         />
 
         <TouchableOpacity
-          onPress={completeOnboarding}
+          onPress={handleSkip}
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
           className="items-center justify-center min-h-[44px] mt-1"

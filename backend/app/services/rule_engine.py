@@ -491,7 +491,7 @@ def apply_roundup_if_eligible(
     db,
     transaction,
     goal,
-    checking_balance: Decimal,
+    checking_balance: Optional[Decimal],
     threshold: Decimal = DEFAULT_ROUNDUP_THRESHOLD,
 ) -> dict:
     """
@@ -507,7 +507,10 @@ def apply_roundup_if_eligible(
         transaction:      ORM Transaction object (must have .amount, .user_id,
                           .description, .merchant attributes).
         goal:             ORM Goal object (must have .saved mutable attribute).
-        checking_balance: Current account balance for eligibility check.
+        checking_balance: Current account balance for the eligibility check, or
+                          None when the balance is unknown (the student has not
+                          recorded any income) — the safety check is then skipped
+                          rather than judged against an invented number.
         threshold:        Minimum safe balance before roundup is paused.
 
     Returns:
@@ -525,7 +528,9 @@ def apply_roundup_if_eligible(
             "roundup_amount": Decimal("0.00"),
         }
 
-    if not is_eligible_for_roundup(checking_balance, threshold):
+    if checking_balance is not None and not is_eligible_for_roundup(
+        checking_balance, threshold
+    ):
         return {
             "success": False,
             "reason": (

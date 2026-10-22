@@ -10,7 +10,9 @@ def parse_transactions_csv(csv_bytes: bytes) -> Dict[str, Any]:
     """
     Parses a bank statement CSV upload using Pandas.
     Cleans, normalizes headers, ensures standard columns, and handles data conversion.
-    Expected columns: amount, category, description, transaction_date, source (optional)
+    Expected columns: amount, category, description; optional: transaction_date
+    (or "date"), type ("debit" default / "credit"), source.
+    Amounts must be positive; use the type column to mark money coming in.
     Tracks individual row validation failures and reports them in a structured format.
     """
     csv_file = io.BytesIO(csv_bytes)
@@ -21,6 +23,9 @@ def parse_transactions_csv(csv_bytes: bytes) -> Dict[str, Any]:
 
     # Normalize column headers (strip spaces, make lowercase)
     df.columns = [col.strip().lower() for col in df.columns]
+    # Accept the common bank-statement header "date" for transaction_date
+    if "transaction_date" not in df.columns and "date" in df.columns:
+        df = df.rename(columns={"date": "transaction_date"})
 
     # Required columns check
     required_cols = {"amount", "category", "description"}
@@ -54,6 +59,8 @@ def parse_transactions_csv(csv_bytes: bytes) -> Dict[str, Any]:
                     .strip()
                 )
                 amount = Decimal(amount_str)
+                if not amount.is_finite():
+                    raise InvalidOperation
                 if amount <= 0:
                     row_errors.append(
                         {
@@ -111,9 +118,27 @@ def parse_transactions_csv(csv_bytes: bytes) -> Dict[str, Any]:
             continue
 
         # Valid row
-        source = str(row.get("source", "checking")).strip()
-        if pd.isna(source) or not source:
+        raw_source = row.get("source")
+        source = "checking" if pd.isna(raw_source) else str(raw_source).strip()
+        if not source:
             source = "checking"
+
+        raw_type = row.get("type")
+        tx_type = (
+            "debit"
+            if pd.isna(raw_type) or not str(raw_type).strip()
+            else str(raw_type).strip().lower()
+        )
+        if tx_type not in {"debit", "credit"}:
+            errors.append(
+                {
+                    "row": row_num,
+                    "column": "type",
+                    "error": f"Type must be 'debit' or 'credit', got: {raw_type}",
+                }
+            )
+            failed_count += 1
+            continue
 
         imported.append(
             {
@@ -122,6 +147,7 @@ def parse_transactions_csv(csv_bytes: bytes) -> Dict[str, Any]:
                 "description": description,
                 "transaction_date": transaction_date,
                 "source": source,
+                "type": tx_type,
             }
         )
 

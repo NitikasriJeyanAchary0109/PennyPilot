@@ -57,9 +57,6 @@ def override_require_student():
         db.close()
 
 
-
-
-
 client = TestClient(app)
 
 
@@ -97,20 +94,87 @@ def setup_database():
     yield
 
 
-def test_auth_google():
-    # Test POST /api/auth/google
-    response = client.post(
-        "/api/auth/google",
-        json={
-            "email": "googleuser@test.com",
-            "full_name": "Google User",
-            "oauth_id": "123456789",
-        },
-    )
+def test_auth_google_verifies_token_with_google():
+    from unittest.mock import patch
+
+    claims = {
+        "email": "GoogleUser@Test.com",
+        "sub": "123456789",
+        "name": "Google User",
+    }
+    with patch("app.routers.auth.verify_google_id_token", return_value=claims):
+        response = client.post(
+            "/api/auth/google",
+            # The body's identity fields (if any) must be ignored: only the
+            # verified token decides who is signing in.
+            json={"id_token": "x" * 20, "email": "victim@test.com"},
+        )
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
     assert data["role"] == "student"
+
+    me = client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {data['access_token']}"}
+    )
+    assert me.json()["email"] == "googleuser@test.com"
+
+
+def test_auth_google_rejects_unverified_identity_claims():
+    # The old contract (email + oauth_id in the body, no token) was an
+    # account-takeover hole and must no longer work.
+    response = client.post(
+        "/api/auth/google",
+        json={
+            "email": "victim@test.com",
+            "full_name": "Victim",
+            "oauth_id": "123456789",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_auth_google_invalid_token_is_401(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(
+        settings, "GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com"
+    )
+
+    class FakeResponse:
+        status_code = 400
+
+        def json(self):
+            return {"error": "invalid_token"}
+
+    monkeypatch.setattr(
+        "app.services.google_auth.httpx.get", lambda *a, **k: FakeResponse()
+    )
+    response = client.post("/api/auth/google", json={"id_token": "bad" * 10})
+    assert response.status_code == 401
+
+
+def test_auth_google_wrong_audience_is_401(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "mine.apps.googleusercontent.com")
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "aud": "someone-elses-app",
+                "email": "a@b.com",
+                "email_verified": "true",
+                "sub": "1",
+            }
+
+    monkeypatch.setattr(
+        "app.services.google_auth.httpx.get", lambda *a, **k: FakeResponse()
+    )
+    response = client.post("/api/auth/google", json={"id_token": "tok" * 10})
+    assert response.status_code == 401
 
 
 def test_google_callback_html_onboarding_states():
@@ -303,9 +367,6 @@ def test_notifications():
     response = client.patch(f"/api/notifications/{notif_id}/read")
     assert response.status_code == 200
     assert response.json()["status"] == "read"
-
-
-
 
 
 def test_legacy_bcrypt_hash_backward_compatibility():

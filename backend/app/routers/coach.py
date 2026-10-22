@@ -125,7 +125,11 @@ def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
     # --- Active goals ---
     goal_rows = (
         db.query(Goal)
-        .filter(Goal.user_id == user_id, Goal.status == "active")
+        .filter(
+            Goal.user_id == user_id,
+            Goal.status == "active",
+            Goal.is_deleted == False,
+        )
         .limit(_MAX_GOALS)
         .all()
     )
@@ -148,7 +152,7 @@ def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
     budgets: list = []
     from decimal import Decimal
 
-    from app.routers.budgets import calculate_spent_amount
+    from app.services.ledger import calculate_spent_amount
     from app.services.rule_engine import budget_status as _budget_status
 
     for b in budget_rows:
@@ -297,10 +301,16 @@ async def get_chat_history(
         page_size,
     )
 
+    # Dream-engine forecasts are cached in this table too; they are not chat
+    # turns, so keep them out of the conversation history.
     base_query = (
         db.query(ChatHistory)
-        .filter(ChatHistory.user_id == current_user.user_id)
-        .order_by(ChatHistory.created_at.desc())
+        .filter(
+            ChatHistory.user_id == current_user.user_id,
+            ~ChatHistory.question.like("dream_engine:%"),
+            ~ChatHistory.question.like("Dream Engine Forecast:%"),
+        )
+        .order_by(ChatHistory.created_at.desc(), ChatHistory.chat_id.desc())
     )
 
     total = base_query.count()

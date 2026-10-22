@@ -1,12 +1,25 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
 from app.database import get_db
 from app.middleware.auth_middleware import require_student
 from app.models.models import AuditLog, Goal, Savings, User
-from app.schemas.schemas import GoalCreate, GoalDetailResponse, GoalResponse, GoalUpdate
-from app.services.rule_engine import goal_forecast, savings_velocity
+from app.schemas.schemas import (
+    GoalCreate,
+    GoalDetailResponse,
+    GoalListItem,
+    GoalResponse,
+    GoalUpdate,
+    GoalWithdrawRequest,
+    GoalWithdrawResponse,
+)
+from app.services.ledger import notify, recent_savings_amounts, sync_goal_status
+from app.services.rule_engine import (
+    GOAL_UNREACHABLE_DATE,
+    goal_forecast,
+    savings_velocity,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -14,7 +27,23 @@ from sqlalchemy.orm import Session
 router = APIRouter(prefix="/goals", tags=["Goals"])
 
 
-@router.get("/", response_model=List[GoalResponse])
+def _progress_percentage(goal: Goal) -> float:
+    target = Decimal(str(goal.target_amount))
+    if target <= 0:
+        return 0.0
+    pct = float((Decimal(str(goal.current_amount)) / target) * 100)
+    return max(min(pct, 100.0), 0.0)
+
+
+def _forecast_or_none(target: Decimal, current: Decimal, velocity: Decimal):
+    """Projected completion date, or None when it can't be predicted."""
+    projected = goal_forecast(target, current, velocity)
+    if projected is None or projected >= GOAL_UNREACHABLE_DATE:
+        return None
+    return projected
+
+
+@router.get("/", response_model=List[GoalListItem])
 def get_goals(
     status: Optional[str] = Query(
         None, description="Filter by status (active/completed/abandoned)"
@@ -28,7 +57,14 @@ def get_goals(
     )
     if status:
         query = query.filter(Goal.status == status)
-    return query.all()
+    goals = query.order_by(Goal.created_at.asc(), Goal.id.asc()).all()
+    return [
+        {
+            **GoalResponse.model_validate(g).model_dump(),
+            "progress_percentage": _progress_percentage(g),
+        }
+        for g in goals
+    ]
 
 
 @router.post("/", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
@@ -78,25 +114,12 @@ def create_goal(
 
 def compute_goal_details(goal: Goal, db: Session) -> dict:
     """Helper to compute progress and projection."""
-    # Progress percentage
-    if goal.target_amount > 0:
-        pct = float((goal.current_amount / goal.target_amount) * 100)
-        progress_percentage = min(pct, 100.0)
-    else:
-        progress_percentage = 0.0
-
-    # Projected completion date
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    past_savings = (
-        db.query(Savings.amount)
-        .filter(Savings.goal_id == goal.id, Savings.created_at >= thirty_days_ago)
-        .all()
+    velocity = savings_velocity(
+        recent_savings_amounts(db, goal.user_id, 30, goal_id=goal.id), 30
     )
-
-    savings_list = [s[0] for s in past_savings]
-    velocity = savings_velocity(savings_list, 30)
-
-    projected_date = goal_forecast(goal.target_amount, goal.current_amount, velocity)
+    projected_date = _forecast_or_none(
+        Decimal(str(goal.target_amount)), Decimal(str(goal.current_amount)), velocity
+    )
 
     return {
         "id": goal.id,
@@ -108,8 +131,8 @@ def compute_goal_details(goal: Goal, db: Session) -> dict:
         "status": goal.status,
         "created_at": goal.created_at,
         "is_deleted": goal.is_deleted,
-        "progress_percentage": progress_percentage,
-        "projected_completion_date": projected_date if projected_date else None,
+        "progress_percentage": _progress_percentage(goal),
+        "projected_completion_date": projected_date,
     }
 
 
@@ -178,6 +201,7 @@ def update_goal(
     for key, value in update_data.items():
         setattr(goal, key, value)
 
+    sync_goal_status(db, goal)
     db.commit()
     db.refresh(goal)
 
@@ -256,6 +280,90 @@ def delete_goal(
     return None
 
 
+@router.post("/{goal_id}/withdraw", response_model=GoalWithdrawResponse)
+def withdraw_from_goal(
+    goal_id: int,
+    payload: GoalWithdrawRequest,
+    current_user: User = Depends(require_student),
+    db: Session = Depends(get_db),
+):
+    """
+    Release money from a goal's saved balance.
+
+    This updates Penny Pilot's records (goal balance + a negative ledger entry);
+    it does not move money in a bank account.
+    """
+    goal = (
+        db.query(Goal)
+        .filter(
+            Goal.id == goal_id,
+            Goal.user_id == current_user.user_id,
+            Goal.is_deleted == False,
+        )
+        .with_for_update()
+        .first()
+    )
+    if not goal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Savings goal not found."
+        )
+
+    balance = Decimal(str(goal.current_amount))
+    if payload.amount > balance:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You can withdraw at most ₹{balance:.2f} from this goal.",
+        )
+
+    goal.current_amount = balance - payload.amount
+    db.add(
+        Savings(
+            user_id=current_user.user_id,
+            goal_id=goal.id,
+            amount=-payload.amount,
+            source="withdrawal",
+            created_at=datetime.utcnow(),
+        )
+    )
+    sync_goal_status(db, goal)
+    db.add(
+        AuditLog(
+            user_id=current_user.user_id,
+            action="withdraw",
+            entity_type="goal",
+            entity_id=goal.id,
+            performed_by=f"user_{current_user.user_id}",
+            timestamp=datetime.utcnow(),
+            metadata_json={
+                "amount": float(payload.amount),
+                "reason": payload.reason,
+                "new_balance": float(goal.current_amount),
+            },
+        )
+    )
+    db.commit()
+    db.refresh(goal)
+
+    notify(
+        db,
+        current_user.user_id,
+        "withdrawal",
+        "Withdrawal recorded",
+        f"₹{payload.amount:.2f} was released from “{goal.title}”.",
+    )
+
+    return GoalWithdrawResponse(
+        success=True,
+        withdrawn=payload.amount,
+        remaining=Decimal(str(goal.current_amount)),
+        goal_status=goal.status,
+        message=(
+            f"₹{payload.amount:.2f} released from “{goal.title}”. "
+            "This is recorded in Penny Pilot; move the money in your bank yourself."
+        ),
+    )
+
+
 class GoalForecastResponse(BaseModel):
     goal_name: str
     target_amount: Decimal
@@ -298,20 +406,12 @@ async def get_goal_forecast(
             status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found."
         )
 
-    # 1. Fetch velocity (from last 30 days savings)
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    past_savings = (
-        db.query(Savings.amount)
-        .filter(Savings.goal_id == goal.id, Savings.created_at >= thirty_days_ago)
-        .all()
+    # 1. Fetch velocity (from last 30 days savings into this goal)
+    velocity = savings_velocity(
+        recent_savings_amounts(db, current_user.user_id, 30, goal_id=goal.id), 30
     )
 
-    from decimal import Decimal
-
-    savings_list = [Decimal(str(s[0])) for s in past_savings]
-    velocity = savings_velocity(savings_list, 30)
-
-    # 2. Get forecast date
+    # 2. Get forecast date (raw value, with sentinel, goes to the prompt builder)
     target = Decimal(str(goal.target_amount))
     current = Decimal(str(goal.current_amount))
     forecast_date = goal_forecast(target, current, velocity)
@@ -367,7 +467,11 @@ async def get_goal_forecast(
         goal_name=goal.title,
         target_amount=target,
         current_amount=current,
-        forecast_date=forecast_date,
+        forecast_date=(
+            None
+            if forecast_date is None or forecast_date >= GOAL_UNREACHABLE_DATE
+            else forecast_date
+        ),
         velocity=velocity,
         narrative=ai_forecast,
     )

@@ -1,11 +1,12 @@
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List
+from typing import List, Optional
 
 from app.database import get_db
 from app.middleware.auth_middleware import require_student
 from app.models.models import Savings, User
 from app.schemas.schemas import SavingsResponse
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -33,22 +34,27 @@ def get_roundup_history(
 
 @router.get("/stats", response_model=dict)
 def get_roundup_stats(
-    current_user: User = Depends(require_student), db: Session = Depends(get_db)
+    since_days: Optional[int] = Query(
+        None, ge=1, le=3650, description="Only count round-ups from the last N days"
+    ),
+    current_user: User = Depends(require_student),
+    db: Session = Depends(get_db),
 ):
     """
     Returns total accumulated savings and count of round-up triggers for the student.
     """
-    stats = (
-        db.query(
-            func.sum(Savings.amount).label("total_saved"),
-            func.count(Savings.id).label("count_transactions"),
-        )
-        .filter(
-            Savings.user_id == current_user.user_id,
-            Savings.source == "round_up",
-        )
-        .first()
+    query = db.query(
+        func.sum(Savings.amount).label("total_saved"),
+        func.count(Savings.id).label("count_transactions"),
+    ).filter(
+        Savings.user_id == current_user.user_id,
+        Savings.source == "round_up",
     )
+    if since_days:
+        query = query.filter(
+            Savings.created_at >= datetime.utcnow() - timedelta(days=since_days)
+        )
+    stats = query.first()
 
     total_saved = (
         stats.total_saved if stats.total_saved is not None else Decimal("0.00")

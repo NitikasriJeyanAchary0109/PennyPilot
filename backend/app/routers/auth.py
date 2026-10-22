@@ -5,12 +5,14 @@ from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.models import SecurityEvent, User, UserSession
 from app.schemas.schemas import Token, UserCreate, UserLogin, UserResponse
+from app.services.google_auth import verify_google_id_token
 from app.utils.security import create_access_token, get_password_hash, verify_password
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -24,6 +26,13 @@ oauth.register(
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"},
 )
+
+
+def _find_user_by_email(db: Session, email: str):
+    """Case-insensitive email lookup."""
+    return (
+        db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
+    )
 
 
 def log_login_session(db: Session, user: User, request: Request) -> UserSession:
@@ -60,8 +69,14 @@ def log_login_session(db: Session, user: User, request: Request) -> UserSession:
 )
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Registers a new student user (email/password)."""
+    if not user_data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A password is required to create an account.",
+        )
+
     # Check if user already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    existing_user = _find_user_by_email(db, user_data.email)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -69,10 +84,10 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         )
 
     # Hash password and create user with student role
-    hashed_pwd = get_password_hash(user_data.password) if user_data.password else None
+    hashed_pwd = get_password_hash(user_data.password)
     new_user = User(
         full_name=user_data.full_name,
-        email=user_data.email,
+        email=user_data.email.strip().lower(),
         password_hash=hashed_pwd,
         phone=user_data.phone,
         role="student",
@@ -93,7 +108,7 @@ def login_for_access_token(
     db: Session = Depends(get_db),
 ):
     """OAuth2 compatible token login, returns access_token."""
-    user = db.query(User).filter(User.email == form_data.username).first()
+    user = _find_user_by_email(db, form_data.username)
     if (
         not user
         or not user.password_hash
@@ -122,7 +137,7 @@ def login_for_access_token(
 @router.post("/login/json", response_model=Token)
 def login_json(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """JSON-body login endpoint for easy API clients (like mobile axios)."""
-    user = db.query(User).filter(User.email == user_data.email).first()
+    user = _find_user_by_email(db, user_data.email)
     if (
         not user
         or not user.password_hash
@@ -190,14 +205,19 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Google account must have an email address.",
         )
+    if user_info.get("email_verified") is False:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your Google account email is not verified.",
+        )
 
     # Check if user already exists
-    user = db.query(User).filter(User.email == email).first()
+    user = _find_user_by_email(db, email)
     if not user:
         # Create a new student user
         user = User(
             full_name=full_name,
-            email=email,
+            email=email.strip().lower(),
             password_hash=None,  # No password for OAuth users
             role="student",  # Default signup role
             created_at=datetime.datetime.utcnow(),
@@ -248,24 +268,26 @@ def read_users_me(current_user: User = Depends(get_current_user)):
 
 
 class GoogleAuthRequest(BaseModel):
-    email: str
-    full_name: str
-    oauth_id: str
+    id_token: str = Field(min_length=10)
 
 
 @router.post("/google", response_model=Token)
 def google_auth_post(
     request: Request, auth_data: GoogleAuthRequest, db: Session = Depends(get_db)
 ):
-    """Exchanges Google OAuth profile data for a backend JWT token."""
-    email = auth_data.email
-    full_name = auth_data.full_name
-    oauth_id = auth_data.oauth_id
+    """
+    Exchanges a Google ID token for a backend JWT.
 
-    # Check if user already exists
-    user = db.query(User).filter(User.email == email).first()
+    The token is verified with Google first; the email / subject used to find or
+    create the account come from Google's response, never from the client body.
+    """
+    claims = verify_google_id_token(auth_data.id_token)
+    email = claims["email"].strip().lower()
+    full_name = claims.get("name") or email.split("@")[0]
+    oauth_id = claims["sub"]
+
+    user = _find_user_by_email(db, email)
     if not user:
-        # Create a new student user
         user = User(
             full_name=full_name,
             email=email,
@@ -279,18 +301,14 @@ def google_auth_post(
         db.add(user)
         db.commit()
         db.refresh(user)
-    else:
-        # Update oauth details if not set
-        if not user.oauth_provider:
-            user.oauth_provider = "google"
-            user.oauth_id = oauth_id
-            db.commit()
-            db.refresh(user)
+    elif not user.oauth_provider:
+        user.oauth_provider = "google"
+        user.oauth_id = oauth_id
+        db.commit()
+        db.refresh(user)
 
-    # Log session and event
     log_login_session(db, user, request)
 
-    # Generate access token
     access_token = create_access_token(
         data={"sub": user.email, "role": user.role, "user_id": user.user_id}
     )

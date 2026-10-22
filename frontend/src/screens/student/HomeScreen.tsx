@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TouchableOpacity, Alert, TextInput } from "react-native";
 import { ShoppingCart, ChevronRight, ArrowRight } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "../../hooks/useAuth";
 import { useIsFocused } from "@react-navigation/native";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
 import {
   ScreenContainer,
   Header,
@@ -18,8 +18,13 @@ import {
   PottedPlantIcon,
 } from "../../components/ui";
 import { Transaction } from "../../types";
+import { DEFAULT_CATEGORIES } from "../../constants/categories";
 
-const DEFAULT_CATEGORIES = ["Food", "Education", "Transport", "Shopping", "More"];
+const greetingForHour = (hour: number): string => {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+};
 
 export const HomeScreen = ({ navigation }: { navigation: any }) => {
   const { logout } = useAuth();
@@ -34,7 +39,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
   };
 
   // User info state
-  const [userName, setUserName] = useState<string>("Student");
+  const [userName, setUserName] = useState<string>("");
 
   // Loading & refresh states
   const [loading, setLoading] = useState(true);
@@ -51,6 +56,8 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
     progress_percentage?: number;
   } | null>(null);
   const [goalsLoading, setGoalsLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Transactions state
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -59,7 +66,9 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Food");
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [customCategory, setCustomCategory] = useState("");
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [budgetCategories, setBudgetCategories] = useState<string[]>([]);
   const [logLoading, setLogLoading] = useState(false);
 
   // Roundup alert modal / banner state
@@ -68,6 +77,9 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
     newGoalAmount?: number;
     explanation?: string;
   } | null>(null);
+
+  // Quick-pick categories: the defaults plus any the student has budgeted.
+  const categories = Array.from(new Set([...DEFAULT_CATEGORIES, ...budgetCategories]));
 
   // Load user profile name
   const loadUser = useCallback(async () => {
@@ -78,95 +90,77 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
         setUserName(firstName);
       }
     } catch {
-      // Fallback to default
+      // Name stays blank; the greeting simply omits it
     }
   }, []);
 
-  // Load stats, goals, transactions & categories from backend
+  // Load stats, goals, transactions, categories & unread count from backend.
+  // Each piece loads independently so one failure doesn't blank the dashboard.
   const loadDashboardData = useCallback(async () => {
-    try {
-      setLoading(true);
+    setLoading(true);
+    setGoalsLoading(true);
+    const [stats, goalsList, txs, budgets, notifications] = await Promise.allSettled([
+      apiService.getRoundupStats(),
+      apiService.getGoals(),
+      apiService.getTransactions({ limit: 5 }),
+      apiService.getBudgets(),
+      apiService.getNotifications(),
+    ]);
 
-      // 1. Fetch round-up stats from backend
-      try {
-        const stats = await apiService.getRoundupStats();
-        if (stats && stats.total_saved !== undefined) {
-          setTotalSaved(Number(stats.total_saved));
-          setRoundupCount(Number(stats.roundup_transactions_count || 0));
-        } else {
-          setTotalSaved(0);
-          setRoundupCount(0);
-        }
-      } catch (err) {
-        console.warn("Failed to load roundup stats:", err);
-        setTotalSaved(0);
-        setRoundupCount(0);
-      }
+    let failures = 0;
 
-      // 2. Fetch goals from backend (zero client-side math)
-      setGoalsLoading(true);
-      try {
-        const goalsList = await apiService.getGoals();
-        if (Array.isArray(goalsList) && goalsList.length > 0) {
-          const firstGoal = goalsList[0];
-          // Retrieve detailed goal including backend-calculated progress_percentage
-          try {
-            const detail = await apiService.getGoalById(firstGoal.goal_id);
-            setActiveGoal({
-              goal_id: detail.goal_id,
-              goal_name: detail.goal_name,
-              saved: detail.saved,
-              target: detail.target,
-              progress_percentage: detail.progress_percentage,
-            });
-          } catch {
-            setActiveGoal({
-              goal_id: firstGoal.goal_id,
-              goal_name: firstGoal.goal_name,
-              saved: firstGoal.saved,
-              target: firstGoal.target,
-            });
-          }
-        } else {
-          setActiveGoal(null);
-        }
-      } catch (err) {
-        console.warn("Failed to load goals:", err);
-      } finally {
-        setGoalsLoading(false);
-      }
-
-      // 3. Fetch recent transactions
-      try {
-        const txs = await apiService.getTransactions();
-        if (Array.isArray(txs)) {
-          setTransactions(txs.slice(0, 5));
-        }
-      } catch (err) {
-        console.warn("Failed to load transactions:", err);
-      }
-
-      // 4. Fetch dynamic categories from user's budgets if available
-      try {
-        const budgets = await apiService.getBudgets();
-        if (Array.isArray(budgets) && budgets.length > 0) {
-          const uniqueCats = Array.from(new Set(budgets.map((b: any) => b.category)));
-          if (uniqueCats.length > 0) {
-            setCategories(uniqueCats);
-            if (!uniqueCats.includes(category)) {
-              setCategory(uniqueCats[0]);
-            }
-          }
-        }
-      } catch {
-        // Keep DEFAULT_CATEGORIES
-      }
-    } catch (e: any) {
-      console.warn("Failed to load dashboard data:", e?.message);
-    } finally {
-      setLoading(false);
+    if (stats.status === "fulfilled") {
+      setTotalSaved(Number(stats.value.total_saved) || 0);
+      setRoundupCount(Number(stats.value.roundup_transactions_count) || 0);
+    } else {
+      failures += 1;
     }
-  }, [category]);
+
+    if (goalsList.status === "fulfilled") {
+      const goals = goalsList.value as any[];
+      // Round-ups go to the oldest active goal — the list is oldest-first.
+      const goal = goals.find((g) => g.status === "active") || goals[0];
+      setActiveGoal(
+        goal
+          ? {
+              goal_id: goal.goal_id,
+              goal_name: goal.goal_name,
+              saved: goal.saved,
+              target: goal.target,
+              progress_percentage: goal.progress_percentage,
+            }
+          : null
+      );
+    } else {
+      failures += 1;
+    }
+
+    if (txs.status === "fulfilled") {
+      setTransactions(txs.value as Transaction[]);
+    } else {
+      failures += 1;
+    }
+
+    if (budgets.status === "fulfilled") {
+      setBudgetCategories(
+        Array.from(new Set((budgets.value as any[]).map((b) => b.category)))
+      );
+    }
+
+    if (notifications.status === "fulfilled") {
+      setUnreadCount(
+        (notifications.value as any[]).filter((n) => n.status !== "read").length
+      );
+    }
+
+    setLoadError(
+      failures > 0
+        ? "Some of your data couldn't be loaded. Pull down to refresh."
+        : null
+    );
+    setLoading(false);
+    setGoalsLoading(false);
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -176,17 +170,16 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
 
   useEffect(() => {
     loadUser();
-    loadDashboardData();
-  }, [loadUser, loadDashboardData]);
+  }, [loadUser]);
 
-  // Refetch when returning to screen
+  // Load on mount and refetch whenever the screen regains focus
   useEffect(() => {
     if (isFocused) {
       loadDashboardData();
     }
   }, [isFocused, loadDashboardData]);
 
-  // Handle transaction simulation & backend round-up calculation
+  // Log a purchase; the backend computes the round-up
   const handleLogTransaction = async () => {
     if (!desc.trim()) {
       Alert.alert("Missing description", "Please enter a store or item name.");
@@ -225,8 +218,11 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
         });
       } else {
         Alert.alert(
-          "Transaction Logged",
-          "Transaction logged successfully. No round-up was applied to this purchase."
+          "Purchase logged",
+          response.roundup_details?.reason ||
+            (activeGoal
+              ? "No round-up was applied to this purchase."
+              : "Set a savings goal to start rounding up your purchases.")
         );
       }
 
@@ -237,7 +233,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
       // Refresh stats from backend to update totals without client-side calculation
       await loadDashboardData();
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed to log transaction.");
+      Alert.alert("Couldn't log purchase", getErrorMessage(e, "Failed to log the purchase."));
     } finally {
       setLogLoading(false);
     }
@@ -260,14 +256,24 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
     >
       {/* Top Header with Brand and Notification Bell */}
       <Header
-        title={`Good morning, ${userName} 👋`}
-        subtitle="Micro-savings active"
+        title={`${greetingForHour(new Date().getHours())}${userName ? `, ${userName}` : ""} 👋`}
+        subtitle={
+          activeGoal
+            ? `Round-ups are going to “${activeGoal.goal_name}”`
+            : "Set a goal to start saving"
+        }
         showLogo
         showNotification
-        hasUnreadNotifications={true}
+        hasUnreadNotifications={unreadCount > 0}
         onNotificationPress={() => navigation.navigate("Notifications")}
         className="px-0 mb-2"
       />
+
+      {loadError && (
+        <Card variant="peach" padding="md" className="mb-3">
+          <Text className="text-xs text-text-secondary font-sans">{loadError}</Text>
+        </Card>
+      )}
 
       {/* Main Stats Card: Total Auto-Saved & Active Goal */}
       <Card variant="default" padding="none" className="mb-4 shadow-card-elevated">
@@ -287,8 +293,10 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
               )}
               <Text className="text-xs text-text-muted mt-1 font-sans">
                 {roundupCount !== null
-                  ? `From ${roundupCount} round-ups`
-                  : "Calculating round-ups..."}
+                  ? `From ${roundupCount} round-up${roundupCount === 1 ? "" : "s"}`
+                  : loading
+                  ? "Loading..."
+                  : "Unavailable"}
               </Text>
             </View>
 
@@ -432,10 +440,10 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
       <Card variant="default" padding="lg" className="mb-4 shadow-card">
         <View className="mb-3.5">
           <Text className="text-base font-bold text-text-primary font-sans">
-            Simulate card swipe / purchase
+            Log a purchase
           </Text>
           <Text className="text-xs text-text-muted mt-0.5">
-            Test how Penny Pilot rounds up your daily campus spending
+            Record something you spent and Penny Pilot rounds it up toward your goal
           </Text>
         </View>
 
@@ -462,28 +470,85 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
 
         {/* Dynamic Category Chips */}
         <View className="mb-4">
-          <Text className="text-xs font-semibold text-text-primary tracking-wide mb-2">
-            Category
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {categories.map((cat) => (
-              <Chip
-                key={cat}
-                label={cat}
-                category={cat}
-                selected={category === cat}
-                onPress={() => {
-                  triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                  setCategory(cat);
-                }}
-              />
-            ))}
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-xs font-semibold text-text-primary tracking-wide">
+              Category
+            </Text>
+            <View className="flex-row items-center bg-primary-tint/70 px-2.5 py-0.5 rounded-full">
+              <Text className="text-[10px] font-semibold text-primary font-sans">
+                ✍️ Or type custom category
+              </Text>
+            </View>
           </View>
+
+          <View className="flex-row flex-wrap gap-2">
+            {categories.map((cat) => {
+              const isSelected = !isCustomCategory && category === cat;
+              return (
+                <Chip
+                  key={cat}
+                  label={cat}
+                  category={cat}
+                  selected={isSelected}
+                  onPress={() => {
+                    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                    setIsCustomCategory(false);
+                    setCategory(cat);
+                  }}
+                />
+              );
+            })}
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setIsCustomCategory(true);
+                if (customCategory.trim()) {
+                  setCategory(customCategory.trim());
+                }
+              }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Add custom category"
+              className={`py-1.5 px-3 rounded-xl border flex-row items-center ${
+                isCustomCategory
+                  ? "bg-primary border-primary"
+                  : "bg-surface-cream border-border"
+              }`}
+            >
+              <Text
+                className={`text-xs font-sans ${
+                  isCustomCategory ? "text-white font-bold" : "text-text font-medium"
+                }`}
+              >
+                + Custom
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {isCustomCategory && (
+            <View className="mt-2.5 bg-surface-cream rounded-xl border border-primary/40 px-3.5 py-1">
+              <TextInput
+                placeholder="Type custom category (e.g. Gym, Books, Gaming)"
+                placeholderTextColor="#707773"
+                value={customCategory}
+                onChangeText={(text) => {
+                  setCustomCategory(text);
+                  setCategory(text.trim() || "Custom");
+                }}
+                className="font-sans text-xs text-text py-2"
+                autoFocus
+              />
+            </View>
+          )}
+
+          <Text className="text-[11px] text-text-muted font-sans mt-2">
+            💡 Tip: Select a quick preset above or tap + Custom to directly type any category.
+          </Text>
         </View>
 
         {/* Primary CTA */}
         <Button
-          title="Show round-up & new balance →"
+          title="Log purchase & round up →"
           variant="primary"
           onPress={handleLogTransaction}
           loading={logLoading}
@@ -522,7 +587,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
         ) : transactions.length === 0 ? (
           <View className="py-6 items-center justify-center">
             <Text className="text-xs text-text-muted italic text-center">
-              No recent swipes. Try logging a purchase above!
+              No transactions yet. Log a purchase above to get started.
             </Text>
           </View>
         ) : (

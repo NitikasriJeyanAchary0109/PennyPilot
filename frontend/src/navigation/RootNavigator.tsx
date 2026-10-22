@@ -33,6 +33,7 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const studentScreenOptions = {
+  headerShown: false,
   headerStyle: {
     backgroundColor: "#fbf7ee",
   },

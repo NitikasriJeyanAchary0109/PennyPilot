@@ -29,7 +29,7 @@ from __future__ import annotations
 import datetime
 import logging
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
@@ -37,20 +37,23 @@ from app.models.models import (
     AIRecommendation,
     Budget,
     Goal,
-    Savings,
+    Transaction,
     User,
 )
 from app.services.ai_engine import AIEngineError, call_llama
+from app.services.ledger import calculate_spent_amount, recent_savings_amounts
 from app.services.rule_engine import (
-    budget_status as compute_budget_status,
-)
-from app.services.rule_engine import (
+    GOAL_UNREACHABLE_DATE,
     goal_forecast,
     savings_velocity,
 )
-from app.utils.prompts import negotiator_prompt
+from app.services.rule_engine import (
+    budget_status as compute_budget_status,
+)
+from app.utils.prompts import negotiator_prompt, pause_subscription_prompt
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger("pennypilot.negotiator")
@@ -82,19 +85,75 @@ class EvaluateRequest(BaseModel):
         max_length=300,
         description="Item or merchant name, e.g. 'boAt Airdopes 141'.",
     )
+    kind: Literal["purchase", "pause"] = Field(
+        "purchase",
+        description=(
+            "'purchase' evaluates spending `price` once; 'pause' evaluates "
+            "redirecting a monthly subscription of `price` into savings."
+        ),
+    )
 
 
 class EvaluateResponse(BaseModel):
     """Response for POST /negotiator/evaluate."""
 
     advice: str = Field(..., description="LLM-generated purchase advice.")
-    budget_status: str = Field(..., description="'safe' | 'warning' | 'exceeded'")
+    budget_status: str = Field(
+        ..., description="'safe' | 'warning' | 'exceeded' | 'no_budget'"
+    )
     goal_impact: str = Field(..., description="Plain-text estimate of goal delay.")
+
+
+class SubscriptionItem(BaseModel):
+    id: str
+    name: str
+    merchant: str
+    amount: Decimal
+    billing_date: str
+    last_charged: datetime.date
+    category: str
+    pausable: bool = True
+    status: str = "active"
+    auto_tracked: bool = True
+    annual_cost: Decimal
+
+
+class SyncSubscriptionsResponse(BaseModel):
+    message: str
+    synced_count: int
+    subscriptions: list[SubscriptionItem]
+
+
+# Merchants recognised as subscriptions when they appear in the student's own
+# transactions. These are matchers only — no amounts or dates are assumed.
+KNOWN_SUBSCRIPTIONS = [
+    {"id": "sub-spotify", "name": "Spotify Premium", "merchant": "Spotify"},
+    {"id": "sub-amazon", "name": "Amazon Prime", "merchant": "Amazon Prime"},
+    {"id": "sub-netflix", "name": "Netflix", "merchant": "Netflix"},
+    {"id": "sub-youtube", "name": "YouTube Premium", "merchant": "YouTube"},
+    {"id": "sub-hotstar", "name": "Disney+ Hotstar", "merchant": "Hotstar"},
+]
 
 
 # ---------------------------------------------------------------------------
 # Helper — compute goal impact string (pure, called before AI)
 # ---------------------------------------------------------------------------
+
+
+def _primary_goal(user_id: int, db: Session) -> Optional[Goal]:
+    """The active goal with the highest saved amount (most progressed)."""
+    goals = (
+        db.query(Goal)
+        .filter(
+            Goal.user_id == user_id,
+            Goal.status == "active",
+            Goal.is_deleted == False,
+        )
+        .all()
+    )
+    if not goals:
+        return None
+    return max(goals, key=lambda g: Decimal(str(g.current_amount)))
 
 
 def _compute_goal_impact(
@@ -110,25 +169,12 @@ def _compute_goal_impact(
     or "no active goals set" — suitable for insertion directly into the prompt.
     """
     # Fetch primary goal (highest progress ratio — most emotionally salient)
-    goals = (
-        db.query(Goal).filter(Goal.user_id == user_id, Goal.status == "active").all()
-    )
-    if not goals:
+    primary_goal = _primary_goal(user_id, db)
+    if primary_goal is None:
         return "no active savings goals set"
 
-    # Pick the goal with the highest absolute saved amount
-    primary_goal: Goal = max(goals, key=lambda g: g.current_amount)
-
-    # Get last-30-days savings velocity
-    recent_savings_rows = (
-        db.query(Savings)
-        .filter(Savings.user_id == user_id)
-        .order_by(Savings.created_at.desc())
-        .limit(60)
-        .all()
-    )
-    past_amounts = [Decimal(str(s.amount)) for s in recent_savings_rows]
-    velocity = savings_velocity(past_amounts, period_days=30)
+    # Last-30-days savings velocity
+    velocity = savings_velocity(recent_savings_amounts(db, user_id, 30), 30)
 
     target = Decimal(str(primary_goal.target_amount))
     current = Decimal(str(primary_goal.current_amount))
@@ -175,35 +221,67 @@ def _compute_budget_status(
     category: str,
     user_id: int,
     db: Session,
+    include_price: bool = True,
 ) -> str:
     """
-    Look up the Budget row for this category for the user and compute status
-    including this hypothetical purchase.
+    Look up the Budget row for this category for the user and compute status,
+    including this hypothetical purchase when `include_price` is set.
 
-    Falls back to "safe" if no budget row exists for the category.
+    Returns "no_budget" when the student has no budget for the category — an
+    absent budget is not the same thing as a healthy one.
     """
     budget_row: Optional[Budget] = (
         db.query(Budget)
         .filter(
             Budget.user_id == user_id,
-            Budget.category == category,
+            func.lower(Budget.category) == category.strip().lower(),
             Budget.is_deleted == False,
         )
         .first()
     )
     if not budget_row:
-        return "safe"  # category not budgeted
+        return "no_budget"
 
-    from app.routers.budgets import calculate_spent_amount
-
-    # Simulate adding the purchase to current spend
     spent = calculate_spent_amount(
-        db, user_id, category, budget_row.period, budget_row.start_date
+        db, user_id, budget_row.category, budget_row.period, budget_row.start_date
     )
-    projected_spent = spent + price
+    projected_spent = spent + price if include_price else spent
     limit = Decimal(str(budget_row.limit_amount))
 
     return compute_budget_status(limit, projected_spent)
+
+
+def _compute_pause_impact(monthly_amount: Decimal, user_id: int, db: Session) -> str:
+    """
+    How much sooner the primary goal is reached if `monthly_amount` is
+    redirected into savings every month. Both dates come from rule_engine.
+    """
+    goal = _primary_goal(user_id, db)
+    if goal is None:
+        return "no active savings goals set, so there is no goal to speed up"
+
+    velocity = savings_velocity(recent_savings_amounts(db, user_id, 30), 30)
+    target = Decimal(str(goal.target_amount))
+    current = Decimal(str(goal.current_amount))
+
+    base_date = goal_forecast(target, current, velocity)
+    new_date = goal_forecast(target, current, velocity + monthly_amount)
+
+    if new_date is None or new_date >= GOAL_UNREACHABLE_DATE:
+        return f"'{goal.title}' goal still has no projected date"
+    if base_date is None or base_date >= GOAL_UNREACHABLE_DATE:
+        return (
+            f"'{goal.title}' goal currently has no projected date; redirecting "
+            f"₹{monthly_amount:.0f}/month would give it one: "
+            f"{new_date.strftime('%B %Y')}"
+        )
+    days_sooner = (base_date - new_date).days
+    if days_sooner <= 0:
+        return f"no meaningful change to the '{goal.title}' goal date"
+    return (
+        f"reaches '{goal.title}' goal about {days_sooner} day"
+        f"{'s' if days_sooner != 1 else ''} sooner"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -248,16 +326,18 @@ async def evaluate_purchase(
     )
 
     # ── 1 & 2: Rule Engine computations (no LLM) ──────────────────────────
+    is_pause = request.kind == "pause"
     bstatus = _compute_budget_status(
         price=request.price,
         category=request.category,
         user_id=uid,
         db=db,
+        include_price=not is_pause,
     )
-    gimpact = _compute_goal_impact(
-        price=request.price,
-        user_id=uid,
-        db=db,
+    gimpact = (
+        _compute_pause_impact(request.price, uid, db)
+        if is_pause
+        else _compute_goal_impact(price=request.price, user_id=uid, db=db)
     )
 
     logger.info(
@@ -268,7 +348,8 @@ async def evaluate_purchase(
     )
 
     # ── 3: Build prompt ───────────────────────────────────────────────────
-    prompt = negotiator_prompt(
+    prompt_builder = pause_subscription_prompt if is_pause else negotiator_prompt
+    prompt = prompt_builder(
         price=request.price,
         category=request.category,
         description=request.description,
@@ -306,6 +387,7 @@ async def evaluate_purchase(
         "description": request.description,
         "budget_status": bstatus,
         "goal_impact": gimpact,
+        "kind": request.kind,
     }
 
     # Find matching budget if exists
@@ -313,7 +395,7 @@ async def evaluate_purchase(
         db.query(Budget)
         .filter(
             Budget.user_id == uid,
-            Budget.category == request.category,
+            func.lower(Budget.category) == request.category.strip().lower(),
             Budget.is_deleted == False,
         )
         .first()
@@ -342,4 +424,119 @@ async def evaluate_purchase(
         advice=advice,
         budget_status=bstatus,
         goal_impact=gimpact,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Subscription detection (read-only, derived from the student's own transactions)
+# ---------------------------------------------------------------------------
+
+
+def _ordinal(day: int) -> str:
+    if 10 <= day % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
+def _detect_subscriptions(user_id: int, db: Session) -> list[SubscriptionItem]:
+    """
+    Subscriptions found in the student's transactions: charges from known
+    streaming / music merchants, plus anything categorised as a subscription.
+    One entry per merchant, using the most recent charge. Nothing is invented —
+    a student with no such transactions gets an empty list.
+    """
+    debits = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.is_deleted == False,
+            Transaction.type == "debit",
+        )
+        .order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+        .all()
+    )
+
+    found: dict[str, SubscriptionItem] = {}
+    for tx in debits:  # newest first → first hit per merchant is the latest charge
+        merchant_text = (tx.merchant or "").lower()
+        description_text = (tx.description or "").lower()
+        known = next(
+            (
+                k
+                for k in KNOWN_SUBSCRIPTIONS
+                if k["merchant"].lower() in merchant_text
+                or k["merchant"].lower() in description_text
+            ),
+            None,
+        )
+        category = (tx.category or "").lower()
+        looks_like_sub = "subscrip" in category or "streaming" in category
+
+        if known:
+            key, name, merchant = known["id"], known["name"], known["merchant"]
+        elif looks_like_sub:
+            merchant = (tx.merchant or tx.description or "Subscription").strip()
+            key, name = f"sub-{merchant.lower().replace(' ', '-')}", merchant
+        else:
+            continue
+
+        if key in found:
+            continue
+
+        amount = Decimal(str(tx.amount))
+        charged = tx.transaction_date
+        found[key] = SubscriptionItem(
+            id=key,
+            name=name,
+            merchant=merchant,
+            amount=amount,
+            billing_date=f"around the {_ordinal(charged.day)} of each month",
+            last_charged=charged.date(),
+            category=tx.category or "Subscriptions",
+            annual_cost=amount * 12,
+        )
+    return list(found.values())
+
+
+@router.get(
+    "/subscriptions",
+    response_model=list[SubscriptionItem],
+    status_code=status.HTTP_200_OK,
+    summary="List subscriptions found in your transactions",
+)
+def get_tracked_subscriptions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[SubscriptionItem]:
+    """Subscriptions detected from the student's own transaction history."""
+    return _detect_subscriptions(current_user.user_id, db)
+
+
+@router.post(
+    "/subscriptions/sync",
+    response_model=SyncSubscriptionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Re-scan transactions for subscriptions",
+)
+def sync_subscriptions_api(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SyncSubscriptionsResponse:
+    """
+    Re-scans the student's transactions for subscriptions. This is read-only:
+    there is no bank / UPI feed, so nothing is imported or created. To get more
+    subscriptions listed, log or import the charges as transactions.
+    """
+    subs = _detect_subscriptions(current_user.user_id, db)
+    if subs:
+        message = f"Found {len(subs)} subscription{'s' if len(subs) != 1 else ''} in your transactions."
+    else:
+        message = (
+            "No subscription charges found in your transactions yet. Log or "
+            "import them (e.g. a Netflix or Spotify payment) and they'll appear here."
+        )
+    return SyncSubscriptionsResponse(
+        message=message, synced_count=len(subs), subscriptions=subs
     )

@@ -63,3 +63,19 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+_INSECURE_JWT_SECRETS = {
+    "dev-secret-key",
+    "your_jwt_secret_key_minimum_32_characters_long_for_security",
+}
+
+
+def assert_production_ready(cfg: Settings = settings) -> None:
+    """Refuse to boot a production server with a guessable signing secret."""
+    if cfg.ENVIRONMENT.lower() != "production":
+        return
+    if cfg.JWT_SECRET in _INSECURE_JWT_SECRETS or len(cfg.JWT_SECRET) < 32:
+        raise RuntimeError(
+            "JWT_SECRET must be a unique random value of at least 32 characters "
+            "when ENVIRONMENT=production."
+        )

@@ -157,6 +157,7 @@ def negotiator_prompt(
         "safe": "their budget is currently healthy",
         "warning": "they are approaching their budget limit",
         "exceeded": "they have already exceeded their budget this period",
+        "no_budget": "they have not set a budget for this category",
     }.get(budget_status, f"budget status is {budget_status!r}")
 
     return (
@@ -168,6 +169,64 @@ def negotiator_prompt(
         "Should they make this purchase now, wait, or find an alternative? "
         "Be honest but kind. No moral lectures."
     )
+
+
+def pause_subscription_prompt(
+    price: Decimal,
+    category: str,
+    description: str,
+    budget_status: str,
+    goal_impact: str,
+) -> str:
+    """
+    Prompt for evaluating pausing a recurring subscription.
+
+    `price` is the monthly subscription cost; `goal_impact` is the precomputed
+    sentence describing how much sooner the goal is reached if that amount is
+    saved instead. The LLM only phrases advice around these supplied facts.
+    """
+    status_note = {
+        "safe": "their budget for this category is currently healthy",
+        "warning": "they are approaching their budget limit for this category",
+        "exceeded": "they have already exceeded their budget for this category",
+        "no_budget": "they have not set a budget for this category",
+    }.get(budget_status, f"budget status is {budget_status!r}")
+
+    return (
+        "You are Penny Pilot, a realistic and supportive financial friend "
+        "for a college student. Give practical, non-preachy advice in 2-3 sentences.\n\n"
+        f"The student is considering pausing: {description} ({category}) — "
+        f"₹{price:.2f} per month.\n"
+        f"Budget situation: {status_note}.\n"
+        f"If they save that amount instead: {goal_impact}\n\n"
+        "Is pausing worth it? Mention only the facts above. "
+        "Remind them pausing is done with the provider, not in this app."
+    )
+
+
+ADVISOR_DISCLAIMER = (
+    "General education only — not personalised investment advice. "
+    "Penny Pilot is not a licensed financial advisor."
+)
+
+
+def advisor_system_prompt() -> str:
+    """System-turn persona for the educational money-concepts assistant."""
+    return (
+        "You are Penny Pilot's money-basics tutor for college students. "
+        "Explain personal-finance concepts (saving, emergency funds, compounding, "
+        "index funds, risk) in plain language, in at most 4 sentences. "
+        "You are educational only: never recommend a specific fund, stock, coin or "
+        "product, never quote or promise returns, and never tell the student to buy "
+        "or sell anything. If asked for a recommendation, explain what they should "
+        "compare and suggest consulting a licensed advisor. "
+        "Do not do arithmetic or invent figures."
+    )
+
+
+def advisor_user_prompt(question: str) -> str:
+    """User-turn prompt for the educational assistant."""
+    return f"Student question: {question}"
 
 
 # ===========================================================================

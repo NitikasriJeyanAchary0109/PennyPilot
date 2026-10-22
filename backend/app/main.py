@@ -1,9 +1,11 @@
+import logging
 from contextlib import asynccontextmanager
 
 import uvicorn
-from app.config import settings
+from app.config import assert_production_ready, settings
 from app.database import Base, engine, get_db
 from app.routers import (
+    advisor,
     auth,
     budgets,
     calculations,
@@ -32,8 +34,11 @@ from starlette.middleware.sessions import SessionMiddleware
 # ==========================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure database tables exist
-    Base.metadata.create_all(bind=engine)
+    assert_production_ready()
+    # Production schemas are managed by Alembic; create_all is a dev/test
+    # convenience only (it would bypass migrations).
+    if settings.ENVIRONMENT.lower() != "production":
+        Base.metadata.create_all(bind=engine)
 
     yield
 
@@ -59,12 +64,13 @@ app.add_middleware(
 # ==========================
 # CORS
 # ==========================
+# Explicit origins come from ALLOWED_ORIGINS (comma-separated). "*" is not valid
+# together with credentials, so it is ignored; local dev origins are always
+# allowed through the regex below.
 origins = [
-    "http://localhost:8081",
-    "http://127.0.0.1:8081",
-    "http://localhost:19000",
-    "http://127.0.0.1:19000",
-    "http://localhost:19006",
+    o.strip()
+    for o in settings.ALLOWED_ORIGINS.split(",")
+    if o.strip() and o.strip() != "*"
 ]
 
 app.add_middleware(
@@ -80,14 +86,16 @@ app.add_middleware(
 # ==========================
 # Health Check
 # ==========================
+@app.get("/health")
 @app.get("/api/health")
 async def healthcheck(db: Session = Depends(get_db)):
     db_status = "healthy"
 
     try:
         db.execute(text("SELECT 1"))
-    except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
+    except Exception:
+        logging.getLogger("pennypilot.health").exception("database health check failed")
+        db_status = "unhealthy"
 
     return {
         "status": "online",
@@ -118,6 +126,7 @@ app.include_router(coach.router, prefix="/api")
 app.include_router(dream.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(advisor.router, prefix="/api")
 
 # ==========================
 # Run Server
