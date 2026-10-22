@@ -493,6 +493,7 @@ def apply_roundup_if_eligible(
     goal,
     checking_balance: Optional[Decimal],
     threshold: Decimal = DEFAULT_ROUNDUP_THRESHOLD,
+    commit: bool = True,
 ) -> dict:
     """
     Orchestration helper kept for backward-compatibility with routers/roundups.py.
@@ -512,6 +513,8 @@ def apply_roundup_if_eligible(
                           recorded any income) — the safety check is then skipped
                           rather than judged against an invented number.
         threshold:        Minimum safe balance before roundup is paused.
+        commit:           Commit after saving (default). Bulk callers pass False
+                          to flush only and commit once themselves.
 
     Returns:
         dict with keys: success, reason (if failed), save_id, roundup_amount,
@@ -555,7 +558,10 @@ def apply_roundup_if_eligible(
         created_at=_dt.datetime.utcnow(),
     )
     db.add(save_record)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(save_record)
 
     return {

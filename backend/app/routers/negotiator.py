@@ -182,38 +182,27 @@ def _compute_goal_impact(
     # Current forecast
     current_date = goal_forecast(target, current, velocity)
 
-    # Hypothetical forecast if money were spent instead of saved
-    # (i.e. the purchase removes `price` from current savings)
-    hypothetical_saved = max(current - price, Decimal("0"))
-    new_date = goal_forecast(target, hypothetical_saved, velocity)
+    # Money spent on this purchase is money not saved: treat it as that much
+    # extra to make up, at the student's current savings rate.
+    new_date = goal_forecast(target + price, current, velocity)
 
-    # Format impact
     goal_name = primary_goal.title
 
-    if current_date >= datetime.date(9999, 1, 1):
-        # Already unreachable — spending doesn't make it worse in a meaningful way
+    if current_date is None or current_date >= GOAL_UNREACHABLE_DATE:
+        # No projected date yet — a purchase can't make an unknown date later.
         return f"'{goal_name}' goal has no projected date yet (savings rate too low)"
 
-    if new_date >= datetime.date(9999, 1, 1):
-        return (
-            f"spending ₹{price:.0f} would deplete savings and make "
-            f"'{goal_name}' goal unreachable at current velocity"
-        )
+    if new_date is None or new_date >= GOAL_UNREACHABLE_DATE:
+        return f"spending ₹{price:.0f} would push the '{goal_name}' goal out of reach at your current savings rate"
 
     delay_days = (new_date - current_date).days
     if delay_days <= 0:
-        return f"no meaningful delay to '{goal_name}' goal (purchase is small relative to savings)"
+        return f"no meaningful delay to '{goal_name}' goal (purchase is small relative to your savings rate)"
 
     if delay_days < 30:
         return f"delays '{goal_name}' goal by ~{delay_days} day{'s' if delay_days != 1 else ''}"
-    else:
-        delay_months = round(delay_days / 30, 1)
-        return f"delays '{goal_name}' goal by ~{delay_months} month{'s' if delay_months != 1.0 else ''}"
-
-
-# ---------------------------------------------------------------------------
-# Helper — compute budget status for the purchase category
-# ---------------------------------------------------------------------------
+    delay_months = round(delay_days / 30, 1)
+    return f"delays '{goal_name}' goal by ~{delay_months} month{'s' if delay_months != 1.0 else ''}"
 
 
 def _compute_budget_status(

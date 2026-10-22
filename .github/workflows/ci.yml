@@ -15,6 +15,21 @@ jobs:
     name: Backend CI
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: sparechange
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sparechange"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -47,6 +62,27 @@ jobs:
           DATABASE_URL: "sqlite:///:memory:"
         run: |
           PYTHONPATH=backend pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=85
+
+      - name: Verify migrations build a working PostgreSQL schema
+        env:
+          DATABASE_URL: "postgresql://postgres:password123@localhost:5432/sparechange"
+        run: |
+          cd backend
+          python scripts/migrate.py
+          python - <<'PY'
+          # The migrated schema must match the ORM models (no missing tables/columns).
+          from sqlalchemy import inspect
+          from app.database import Base, engine
+          import app.models.models  # noqa: F401
+          insp = inspect(engine)
+          missing = [
+              f"{t.name}.{c.name}"
+              for t in Base.metadata.sorted_tables
+              for c in t.columns
+              if c.name not in {col["name"] for col in insp.get_columns(t.name)}
+          ]
+          assert not missing, f"columns missing after migrations: {missing}"
+          PY
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -83,3 +119,8 @@ jobs:
         working-directory: ./frontend
         run: |
           npm run ts:check
+
+      - name: Frontend Unit Tests
+        working-directory: ./frontend
+        run: |
+          npm test -- --ci

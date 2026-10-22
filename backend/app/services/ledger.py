@@ -82,7 +82,7 @@ def pick_roundup_goal(db: Session, user_id: int) -> Optional[Goal]:
     )
 
 
-def sync_goal_status(db: Session, goal: Goal) -> None:
+def sync_goal_status(db: Session, goal: Goal, commit: bool = True) -> None:
     """Flip a goal between active/completed after its balance changed."""
     if goal.is_deleted or goal.status == "abandoned":
         return
@@ -96,6 +96,7 @@ def sync_goal_status(db: Session, goal: Goal) -> None:
             "goal_completed",
             "Goal reached 🎉",
             f"You've fully funded “{goal.title}”. Nice work!",
+            commit=commit,
         )
     elif goal.status == "completed" and current < target:
         goal.status = "active"
@@ -238,8 +239,10 @@ def notify(
     notif_type: str,
     title: str,
     message: str,
+    commit: bool = True,
 ) -> Optional[Notification]:
     """Persist a notification unless an identical unread one already exists."""
+    db.flush()  # make pending (uncommitted) notifications visible to the check
     duplicate = (
         db.query(Notification.notif_id)
         .filter(
@@ -262,5 +265,8 @@ def notify(
         created_at=datetime.datetime.utcnow(),
     )
     db.add(notification)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return notification

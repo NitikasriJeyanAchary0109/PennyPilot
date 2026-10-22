@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # ==========================
     OLLAMA_URL: str = "http://ollama:11434/api/generate"
     OLLAMA_MODEL: str = "llama3"
+    # Max tokens per reply. Replies cut off by this limit are trimmed to the last
+    # complete sentence rather than shown mid-word.
+    OLLAMA_NUM_PREDICT: int = 160
 
     # ==========================
     # Server Configuration

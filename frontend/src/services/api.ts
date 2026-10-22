@@ -1,6 +1,7 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../config";
+import { tokenStorage } from "./tokenStorage";
 
 const api = axios.create({
   baseURL: API_URL,
@@ -50,7 +51,7 @@ export const getErrorMessage = (
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await tokenStorage.get();
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -71,11 +72,8 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       console.warn("Unauthorized API call detected, logging out...");
       try {
-        await AsyncStorage.multiRemove([
-          "userToken",
-          "userRole",
-          "hasCompletedOnboarding",
-        ]);
+        await tokenStorage.clear();
+        await AsyncStorage.multiRemove(["userRole", "hasCompletedOnboarding"]);
       } catch (e) {
         console.error("Storage clear failure in response interceptor", e);
       }
@@ -121,6 +119,10 @@ export const apiService = {
   completeOnboarding: async () => {
     const response = await api.patch("/users/me/onboarding-complete");
     return response.data;
+  },
+  // Best-effort: revokes the token server-side so a copy of it stops working.
+  logout: async () => {
+    await api.post("/auth/logout");
   },
   getCurrentUser: async () => {
     const response = await api.get("/auth/me");
@@ -186,6 +188,7 @@ export const apiService = {
       roundups_triggered: number;
       total_roundup_saved: string | number;
       failed_count: number;
+      duplicates_skipped: number;
       errors: { row: number; column: string; error: string }[];
     };
   },

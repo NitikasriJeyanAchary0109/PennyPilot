@@ -26,6 +26,7 @@ which Ollama endpoint is in use.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Optional
 
@@ -100,6 +101,22 @@ class AIEngineError(Exception):
         )
 
 
+_SENTENCE_END = re.compile(r"^(.*[.!?])(?=\s|$)", re.DOTALL)
+
+
+def trim_to_last_sentence(text: str) -> str:
+    """
+    Drop a trailing fragment left by hitting the token limit.
+
+    Keeps everything up to the last sentence terminator (a "." inside a number
+    such as ₹1,200.50 doesn't count). If the reply has no complete sentence it
+    is returned unchanged rather than emptied.
+    """
+    text = text.strip()
+    match = _SENTENCE_END.match(text)
+    return match.group(1).strip() if match else text
+
+
 # ---------------------------------------------------------------------------
 # Core LLM caller
 # ---------------------------------------------------------------------------
@@ -154,7 +171,7 @@ async def call_llama(
         "stream": False,
         "keep_alive": -1,
         "options": {
-            "num_predict": 120,
+            "num_predict": settings.OLLAMA_NUM_PREDICT,
             "temperature": 0.4,
         },
     }
@@ -220,6 +237,9 @@ async def call_llama(
                 data.get("message", {}).get("content", "")
                 or data.get("response", "")  # fallback for older Ollama builds
             ).strip()
+
+            if data.get("done_reason") == "length":
+                content = trim_to_last_sentence(content)
 
             if not content:
                 logger.error(

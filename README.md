@@ -269,7 +269,7 @@ Configure these settings in your `backend/.env` file:
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
 | `DATABASE_URL` | `sqlite:///./campus_drift.db` | Database connection string (SQLite or PostgreSQL) |
-| `JWT_SECRET` | `dev_secret_key` | Secret key for signing access tokens |
+| `JWT_SECRET` | `dev_secret_key` | Secret key for signing access tokens. **Required and must be a unique random string of ≥ 32 chars when `ENVIRONMENT=production`** (the API refuses to start otherwise; `docker compose` reads it from `.env`) |
 | `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days) | Token expiration duration |
 | `OLLAMA_URL` | `http://localhost:11434/api/generate` | Local Ollama AI inference endpoint |

@@ -181,7 +181,8 @@ def _load_context(user_id: int, db: Session) -> tuple[list, list, list]:
     "/chat",
     response_model=CoachChatResponse,
     status_code=status.HTTP_200_OK,
-    summary="Chat with the AI Financial Coach",
+    deprecated=True,
+    summary="Deprecated — use POST /chat/ (history stays at GET /coach/history)",
     description=(
         "Send a free-form message to the AI Financial Coach. "
         "The coach receives the student's recent transactions, savings goals, "

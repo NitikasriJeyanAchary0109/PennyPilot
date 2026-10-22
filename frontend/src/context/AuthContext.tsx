@@ -4,6 +4,7 @@ import axios from "axios";
 import { API_URL } from "../config";
 import { TokenResponse } from "../types";
 import { apiService, getErrorMessage, setUnauthorizedHandler } from "../services/api";
+import { tokenStorage } from "../services/tokenStorage";
 
 interface AuthContextType {
   userToken: string | null;
@@ -41,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const bootstrapAsync = async () => {
       try {
-        const token = await AsyncStorage.getItem("userToken");
+        const token = await tokenStorage.get();
         if (!token) return;
 
         const storedCompleted = await AsyncStorage.getItem("hasCompletedOnboarding");
@@ -81,7 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const { access_token, has_completed_onboarding } = response.data;
 
-      await AsyncStorage.setItem("userToken", access_token);
+      await tokenStorage.set(access_token);
       await AsyncStorage.setItem("userRole", "student");
       await AsyncStorage.setItem("hasCompletedOnboarding", String(has_completed_onboarding));
 
@@ -111,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithToken = async (token: string, _role = "student", completed = false) => {
     try {
       setIsLoading(true);
-      await AsyncStorage.setItem("userToken", token);
+      await tokenStorage.set(token);
       await AsyncStorage.setItem("userRole", "student");
       await AsyncStorage.setItem("hasCompletedOnboarding", String(completed));
       setUserToken(token);
@@ -135,7 +136,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       setIsLoading(true);
-      await AsyncStorage.removeItem("userToken");
+      // Revoke on the server first (needs the token); a failure must not trap
+      // the user in a signed-in state, so it is ignored.
+      await apiService.logout().catch(() => undefined);
+      await tokenStorage.clear();
       await AsyncStorage.removeItem("userRole");
       await AsyncStorage.removeItem("hasCompletedOnboarding");
       setUserToken(null);

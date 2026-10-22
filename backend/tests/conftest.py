@@ -86,6 +86,3 @@ def student_token(student_user):
             "user_id": student_user.user_id,
         }
     )
-
-
-

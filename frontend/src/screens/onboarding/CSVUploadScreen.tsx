@@ -77,9 +77,11 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
 
         if (Number(imported) === 0) {
           Alert.alert(
-            "Nothing was imported",
-            failedLines ||
-              "No valid rows were found. Check the file format and try again."
+            "Nothing new was imported",
+            summary.duplicates_skipped > 0
+              ? `All ${summary.duplicates_skipped} rows are already in your transactions, so nothing was added again.`
+              : failedLines ||
+                  "No valid rows were found. Check the file format and try again."
           );
           return;
         }
@@ -88,6 +90,9 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
           `Imported ${imported} transaction${Number(imported) === 1 ? "" : "s"}.`,
           summary.roundups_triggered > 0
             ? `${summary.roundups_triggered} round-up${summary.roundups_triggered === 1 ? "" : "s"} saved toward your goal.`
+            : null,
+          summary.duplicates_skipped > 0
+            ? `${summary.duplicates_skipped} row${summary.duplicates_skipped === 1 ? " was" : "s were"} already in your transactions and skipped.`
             : null,
           summary.failed_count > 0
             ? `${summary.failed_count} row${summary.failed_count === 1 ? "" : "s"} skipped:\n${failedLines}`

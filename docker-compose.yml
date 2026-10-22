@@ -25,7 +25,9 @@ services:
       - DATABASE_URL=postgresql://postgres:password123@db:5432/sparechange
       - OLLAMA_URL=http://ollama:11434/api/generate
       - OLLAMA_MODEL=llama3
-      - JWT_SECRET=your_jwt_secret_key_minimum_32_characters_long_for_security
+      # Required: set a unique random value (>= 32 chars) in .env — the API refuses
+      # to start in production with the placeholder.
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env}
       - GOOGLE_CLIENT_ID=your_google_client_id_placeholder
       - GOOGLE_CLIENT_SECRET=your_google_client_secret_placeholder
       - ENVIRONMENT=production

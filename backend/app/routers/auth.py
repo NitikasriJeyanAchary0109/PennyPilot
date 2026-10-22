@@ -2,11 +2,17 @@ import datetime
 
 from app.config import settings
 from app.database import get_db
-from app.middleware.auth_middleware import get_current_user
+from app.middleware.auth_middleware import get_current_user, oauth2_scheme
 from app.models.models import SecurityEvent, User, UserSession
 from app.schemas.schemas import Token, UserCreate, UserLogin, UserResponse
 from app.services.google_auth import verify_google_id_token
-from app.utils.security import create_access_token, get_password_hash, verify_password
+from app.utils.rate_limit import login_limiter
+from app.utils.security import (
+    create_access_token,
+    decode_access_token,
+    get_password_hash,
+    verify_password,
+)
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
@@ -35,33 +41,84 @@ def _find_user_by_email(db: Session, email: str):
     )
 
 
-def log_login_session(db: Session, user: User, request: Request) -> UserSession:
-    """Logs the session and security events upon successful login."""
+def issue_session(db: Session, user: User, request: Request) -> str:
+    """
+    Create the access token for a successful sign-in and record the session.
+
+    The token's `jti` is stored on the session row so the token can later be
+    revoked (logout) and the middleware can reject it.
+    """
+    access_token = create_access_token(
+        data={"sub": user.email, "role": user.role, "user_id": user.user_id}
+    )
+    claims = decode_access_token(access_token) or {}
+
     client_host = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
+    now = datetime.datetime.utcnow()
 
-    # 1. Create session record
     session = UserSession(
         user_id=user.user_id,
+        jwt_token_id=claims.get("jti"),
         ip_address=client_host,
         device=user_agent,
-        login_at=datetime.datetime.utcnow(),
+        login_at=now,
+        expires_at=(
+            datetime.datetime.utcfromtimestamp(claims["exp"])
+            if claims.get("exp")
+            else None
+        ),
     )
     db.add(session)
     db.commit()
     db.refresh(session)
 
-    # 2. Log security event for successful login
-    sec_event = SecurityEvent(
-        session_id=session.session_id,
-        event_type="login",
-        severity="low",
-        created_at=datetime.datetime.utcnow(),
+    db.add(
+        SecurityEvent(
+            session_id=session.session_id,
+            user_id=user.user_id,
+            event_type="login",
+            severity="low",
+            ip_address=client_host,
+            user_agent=user_agent,
+            created_at=now,
+        )
     )
-    db.add(sec_event)
     db.commit()
+    return access_token
 
-    return session
+
+def _login_key(request: Request, email: str) -> str:
+    host = request.client.host if request.client else "unknown"
+    return f"{host}:{email.strip().lower()}"
+
+
+def _authenticate(request: Request, db: Session, email: str, password: str) -> User:
+    """Verify credentials with failed-attempt throttling; raise 401 / 429."""
+    key = _login_key(request, email)
+    wait = login_limiter.retry_after(key)
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed sign-in attempts. Try again later.",
+            headers={"Retry-After": str(wait)},
+        )
+
+    user = _find_user_by_email(db, email)
+    if (
+        not user
+        or not user.password_hash
+        or not verify_password(password, user.password_hash)
+    ):
+        login_limiter.record_failure(key)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    login_limiter.reset(key)
+    return user
 
 
 @router.post(
@@ -101,6 +158,15 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 
+def _token_response(user: User, access_token: str) -> dict:
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role,
+        "has_completed_onboarding": user.has_completed_onboarding,
+    }
+
+
 @router.post("/login", response_model=Token)
 def login_for_access_token(
     request: Request,
@@ -108,58 +174,48 @@ def login_for_access_token(
     db: Session = Depends(get_db),
 ):
     """OAuth2 compatible token login, returns access_token."""
-    user = _find_user_by_email(db, form_data.username)
-    if (
-        not user
-        or not user.password_hash
-        or not verify_password(form_data.password, user.password_hash)
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Log session and event
-    log_login_session(db, user, request)
-
-    access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "user_id": user.user_id}
-    )
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user.role,
-        "has_completed_onboarding": user.has_completed_onboarding,
-    }
+    user = _authenticate(request, db, form_data.username, form_data.password)
+    return _token_response(user, issue_session(db, user, request))
 
 
 @router.post("/login/json", response_model=Token)
 def login_json(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """JSON-body login endpoint for easy API clients (like mobile axios)."""
-    user = _find_user_by_email(db, user_data.email)
-    if (
-        not user
-        or not user.password_hash
-        or not verify_password(user_data.password, user.password_hash)
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+    user = _authenticate(request, db, user_data.email, user_data.password)
+    return _token_response(user, issue_session(db, user, request))
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Revoke the presented access token so it can't be used again."""
+    claims = decode_access_token(token) or {}
+    session = (
+        db.query(UserSession)
+        .filter(
+            UserSession.user_id == current_user.user_id,
+            UserSession.jwt_token_id == claims.get("jti"),
         )
-
-    # Log session and event
-    log_login_session(db, user, request)
-
-    access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "user_id": user.user_id}
+        .first()
     )
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user.role,
-        "has_completed_onboarding": user.has_completed_onboarding,
-    }
+    if session and session.revoked_at is None:
+        now = datetime.datetime.utcnow()
+        session.logout_at = now
+        session.revoked_at = now
+        db.add(
+            SecurityEvent(
+                session_id=session.session_id,
+                user_id=current_user.user_id,
+                event_type="logout",
+                severity="low",
+                created_at=now,
+            )
+        )
+        db.commit()
+    return None
 
 
 # ==========================================
@@ -227,13 +283,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
 
-    # Log session and event
-    log_login_session(db, user, request)
-
-    # Generate access token
-    access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "user_id": user.user_id}
-    )
+    access_token = issue_session(db, user, request)
 
     # HTML Redirection payload to automatically route back into the mobile app's deep linking
     html_content = f"""
@@ -307,14 +357,4 @@ def google_auth_post(
         db.commit()
         db.refresh(user)
 
-    log_login_session(db, user, request)
-
-    access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "user_id": user.user_id}
-    )
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user.role,
-        "has_completed_onboarding": user.has_completed_onboarding,
-    }
+    return _token_response(user, issue_session(db, user, request))

@@ -653,3 +653,215 @@ def test_coach_history_hides_internal_forecast_rows(client, db, student_user, he
     db.commit()
     items = client.get("/api/coach/history", headers=headers).json()["items"]
     assert [i["question"] for i in items] == ["hello"]
+
+
+# ------------------------------------------------- sessions & rate limiting
+@pytest.fixture(autouse=True)
+def _reset_login_limiter():
+    from app.utils.rate_limit import login_limiter
+
+    login_limiter.clear()
+    yield
+    login_limiter.clear()
+
+
+def _register_and_login(client, email="sess@test.com"):
+    client.post(
+        "/api/auth/register",
+        json={"full_name": "Sess Ion", "email": email, "password": "longenough1"},
+    )
+    res = client.post(
+        "/api/auth/login/json", json={"email": email, "password": "longenough1"}
+    )
+    assert res.status_code == 200
+    return res.json()["access_token"]
+
+
+def test_logout_revokes_only_the_presented_token(client, db):
+    from app.models.models import UserSession
+
+    first = _register_and_login(client)
+    second = _register_and_login(client)  # second device, same user
+    auth = lambda t: {"Authorization": f"Bearer {t}"}  # noqa: E731
+
+    assert client.get("/api/auth/me", headers=auth(first)).status_code == 200
+    assert client.post("/api/auth/logout", headers=auth(first)).status_code == 204
+
+    assert client.get("/api/auth/me", headers=auth(first)).status_code == 401
+    assert client.get("/api/auth/me", headers=auth(second)).status_code == 200
+    revoked = db.query(UserSession).filter(UserSession.revoked_at.isnot(None)).count()
+    assert revoked == 1
+    # Logging out twice is harmless.
+    assert client.post("/api/auth/logout", headers=auth(second)).status_code == 204
+
+
+def test_login_session_records_token_id_and_expiry(client, db):
+    from app.models.models import UserSession
+    from app.utils.security import decode_access_token
+
+    token = _register_and_login(client)
+    session = db.query(UserSession).one()
+    assert session.jwt_token_id == decode_access_token(token)["jti"]
+    assert session.expires_at > datetime.datetime.utcnow()
+
+
+def test_repeated_wrong_passwords_are_throttled(client):
+    client.post(
+        "/api/auth/register",
+        json={
+            "full_name": "Brute Force",
+            "email": "bf@test.com",
+            "password": "longenough1",
+        },
+    )
+    bad = {"email": "bf@test.com", "password": "wrong-password"}
+    for _ in range(5):
+        assert client.post("/api/auth/login/json", json=bad).status_code == 401
+
+    blocked = client.post("/api/auth/login/json", json=bad)
+    assert blocked.status_code == 429
+    assert int(blocked.headers["Retry-After"]) > 0
+    # Even the right password is refused while blocked…
+    good = {"email": "bf@test.com", "password": "longenough1"}
+    assert client.post("/api/auth/login/json", json=good).status_code == 429
+    # …but another account from the same address isn't affected.
+    other = client.post(
+        "/api/auth/login/json", json={"email": "other@test.com", "password": "x" * 9}
+    )
+    assert other.status_code == 401
+
+
+def test_successful_login_clears_failed_attempts(client):
+    client.post(
+        "/api/auth/register",
+        json={
+            "full_name": "Slip Up",
+            "email": "su@test.com",
+            "password": "longenough1",
+        },
+    )
+    for _ in range(4):
+        client.post(
+            "/api/auth/login/json",
+            json={"email": "su@test.com", "password": "nope-nope"},
+        )
+    ok = client.post(
+        "/api/auth/login/json", json={"email": "su@test.com", "password": "longenough1"}
+    )
+    assert ok.status_code == 200
+    for _ in range(4):  # counter restarted, so four more misses are still allowed
+        assert (
+            client.post(
+                "/api/auth/login/json",
+                json={"email": "su@test.com", "password": "nope-nope"},
+            ).status_code
+            == 401
+        )
+
+
+def test_attempt_limiter_window_expires():
+    from app.utils.rate_limit import AttemptLimiter
+
+    now = [1000.0]
+    limiter = AttemptLimiter(max_failures=2, window_seconds=60, clock=lambda: now[0])
+    limiter.record_failure("k")
+    limiter.record_failure("k")
+    assert limiter.retry_after("k") > 0
+    now[0] += 61
+    assert limiter.retry_after("k") == 0
+
+
+# --------------------------------------------------- purchase impact model
+def test_purchase_impact_counts_spend_as_unsaved_money(db, student_user):
+    from app.routers.negotiator import _compute_goal_impact
+
+    make_goal(
+        db,
+        student_user,
+        target_amount=Decimal("1000.00"),
+        current_amount=Decimal("100.00"),
+    )
+    db.add(
+        Savings(
+            user_id=student_user.user_id,
+            amount=Decimal("300"),
+            source="manual",
+            created_at=NOW,
+        )
+    )
+    db.commit()
+    # ₹300/month: ₹900 left (3 months). A ₹600 purchase adds 2 months → ~60 days.
+    # Previously this was clamped by the (smaller) saved balance and understated.
+    impact = _compute_goal_impact(Decimal("600"), student_user.user_id, db)
+    assert "delays 'Laptop' goal by ~2.0 months" in impact
+
+
+def test_purchase_impact_without_savings_rate_is_not_invented(db, student_user):
+    from app.routers.negotiator import _compute_goal_impact
+
+    make_goal(db, student_user)
+    impact = _compute_goal_impact(Decimal("600"), student_user.user_id, db)
+    assert "no projected date yet" in impact
+
+
+# ------------------------------------------------------------- CSV import
+STATEMENT = (
+    b"date,description,amount,category,type\n"
+    b"2026-10-02,Lunch,120.50,Food,debit\n"
+    b"2026-10-02,Lunch,120.50,Food,debit\n"  # two real identical purchases
+    b"2026-10-03,Metro,45.00,Transport,debit\n"
+)
+
+
+def _upload(client, headers, content=STATEMENT):
+    return client.post(
+        "/api/transactions/upload",
+        files={"file": ("statement.csv", content, "text/csv")},
+        headers=headers,
+    )
+
+
+def test_reimporting_a_statement_does_not_duplicate_it(
+    client, db, student_user, headers
+):
+    make_goal(db, student_user)
+    first = _upload(client, headers).json()
+    assert first["imported_count"] == 3  # repeated rows inside one file are kept
+    assert first["duplicates_skipped"] == 0
+    saved_after_first = db.query(Savings).count()
+
+    second = _upload(client, headers).json()
+    assert second["imported_count"] == 0
+    assert second["duplicates_skipped"] == 3
+    assert db.query(Transaction).count() == 3
+    assert db.query(Savings).count() == saved_after_first  # no extra round-ups
+
+    # A statement that overlaps only partly imports just the new rows.
+    more = STATEMENT + b"2026-10-04,Books,300.00,Education,debit\n"
+    third = _upload(client, headers, more).json()
+    assert third["imported_count"] == 1
+    assert third["duplicates_skipped"] == 3
+
+
+def test_import_is_all_or_nothing(client, db, student_user, headers, monkeypatch):
+    make_goal(db, student_user)
+    calls = {"n": 0}
+    from app.services import rule_engine
+
+    real = rule_engine.apply_roundup_if_eligible
+
+    def explode_on_second(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("boom")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "app.routers.transactions.apply_roundup_if_eligible", explode_on_second
+    )
+    res = _upload(client, headers)
+    assert res.status_code == 500
+    assert "nothing was saved" in res.json()["detail"]
+    db.expire_all()
+    assert db.query(Transaction).count() == 0
+    assert db.query(Savings).count() == 0

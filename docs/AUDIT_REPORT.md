@@ -96,6 +96,20 @@ Hard-coded values that remain **by design** (not fabricated results): quick-pick
 - Goals list made one extra request per goal; the list endpoint now returns `progress_percentage`.
 - Auth: login/register no longer toggle the global loading flag (it unmounted the whole navigator and wiped the form on a failed login). Dead "guest" login (token `"guest"` → every call 401) removed.
 
+### 3.5 Follow-up pass (the former "open items")
+
+| # | Item | What was done |
+|---|---|---|
+| F1 | **Alembic could not build a working database** (found when I ran the app on real PostgreSQL). Migrations 001–006 left out `users.university/oauth_*`, `goals.status`, `savings.goal_id`, `user_sessions.jwt_token_id`, `audit_logs.user_id/entity_*`, `notifications.type`, and the whole current shape of `budgets`. Registering a user on a migrated database returned HTTP 500. Production relies on Alembic, so a `docker compose` deployment could not have worked. | Migration **007** (PostgreSQL only; SQLite dev DBs still use `create_all`) adds everything missing and keeps the old budgets table as `budgets_legacy` instead of dropping it. `scripts/migrate.py` runs before the API starts: fresh DB → upgrade, DB previously made by `create_all` → stamp, Alembic-managed → upgrade. The Dockerfile now runs it; CI builds the schema on a Postgres service and asserts no model column is missing. Verified on PostgreSQL 18, all three paths. |
+| F2 | No logout / token revocation (the `user_sessions` table was designed for it but unused). | Each login stores the token's `jti` + expiry on its session. New `POST /auth/logout` revokes just that token; the auth middleware rejects revoked tokens. The app calls it on sign-out. |
+| F3 | No login throttling. | 5 failed passwords per (address, email) in 15 min → HTTP 429 with `Retry-After`; success resets the count. In-process memory (no new infrastructure) — see "still open". |
+| F4 | JWT stored in plain AsyncStorage. | `tokenStorage`: Keychain / Keystore via `expo-secure-store` on iOS/Android, AsyncStorage on web. Tokens saved by older versions are migrated automatically. |
+| F5 | LLM replies could stop mid-sentence at the 120-token cap. | Token limit is now `OLLAMA_NUM_PREDICT` (default 160); when Ollama reports it stopped for length the reply is cut back to its last complete sentence (numbers like ₹1,200.50 are respected). |
+| F6 | Purchase evaluator assumed the cost came out of the goal's saved balance (and clamped at ₹0, understating the delay). | Spending is treated as money not saved: the goal date is recomputed with the price added to what's left, at the student's real 30-day savings rate. |
+| F7 | CSV import committed row-by-row and importing the same statement twice doubled every transaction and round-up. | Whole file is one transaction (all or nothing); rows already present (same day, amount, description, direction) are skipped and reported as `duplicates_skipped`. |
+| F8 | Duplicate endpoints. | `POST /forecast/`, `GET /goal/{id}/forecast`, `POST /coach/chat` are marked deprecated in OpenAPI and point to the canonical route. Not removed, so nothing breaks. |
+| F9 | No frontend tests. | Jest (`jest-expo`) suite: error-message mapping, "API failure never yields substitute data" for every call that used to fake one, adapter fields, 401 sign-out, token storage on device/web. CI runs it. |
+
 ---
 
 ## 4. Behaviour changes you should know about
@@ -105,7 +119,8 @@ Hard-coded values that remain **by design** (not fabricated results): quick-pick
 3. **Budgets are now "current period" budgets.** Tests in `test_budgets.py` and `test_calculations.py` were pinned to August 2026 dates and encoded the old bug; I made their fixtures relative to *now*.
 4. `PUT /goals/{id}` ignores `current_amount`. Balances move only via savings / round-ups / withdrawals.
 5. Passwords must be ≥ 8 characters.
-6. No schema migration is needed (new `source` / notification `type` values are plain strings); migrations 001–006 are untouched.
+6. **A new migration (007) is required on PostgreSQL** and the container now runs it on start. Migrations 001–006 are untouched. `docker compose` now needs `JWT_SECRET` set in `.env` (it fails fast with a message instead of using a placeholder). Existing databases created by the old `create_all` start-up are detected and stamped, not re-created.
+7. After logout the old token stops working; logging in again from another device is unaffected.
 
 ---
 
@@ -113,30 +128,27 @@ Hard-coded values that remain **by design** (not fabricated results): quick-pick
 
 | Check | Result |
 |---|---|
-| Backend tests | **119 passed** (was 81). 34 new regression tests in `backend/tests/test_audit_fixes.py` covering the bugs above; existing tests rewritten where they asserted the old behaviour (Google sign-in, subscription sync, round-up projection, date-pinned budget/stress fixtures — see §4). |
+| Backend tests | **131 passed** (was 81), 91.6 % coverage (CI gate is 85 %). 34 new regression tests in `backend/tests/test_audit_fixes.py` covering the bugs above; existing tests rewritten where they asserted the old behaviour (Google sign-in, subscription sync, round-up projection, date-pinned budget/stress fixtures — see §4). |
 | `ruff`, `black --check`, `mypy backend/app` | clean |
 | Frontend `tsc --noEmit` | clean (20 screens included) |
+| Frontend Jest | 24 tests passed |
+| PostgreSQL 18 | `alembic upgrade head`, fresh / `create_all`-built / re-run paths all OK; then the full register → login → goal → CSV import ×2 → withdrawal → budget → wellness → logout → throttle flow ran against it with `ENVIRONMENT=production` and no errors |
 | Web bundle (`expo export --platform web`) | succeeds — every screen compiles and bundles |
 | Live server smoke test (uvicorn + curl, SQLite) | register → login → goal → purchase (round-up + template explanation) → goal list with progress → withdrawal → trend → notification all returned correct data; `/auth/google` with the old body now 422; advisor returns 503 when Ollama is unreachable |
 
-## 6. Still open — not fixed (needs a decision or is out of scope)
+## 6. Still open — not fixed
 
-- **There is no bank/UPI connection.** Round-ups happen only on purchases the student logs or imports; the "checking balance" is an estimate from their own records. The copy no longer implies otherwise, but the product promise ("automatic") depends on adding a real data source.
-- **No money ever moves.** Withdrawals, "transfers", and goal balances are bookkeeping. This is now stated in the UI, but it is a product limitation.
-- **Auth hardening not done:** no refresh-token flow (the function exists, unused), no logout/revocation (sessions are logged but never checked), no login rate-limiting, JWT kept in `AsyncStorage` rather than secure storage, OAuth token passed in a deep-link URL.
-- **Purchase-evaluator assumption:** "should I buy this?" models the cost as coming out of the goal's saved balance. That is a modelling choice, not something the user told us.
-- **LLM output length:** `num_predict: 120` (your uncommitted change) can cut a reply mid-sentence. I left it; raise it if replies look truncated.
-- **Duplicated endpoints:** `/goals/{id}/forecast`, `/goal/{id}/forecast`, `/forecast/`; `/chat/` vs `/coach/chat`; `/wellness/score` vs `/stress/`. Consolidate when convenient.
-- **Uploads commit row-by-row** (fine for statements of hundreds of rows, slow for thousands).
-- **No frontend tests.** CI only type-checks the frontend. The new behaviour is covered on the API side, not in the UI.
-- **Stale docs:** `docs/ux/mock_data_inventory.md` refers to screens that no longer exist (`AnalysisScreen`, `GoalsDashboardScreen` mocks) and `docs/screenshots/` show earlier UI (e.g. "Wealth Advisor", "Sync API"). `docs/HANDOFF.md` is from 2026-10-20. Regenerate screenshots before sharing the README.
-- **Loose files in the repo root / `backend/`:** `*.db` (including `pennypilot.db`, `sparechange.db`, `test_*.db`) are git-ignored, so not a leak, but they're clutter and may hold real data.
-- Git history check: no `.env` / `.db` files and no `GOCSPX…` client secret have ever been committed (searched all refs). A commit named "frontend" once added a `node_modules` template `.env`-pattern file; it holds no secrets.
+- **There is no bank/UPI connection, and no money ever moves.** This is a product boundary, not a bug: connecting to bank data needs a regulated aggregator (e.g. Account Aggregator) and a business relationship. What the app does instead is honest about it — round-ups come from purchases the student logs or imports (CSV import is now safe to repeat), the balance check is estimated from their own records, and withdrawals/"transfers" are labelled as bookkeeping. Real data access should be its own project.
+- **Auth, remaining:** no refresh-token flow (access tokens last 24 h, then the user signs in again); the login limiter is per process (use Redis if the API runs several workers); the Google browser flow still returns the token in a `pennypilot://` deep link.
+- **Stress-score benchmarks** (₹3,000 healthy savings, ₹15,000 spend cap) are fixed constants, not scaled to the student's income. They are named and documented in `rule_engine.py`; making them income-relative changes the scoring model and the property tests, so it's a product decision.
+- **Stale visuals:** `docs/screenshots/` and the README images still show the old UI (e.g. "Wealth Advisor", "Sync API"). They need to be re-captured from a running app; I can't produce them here. `docs/HANDOFF.md` is from 2026-10-20.
+- **Loose files:** `*.db` files in the repo root and `backend/` are git-ignored but are clutter and may hold real data.
+- Remaining Alembic differences from the models are cosmetic only (index names, a few columns the DB makes NOT NULL while the model allows NULL); the app always supplies those values.
 
 ## 7. What I could not verify
 
-- **No visual check on a device or simulator.** I verified types, bundling, and the API; I did not look at the screens rendered. Layout of the changed screens (Insights chart, Round-up Tracker, Manual setup amount fields, Budgets custom-category input) should be eyeballed.
+- **No visual check on a device or simulator.** I verified types, unit tests, bundling, and the API; `expo-secure-store` (native only) was verified through its tests with the module mocked, not on a device; I did not look at the screens rendered. Layout of the changed screens (Insights chart, Round-up Tracker, Manual setup amount fields, Budgets custom-category input) should be eyeballed.
 - **Ollama / real LLM output** — tests and the smoke run mock or fail the LLM. Prompt quality and latency on your machine are untested.
 - **Google OAuth against Google** — the verification path is unit-tested with Google's response mocked; I did not run a live sign-in.
-- **PostgreSQL** — everything ran on SQLite. `with_for_update()` and `Numeric(12,2)` behave differently on Postgres; run the suite against it before deploying.
+- **The pytest suite on PostgreSQL** — the test fixtures are SQLite. I ran migrations and an end-to-end flow on PostgreSQL 18 (see §5), but not every test against it; row-locking (`with_for_update`) is only exercised there under a single client.
 - WCAG "100% verified" (README badge) — I did not re-run the contrast scripts or audit screen-reader behaviour.

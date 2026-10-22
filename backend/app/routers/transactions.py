@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import Counter
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
@@ -34,6 +35,16 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 # The roundup explanation is a nicety; never let a slow LLM hold up a purchase.
 _EXPLANATION_TIMEOUT_SECONDS = 8.0
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+
+
+def _import_key(when: datetime, amount, description, tx_type: str) -> tuple:
+    """Identity used to recognise a transaction that was already imported."""
+    return (
+        when.date(),
+        Decimal(str(amount)).quantize(Decimal("0.01")),
+        (description or "").strip().lower(),
+        tx_type,
+    )
 
 
 @router.get("/", response_model=List[TransactionResponse])
@@ -392,58 +403,91 @@ async def upload_bank_statement(
 
     inserted_count = 0
     roundup_count = 0
+    duplicates_skipped = 0
     total_roundup = Decimal("0.00")
+
+    # Re-importing a statement must not double-count it: rows that match an
+    # existing transaction (same day, amount, description and direction) are
+    # skipped. Matching is by count, so genuinely repeated rows inside one file
+    # are still kept.
+    existing = Counter(
+        _import_key(t.transaction_date, t.amount, t.description or t.merchant, t.type)
+        for t in db.query(Transaction).filter(
+            Transaction.user_id == current_user.user_id,
+            Transaction.is_deleted == False,
+        )
+    )
 
     # Round-ups go to the oldest active goal (if any)
     active_goal = pick_roundup_goal(db, current_user.user_id)
 
-    for tx in parsed_txs:
-        db_tx = Transaction(
-            user_id=current_user.user_id,
-            amount=tx["amount"],
-            category=tx["category"],
-            merchant=tx.get("merchant") or tx["description"],
-            type=tx.get("type") or "debit",
-            transaction_date=tx["transaction_date"],
-            description=tx["description"],
-            is_round_up_applied=False,
-            round_up_amount=Decimal("0.00"),
-            is_deleted=False,
-        )
-        db.add(db_tx)
-        db.commit()
-        db.refresh(db_tx)
-        inserted_count += 1
-
-        # Log transaction audit record
-        audit = AuditLog(
-            trans_id=db_tx.id,
-            user_id=current_user.user_id,
-            action="import_csv",
-            performed_by=f"user_{current_user.user_id}",
-            timestamp=datetime.utcnow(),
-        )
-        db.add(audit)
-        db.commit()
-
-        if active_goal and db_tx.type == "debit":
-            roundup_res = apply_roundup_if_eligible(
-                db=db,
-                transaction=db_tx,
-                goal=active_goal,
-                checking_balance=estimate_checking_balance(db, current_user.user_id),
+    # The whole file is one transaction: either every row is saved or none is.
+    try:
+        for tx in parsed_txs:
+            tx_type = tx.get("type") or "debit"
+            key = _import_key(
+                tx["transaction_date"], tx["amount"], tx["description"], tx_type
             )
-            if roundup_res.get("success"):
-                roundup_count += 1
-                amt = roundup_res.get("roundup_amount", Decimal("0.00"))
-                total_roundup += amt
-                db_tx.is_round_up_applied = True
-                db_tx.round_up_amount = amt
-                sync_goal_status(db, active_goal)
-                db.commit()
-                if active_goal.status != "active":
-                    # Goal just completed — later rows go to the next active goal.
-                    active_goal = pick_roundup_goal(db, current_user.user_id)
+            if existing[key] > 0:
+                existing[key] -= 1
+                duplicates_skipped += 1
+                continue
+
+            db_tx = Transaction(
+                user_id=current_user.user_id,
+                amount=tx["amount"],
+                category=tx["category"],
+                merchant=tx.get("merchant") or tx["description"],
+                type=tx_type,
+                transaction_date=tx["transaction_date"],
+                description=tx["description"],
+                is_round_up_applied=False,
+                round_up_amount=Decimal("0.00"),
+                is_deleted=False,
+            )
+            db.add(db_tx)
+            db.flush()  # assigns the id; autoflush is off, so flush explicitly
+            inserted_count += 1
+
+            db.add(
+                AuditLog(
+                    trans_id=db_tx.id,
+                    user_id=current_user.user_id,
+                    action="import_csv",
+                    performed_by=f"user_{current_user.user_id}",
+                    timestamp=datetime.utcnow(),
+                )
+            )
+
+            if active_goal and db_tx.type == "debit":
+                roundup_res = apply_roundup_if_eligible(
+                    db=db,
+                    transaction=db_tx,
+                    goal=active_goal,
+                    checking_balance=estimate_checking_balance(
+                        db, current_user.user_id
+                    ),
+                    commit=False,
+                )
+                if roundup_res.get("success"):
+                    roundup_count += 1
+                    amt = roundup_res.get("roundup_amount", Decimal("0.00"))
+                    total_roundup += amt
+                    db_tx.is_round_up_applied = True
+                    db_tx.round_up_amount = amt
+                    sync_goal_status(db, active_goal, commit=False)
+                    if active_goal.status != "active":
+                        # Goal just completed — later rows go to the next one.
+                        db.flush()
+                        active_goal = pick_roundup_goal(db, current_user.user_id)
+            db.flush()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The import failed and nothing was saved. Please try again.",
+        )
 
     return {
         "success": True,
@@ -452,5 +496,6 @@ async def upload_bank_statement(
         "roundups_triggered": roundup_count,
         "total_roundup_saved": total_roundup,
         "failed_count": failed_count,
+        "duplicates_skipped": duplicates_skipped,
         "errors": errors,
     }

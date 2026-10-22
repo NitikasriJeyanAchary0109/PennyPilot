@@ -202,3 +202,49 @@ async def test_router_returns_503_when_call_llama_fails(client, student_token):
         )
         assert resp.status_code == 503
         assert "temporarily unavailable" in resp.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_call_llama_trims_reply_cut_off_by_token_limit():
+    """A reply stopped by num_predict is cut back to its last complete sentence."""
+    mock_response = httpx.Response(
+        status_code=200,
+        json={
+            "message": {
+                "role": "assistant",
+                "content": "You saved ₹1,200.50 this month. Try setting aside a lit",
+            },
+            "done_reason": "length",
+        },
+        request=httpx.Request("POST", "http://ollama:11434/api/chat"),
+    )
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+        reply = await call_llama("System", "User")
+    assert reply == "You saved ₹1,200.50 this month."
+
+
+def test_trim_to_last_sentence_edge_cases():
+    from app.services.ai_engine import trim_to_last_sentence
+
+    assert trim_to_last_sentence("One. Two! Thr") == "One. Two!"
+    assert trim_to_last_sentence("No terminator here") == "No terminator here"
+    assert trim_to_last_sentence("Costs ₹99.50 and") == "Costs ₹99.50 and"
+    assert trim_to_last_sentence("Done.") == "Done."
+
+
+@pytest.mark.anyio
+async def test_call_llama_uses_configured_model_and_token_limit():
+    from app.config import settings
+
+    mock_response = httpx.Response(
+        status_code=200,
+        json={"message": {"role": "assistant", "content": "ok."}},
+        request=httpx.Request("POST", "http://ollama:11434/api/chat"),
+    )
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+        await call_llama("System", "User")
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["model"] == settings.OLLAMA_MODEL
+    assert payload["options"]["num_predict"] == settings.OLLAMA_NUM_PREDICT
