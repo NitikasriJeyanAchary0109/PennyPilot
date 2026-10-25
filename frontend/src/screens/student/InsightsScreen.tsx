@@ -44,6 +44,8 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState<string>("");
   const [stressSummary, setStressSummary] = useState<string | null>(null);
+  const [summarySource, setSummarySource] = useState<"factual" | "ai">("factual");
+  const [narrating, setNarrating] = useState(false);
   const [healthScore, setHealthScore] = useState<number | null>(null);
   const [stressScore, setStressScore] = useState<number | null>(null);
   const [trend, setTrend] = useState<TrendWeek[] | null>(null);
@@ -57,6 +59,23 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
       // Ignore on web
     }
   };
+
+  // The scores are already on screen; ask the model for a friendlier summary in
+  // the background and swap it in if it arrives (it can take a while locally).
+  const narrate = useCallback(async (reportId: number) => {
+    setNarrating(true);
+    try {
+      const report = await apiService.narrateWellness(reportId, 30);
+      if (report.summary_source === "ai") {
+        setStressSummary(report.ai_summary || null);
+        setSummarySource("ai");
+      }
+    } catch (e: any) {
+      console.warn("Wellness narration unavailable:", e?.message);
+    } finally {
+      setNarrating(false);
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -75,7 +94,9 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
       setHealthScore(Number(res.health_score));
       setStressScore(Number(res.stress_score));
       setStressSummary(res.ai_summary || null);
+      setSummarySource(res.summary_source);
       setError(null);
+      if (res.summary_source !== "ai") narrate(res.report_id);
     } else {
       setHealthScore(null);
       setStressScore(null);
@@ -95,7 +116,7 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
       setTrend(null);
     }
     setLoading(false);
-  }, []);
+  }, [narrate]);
 
   useEffect(() => {
     loadData();
@@ -115,7 +136,9 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
       setHealthScore(Number(response.health_score));
       setStressScore(Number(response.stress_score));
       setStressSummary(response.ai_summary || null);
+      setSummarySource(response.summary_source);
       setError(null);
+      if (response.summary_source !== "ai") narrate(response.report_id);
       Alert.alert(
         "Financial health updated",
         response.ai_summary || `Your wellness score is ${response.health_score}/100.`
@@ -384,6 +407,13 @@ export const InsightsScreen = ({ navigation }: { navigation: any }) => {
               </View>
               <Text className="text-xs text-text-secondary font-sans leading-relaxed">
                 {stressSummary}
+              </Text>
+              <Text className="text-[10px] text-text-muted font-sans mt-2 italic">
+                {summarySource === "ai"
+                  ? "Summary written by the AI coach from the figures above."
+                  : narrating
+                  ? "Writing a friendlier summary…"
+                  : "Plain summary of the figures above."}
               </Text>
             </Card>
           )}

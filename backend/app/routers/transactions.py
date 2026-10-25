@@ -392,7 +392,12 @@ async def upload_bank_statement(
     current_user: User = Depends(require_student),
     db: Session = Depends(get_db),
 ):
-    """Uploads a CSV statement, parses transactions, and logs audit logs."""
+    """
+    Import a CSV bank statement as spending history.
+
+    Rows are categorised, de-duplicated and stored (source="csv_import") for the
+    spending analysis. They do NOT generate round-ups or change any goal.
+    """
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -420,9 +425,7 @@ async def upload_bank_statement(
     errors = parse_res["errors"]
 
     inserted_count = 0
-    roundup_count = 0
     duplicates_skipped = 0
-    total_roundup = Decimal("0.00")
 
     # Re-importing a statement must not double-count it: rows that match an
     # existing transaction (same day, amount, description and direction) are
@@ -436,9 +439,11 @@ async def upload_bank_statement(
         )
     )
 
-    # Round-ups go to the oldest active goal (if any)
-    active_goal = pick_roundup_goal(db, current_user.user_id)
-
+    # Imported rows are *history*: they feed the spending analysis but never create
+    # round-ups. Nothing was set aside when those purchases happened, so crediting
+    # a goal for them would show savings that don't exist. Round-ups apply only to
+    # new spending (logged purchases and the bank sandbox).
+    #
     # The whole file is one transaction: either every row is saved or none is.
     try:
         for tx in parsed_txs:
@@ -477,29 +482,6 @@ async def upload_bank_statement(
                     timestamp=datetime.utcnow(),
                 )
             )
-
-            if active_goal and db_tx.type == "debit":
-                roundup_res = apply_roundup_if_eligible(
-                    db=db,
-                    transaction=db_tx,
-                    goal=active_goal,
-                    checking_balance=estimate_checking_balance(
-                        db, current_user.user_id
-                    ),
-                    commit=False,
-                )
-                if roundup_res.get("success"):
-                    roundup_count += 1
-                    amt = roundup_res.get("roundup_amount", Decimal("0.00"))
-                    total_roundup += amt
-                    db_tx.is_round_up_applied = True
-                    db_tx.round_up_amount = amt
-                    sync_goal_status(db, active_goal, commit=False)
-                    if active_goal.status != "active":
-                        # Goal just completed — later rows go to the next one.
-                        db.flush()
-                        active_goal = pick_roundup_goal(db, current_user.user_id)
-            db.flush()
         db.commit()
     except Exception:
         db.rollback()
@@ -512,8 +494,8 @@ async def upload_bank_statement(
         "success": True,
         "message": f"Successfully imported {inserted_count} transactions.",
         "imported_count": inserted_count,
-        "roundups_triggered": roundup_count,
-        "total_roundup_saved": total_roundup,
+        "roundups_triggered": 0,  # imports are history: no round-ups, see above
+        "total_roundup_saved": Decimal("0.00"),
         "failed_count": failed_count,
         "duplicates_skipped": duplicates_skipped,
         "errors": errors,

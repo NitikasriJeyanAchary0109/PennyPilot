@@ -245,7 +245,12 @@ def test_wellness_and_stress():
     assert "health_score" in data
     assert "stress_score" in data
     assert "ai_summary" in data
-    assert "Mocked AI Response" in data["ai_summary"]
+    # The score returns at once with a plain summary; the AI text is a second step.
+    assert data["summary_source"] == "factual"
+    narrated = client.post(f"/api/wellness/narrate/{data['report_id']}")
+    assert narrated.status_code == 200
+    assert "Mocked AI Response" in narrated.json()["ai_summary"]
+    assert narrated.json()["summary_source"] == "ai"
 
     # Test POST /api/wellness/score
     response = client.post("/api/wellness/score", json={"timeframe_days": 30})

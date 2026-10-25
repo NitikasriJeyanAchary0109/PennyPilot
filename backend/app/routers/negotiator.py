@@ -40,7 +40,7 @@ from app.models.models import (
     Transaction,
     User,
 )
-from app.services.ai_engine import AIEngineError, call_llama
+from app.services.ai_engine import AIEngineError, call_llama, user_facing_error
 from app.services.ledger import calculate_spent_amount, recent_savings_amounts
 from app.services.rule_engine import (
     GOAL_UNREACHABLE_DATE,
@@ -363,9 +363,10 @@ async def evaluate_purchase(
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
+            detail=user_facing_error(
+                exc,
                 "The AI negotiator is temporarily unavailable. "
-                "Your data is safe — please try again in a moment."
+                "Your data is safe — please try again in a moment.",
             ),
         ) from exc
 

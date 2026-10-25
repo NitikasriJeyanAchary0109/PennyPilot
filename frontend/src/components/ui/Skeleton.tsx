@@ -16,18 +16,18 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   style,
   ...rest
 }) => {
-  const opacity = useRef(new Animated.Value(0.3)).current;
+  const opacity = useRef(new Animated.Value(0.5)).current;
 
   useEffect(() => {
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
-          toValue: 0.7,
+          toValue: 1,
           duration: 750,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
-          toValue: 0.3,
+          toValue: 0.5,
           duration: 750,
           useNativeDriver: true,
         }),
@@ -40,7 +40,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 
   return (
     <Animated.View
-      className={`bg-border/60 ${className}`}
+      className={`bg-text-muted/20 ${className}`}
       style={[
         {
           width: width as any,

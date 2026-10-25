@@ -438,6 +438,12 @@ class FinancialHealth(Base):
 
     ai_summary = Column(Text)
 
+    # "factual": plain statement of the computed score (always available);
+    # "ai": the model's narration, which passed the numbers check.
+    summary_source = Column(
+        String, nullable=False, default="factual", server_default="factual"
+    )
+
     contributing_factors = Column(JSON)
 
     created_at = Column(

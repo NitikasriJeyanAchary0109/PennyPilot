@@ -220,7 +220,7 @@ async def test_call_llama_trims_reply_cut_off_by_token_limit():
     )
     with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_response
-        reply = await call_llama("System", "User")
+        reply = await call_llama("System", "You saved ₹1,200.50 this month.")
     assert reply == "You saved ₹1,200.50 this month."
 
 

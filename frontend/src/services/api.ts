@@ -162,6 +162,16 @@ const mapTransaction = (t: any) => ({
   source: (t.source ?? "manual") as string,
 });
 
+export interface WellnessReport {
+  report_id: number;
+  health_score: number;
+  stress_score: number;
+  ai_summary: string | null;
+  /** "factual" = plain statement of the score; "ai" = model narration. */
+  summary_source: "factual" | "ai";
+  created_at: string;
+}
+
 export interface SpendingAnalysis {
   has_data: boolean;
   period_start?: string | null;
@@ -469,13 +479,19 @@ export const apiService = {
     const response = await api.post("/forecast/", data, { timeout: AI_TIMEOUT_MS });
     return response.data;
   },
+  // The score and a plain summary come back immediately...
   getStressMeter: async (timeframe_days: number = 30) => {
+    const response = await api.post("/wellness/score", { timeframe_days });
+    return response.data as WellnessReport;
+  },
+  // ...the AI's friendlier narration is a separate, slower call.
+  narrateWellness: async (reportId: number, timeframe_days: number = 30) => {
     const response = await api.post(
-      "/wellness/score",
-      { timeframe_days },
-      { timeout: AI_TIMEOUT_MS }
+      `/wellness/narrate/${reportId}`,
+      undefined,
+      { params: { timeframe_days }, timeout: AI_TIMEOUT_MS }
     );
-    return response.data;
+    return response.data as WellnessReport;
   },
 
   // Notifications

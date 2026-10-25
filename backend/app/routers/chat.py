@@ -5,7 +5,7 @@ from app.middleware.auth_middleware import require_student
 from app.models.models import ChatHistory, User
 from app.routers.coach import _load_context
 from app.schemas.schemas import ChatHistoryResponse, ChatRequest
-from app.services.ai_engine import AIEngineError, call_llama
+from app.services.ai_engine import AIEngineError, call_llama, user_facing_error
 from app.utils.prompts import coach_system_prompt, coach_user_prompt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -45,7 +45,9 @@ async def chat_with_coach(
     except AIEngineError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The AI coach is temporarily offline. Try again in a moment.",
+            detail=user_facing_error(
+                exc, "The AI coach is temporarily offline. Try again in a moment."
+            ),
         ) from exc
 
     # 4. Save to ChatHistory

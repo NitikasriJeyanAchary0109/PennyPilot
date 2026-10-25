@@ -142,7 +142,7 @@ Hard-coded values that remain **by design** (not fabricated results): quick-pick
 
 | Check | Result |
 |---|---|
-| Backend tests | **166 passed** (was 81), 92.4 % coverage (CI gate is 85 %). 34 new regression tests in `backend/tests/test_audit_fixes.py` covering the bugs above; existing tests rewritten where they asserted the old behaviour (Google sign-in, subscription sync, round-up projection, date-pinned budget/stress fixtures — see §4). |
+| Backend tests | **168 passed** (was 81), 93 % coverage (CI gate is 85 %). 34 new regression tests in `backend/tests/test_audit_fixes.py` covering the bugs above; existing tests rewritten where they asserted the old behaviour (Google sign-in, subscription sync, round-up projection, date-pinned budget/stress fixtures — see §4). |
 | `ruff`, `black --check`, `mypy backend/app` | clean |
 | Frontend `tsc --noEmit` | clean (20 screens included) |
 | Frontend Jest | 30 tests passed (adds: silent refresh + replay, one shared refresh for concurrent 401s, sign-out when the refresh is rejected, no retry loops, logout sends the refresh token) |

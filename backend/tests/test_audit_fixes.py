@@ -844,24 +844,254 @@ def test_reimporting_a_statement_does_not_duplicate_it(
 
 
 def test_import_is_all_or_nothing(client, db, student_user, headers, monkeypatch):
-    make_goal(db, student_user)
     calls = {"n": 0}
-    from app.services import rule_engine
+    from app.routers import transactions
 
-    real = rule_engine.apply_roundup_if_eligible
+    real = transactions._import_key
 
-    def explode_on_second(*args, **kwargs):
+    def explode_on_second_row(*args, **kwargs):
         calls["n"] += 1
         if calls["n"] == 2:
             raise RuntimeError("boom")
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(
-        "app.routers.transactions.apply_roundup_if_eligible", explode_on_second
-    )
+    monkeypatch.setattr(transactions, "_import_key", explode_on_second_row)
     res = _upload(client, headers)
     assert res.status_code == 500
     assert "nothing was saved" in res.json()["detail"]
     db.expire_all()
     assert db.query(Transaction).count() == 0
+
+
+def test_importing_a_statement_never_creates_savings(client, db, student_user, headers):
+    """Past purchases were never rounded up, so an import must not credit any goal."""
+    goal = make_goal(db, student_user)
+    res = _upload(client, headers)
+    body = res.json()
+    assert body["imported_count"] == 3
+    assert body["roundups_triggered"] == 0
+    assert Decimal(str(body["total_roundup_saved"])) == 0
+
+    db.refresh(goal)
+    assert goal.current_amount == Decimal("0.00")
     assert db.query(Savings).count() == 0
+    assert db.query(Notification).count() == 0
+    assert all(
+        t.is_round_up_applied is False and t.round_up_amount == 0
+        for t in db.query(Transaction).all()
+    )
+    # …but the history is there for the analysis.
+    analysis = client.get("/api/analysis/spending?months=36", headers=headers).json()
+    assert analysis["has_data"] is True
+
+
+def test_new_spending_after_an_import_still_rounds_up(
+    client, db, student_user, headers
+):
+    goal = make_goal(db, student_user)
+    _upload(client, headers)
+    assert goal.current_amount == Decimal("0.00")
+    res = post_tx(client, headers, amount=12.5)
+    assert res.json()["roundup_applied"] is True
+    db.refresh(goal)
+    assert goal.current_amount == Decimal("0.50")
+
+
+# --------------------------------------------- dev SQLite files from older versions
+def test_old_sqlite_dev_database_is_upgraded_in_place(tmp_path):
+    from app.database import Base, upgrade_sqlite_schema
+    from sqlalchemy import create_engine, inspect, text
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    # The schema as it was before refresh tokens / transactions.source existed.
+    with engine.begin() as c:
+        Base.metadata.tables["users"].create(c)
+        c.execute(
+            text(
+                "CREATE TABLE user_sessions (session_id INTEGER PRIMARY KEY, user_id INTEGER"
+                " NOT NULL, jwt_token_id VARCHAR, ip_address VARCHAR, device VARCHAR,"
+                " login_at DATETIME, expires_at DATETIME, logout_at DATETIME, revoked_at DATETIME)"
+            )
+        )
+        c.execute(
+            text(
+                "CREATE TABLE transactions (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,"
+                " amount NUMERIC(12,2) NOT NULL, merchant VARCHAR NOT NULL, category VARCHAR"
+                " NOT NULL, type VARCHAR NOT NULL, description VARCHAR, transaction_date"
+                " DATETIME NOT NULL, round_up_amount NUMERIC(12,2) NOT NULL,"
+                " is_round_up_applied BOOLEAN NOT NULL, created_at DATETIME NOT NULL,"
+                " is_deleted BOOLEAN NOT NULL)"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO users(full_name,email,role,has_completed_onboarding,created_at,updated_at)"
+                " VALUES('Old','old@x.com','student',0,'2026-01-01','2026-01-01')"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO transactions(user_id,amount,merchant,category,type,transaction_date,"
+                "round_up_amount,is_round_up_applied,created_at,is_deleted)"
+                " VALUES(1,10,'Cafe','Food','debit','2026-01-01',0,0,'2026-01-01',0)"
+            )
+        )
+
+    added = upgrade_sqlite_schema(engine)
+    assert set(added) == {
+        "user_sessions.refresh_token_hash",
+        "user_sessions.previous_refresh_token_hash",
+        "user_sessions.refresh_expires_at",
+        "transactions.source",
+    }
+    names = {c["name"] for c in inspect(engine).get_columns("transactions")}
+    assert "source" in names
+    with engine.connect() as c:
+        # Existing rows survive and get the default.
+        assert c.execute(text("SELECT source FROM transactions")).scalar() == "manual"
+        assert c.execute(text("SELECT count(*) FROM users")).scalar() == 1
+    assert upgrade_sqlite_schema(engine) == []  # idempotent
+
+
+def test_demo_seed_is_complete_and_idempotent(client, db):
+    from app.services.demo_seed import DEMO_EMAIL, DEMO_PASSWORD, seed
+
+    first = seed(client)
+    assert first["imported"] == 81
+    assert first["simulated"] == 3
+
+    second = seed(client)  # nothing is added twice
+    assert second["imported"] == 0 and second["duplicates_skipped"] == 81
+    assert second["simulated"] == 0
+
+    token = client.post(
+        "/api/auth/login/json", json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
+    ).json()
+    assert token["has_completed_onboarding"] is True
+    headers = {"Authorization": f"Bearer {token['access_token']}"}
+    goals = client.get("/api/goals/", headers=headers).json()
+    assert [g["title"] for g in goals] == ["New Laptop"]
+    # Savings come only from the three simulated payments, not from the history.
+    assert db.query(Savings).count() == 3
+    assert goals[0]["progress_percentage"] > 0
+    analysis = client.get("/api/analysis/spending?months=36", headers=headers).json()
+    assert analysis["has_data"] is True and analysis["transaction_count"] == 81
+
+
+# ------------------------------------- wellness: scores first, narration second
+def _calls(monkeypatch, behaviour):
+    calls = {"n": 0}
+
+    async def fake(*args, **kwargs):
+        calls["n"] += 1
+        return await behaviour()
+
+    monkeypatch.setattr("app.routers.wellness.call_llama", fake)
+    return calls
+
+
+def test_wellness_score_returns_without_waiting_for_the_ai(
+    client, headers, monkeypatch
+):
+    async def never_called():
+        raise AssertionError("the fast path must not call the model")
+
+    calls = _calls(monkeypatch, never_called)
+    res = client.get("/api/wellness/score", headers=headers)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["summary_source"] == "factual"
+    assert body["ai_summary"].startswith("Your financial wellness score is")
+    assert calls["n"] == 0
+
+
+def test_narration_upgrades_the_summary_and_is_remembered(client, headers, monkeypatch):
+    async def narrate():
+        return "You're doing fine; keep topping up your goal."
+
+    calls = _calls(monkeypatch, narrate)
+    report = client.get("/api/wellness/score", headers=headers).json()
+
+    res = client.post(f"/api/wellness/narrate/{report['report_id']}", headers=headers)
+    assert res.status_code == 200
+    assert res.json()["summary_source"] == "ai"
+    assert res.json()["ai_summary"].startswith("You're doing fine")
+
+    # Same score within the hour: the stored AI text is served, the model isn't asked again.
+    again = client.get("/api/wellness/score", headers=headers).json()
+    assert again["report_id"] == report["report_id"]
+    assert again["summary_source"] == "ai"
+    client.post(f"/api/wellness/narrate/{report['report_id']}", headers=headers)
+    assert calls["n"] == 1
+
+
+def test_failed_narration_leaves_the_factual_summary(client, headers, monkeypatch):
+    async def offline():
+        raise RuntimeError("model offline")
+
+    _calls(monkeypatch, offline)
+    report = client.get("/api/wellness/score", headers=headers).json()
+    res = client.post(f"/api/wellness/narrate/{report['report_id']}", headers=headers)
+    assert res.status_code == 200
+    assert res.json()["summary_source"] == "factual"
+    assert res.json()["ai_summary"] == report["ai_summary"]
+
+
+def test_narration_with_invented_figures_is_never_stored(client, headers):
+    from unittest.mock import AsyncMock, patch
+
+    import httpx
+    from app.services.ai_engine import call_llama
+
+    # Use the real call_llama (with its numbers check) against a model that invents a figure.
+    reply = httpx.Response(
+        200,
+        json={"message": {"role": "assistant", "content": "You could save 37% more!"}},
+        request=httpx.Request("POST", "http://ollama:11434/api/chat"),
+    )
+    report = client.get("/api/wellness/score", headers=headers).json()
+    with (
+        patch("app.routers.wellness.call_llama", call_llama),
+        patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock, return_value=reply
+        ),
+    ):
+        res = client.post(
+            f"/api/wellness/narrate/{report['report_id']}", headers=headers
+        )
+    assert res.json()["summary_source"] == "factual"
+    assert "37" not in res.json()["ai_summary"]
+
+
+def test_narration_is_private_and_skips_stale_reports(
+    client, db, student_user, headers, monkeypatch
+):
+    from app.models.models import FinancialHealth, User
+
+    async def narrate():
+        return "Hello."
+
+    _calls(monkeypatch, narrate)
+    other = User(full_name="Other", email="o@x.com", role="student")
+    db.add(other)
+    db.commit()
+    theirs = FinancialHealth(user_id=other.user_id, health_score=50, stress_score=50)
+    db.add(theirs)
+    db.commit()
+    assert (
+        client.post(
+            f"/api/wellness/narrate/{theirs.report_id}", headers=headers
+        ).status_code
+        == 404
+    )
+
+    # A report whose score no longer matches the live numbers is not narrated.
+    mine = FinancialHealth(
+        user_id=student_user.user_id, health_score=1, stress_score=99, ai_summary="old"
+    )
+    db.add(mine)
+    db.commit()
+    res = client.post(f"/api/wellness/narrate/{mine.report_id}", headers=headers)
+    assert (
+        res.json()["ai_summary"] == "old" and res.json()["summary_source"] == "factual"
+    )

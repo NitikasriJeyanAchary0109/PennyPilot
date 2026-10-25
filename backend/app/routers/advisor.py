@@ -12,7 +12,7 @@ import logging
 
 from app.middleware.auth_middleware import get_current_user
 from app.models.models import User
-from app.services.ai_engine import AIEngineError, call_llama
+from app.services.ai_engine import AIEngineError, call_llama, user_facing_error
 from app.utils.prompts import (
     ADVISOR_DISCLAIMER,
     advisor_system_prompt,
@@ -53,7 +53,10 @@ async def ask_advisor(
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The money-basics assistant is temporarily unavailable. Try again in a moment.",
+            detail=user_facing_error(
+                exc,
+                "The money-basics assistant is temporarily unavailable. Try again in a moment.",
+            ),
         ) from exc
 
     return AdvisorResponse(response=answer, disclaimer=ADVISOR_DISCLAIMER)

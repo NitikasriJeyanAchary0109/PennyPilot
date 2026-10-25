@@ -234,6 +234,12 @@ npm run start
 - Press `w` in your terminal to open the web application at `http://localhost:8081`.
 - Scan the QR code using the **Expo Go** app on your physical iOS or Android device.
 
+#### Demo account (local development only)
+```bash
+cd backend && python scripts/seed_demo.py
+```
+Creates a ready-to-use student (onboarding done, a savings goal, the sample bank statement imported) and prints its login. The credentials live in `backend/app/services/demo_seed.py`; the script refuses to run when `ENVIRONMENT=production`.
+
 #### 4. Local AI Engine Setup (Ollama)
 To enable the offline AI financial coach:
 ```bash

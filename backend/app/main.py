@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from app.config import assert_production_ready, settings
-from app.database import Base, engine, get_db
+from app.database import Base, engine, get_db, upgrade_sqlite_schema
 from app.routers import (
     advisor,
     analysis,
@@ -41,6 +41,8 @@ async def lifespan(app: FastAPI):
     # convenience only (it would bypass migrations).
     if settings.ENVIRONMENT.lower() != "production":
         Base.metadata.create_all(bind=engine)
+        # Older development SQLite files predate newer columns; add them in place.
+        upgrade_sqlite_schema(engine)
 
     yield
 

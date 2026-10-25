@@ -81,9 +81,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
 
         const details = [
           `Imported ${imported} transaction${Number(imported) === 1 ? "" : "s"}.`,
-          summary.roundups_triggered > 0
-            ? `${summary.roundups_triggered} round-up${summary.roundups_triggered === 1 ? "" : "s"} saved toward your goal.`
-            : null,
+          "This is your spending history, used for analysis only. It doesn't add anything to your savings — round-ups start with new purchases.",
           summary.duplicates_skipped > 0
             ? `${summary.duplicates_skipped} row${summary.duplicates_skipped === 1 ? " was" : "s were"} already in your transactions and skipped.`
             : null,
@@ -142,7 +140,7 @@ export const CSVUploadScreen = ({ navigation }: { navigation: any }) => {
           Upload statement history
         </Text>
         <Text className="mt-2 font-sans text-sm text-text-secondary leading-relaxed">
-          Import a bank statement CSV to see where your money goes, find subscriptions and start rounding up.
+          Import a bank statement CSV to see where your money goes and find subscriptions. It's used for analysis only — round-ups apply to new purchases.
         </Text>
       </View>
 

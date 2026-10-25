@@ -279,6 +279,7 @@ class FinancialHealthResponse(BaseModel):
     health_score: int
     stress_score: int
     ai_summary: Optional[str]
+    summary_source: str = "factual"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

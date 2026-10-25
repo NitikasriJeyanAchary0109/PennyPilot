@@ -78,6 +78,7 @@ describe("no substitute data when the API fails", () => {
     ],
     ["getRoundupStats", () => apiService.getRoundupStats()],
     ["getStressMeter", () => apiService.getStressMeter(30)],
+    ["narrateWellness", () => apiService.narrateWellness(1, 30)],
   ];
 
   it.each(failing)("%s rejects on a server error", async (_name, call) => {
