@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { Target, Plus, ChevronRight, Calendar } from "lucide-react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
 import {
   ScreenContainer,
   Header,
@@ -28,6 +28,7 @@ export const GoalsScreen = () => {
   const [goals, setGoals] = useState<GoalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const triggerHaptic = () => {
     try {
@@ -40,39 +41,13 @@ export const GoalsScreen = () => {
   const loadGoals = useCallback(async () => {
     try {
       setLoading(true);
+      // The list endpoint already includes the backend-computed progress_percentage.
       const rawGoals = await apiService.getGoals();
-      if (Array.isArray(rawGoals) && rawGoals.length > 0) {
-        // Fetch detailed stats including backend-calculated progress_percentage for each
-        const detailed = await Promise.all(
-          rawGoals.map(async (g) => {
-            try {
-              const d = await apiService.getGoalById(g.goal_id);
-              return {
-                goal_id: g.goal_id,
-                goal_name: g.goal_name,
-                saved: g.saved,
-                target: g.target,
-                deadline: g.deadline,
-                progress_percentage: d.progress_percentage,
-              };
-            } catch {
-              return {
-                goal_id: g.goal_id,
-                goal_name: g.goal_name,
-                saved: g.saved,
-                target: g.target,
-                deadline: g.deadline,
-              };
-            }
-          })
-        );
-        setGoals(detailed);
-      } else {
-        setGoals([]);
-      }
+      setGoals(Array.isArray(rawGoals) ? rawGoals : []);
+      setError(null);
     } catch (e: any) {
       console.warn("Failed to load goals:", e?.message);
-      setGoals([]);
+      setError(getErrorMessage(e, "Couldn't load your goals."));
     } finally {
       setLoading(false);
     }
@@ -126,13 +101,19 @@ export const GoalsScreen = () => {
         className="px-0 mb-3"
       />
 
+      {error && (
+        <Card variant="peach" padding="md" className="mb-3">
+          <Text className="text-xs text-text-secondary font-sans">{error}</Text>
+        </Card>
+      )}
+
       {loading && goals.length === 0 ? (
         <View className="py-4 space-y-4">
           <Skeleton width="100%" height={120} className="rounded-card mb-3" />
           <Skeleton width="100%" height={120} className="rounded-card mb-3" />
           <Skeleton width="100%" height={120} className="rounded-card" />
         </View>
-      ) : goals.length === 0 ? (
+      ) : goals.length === 0 && !error ? (
         <Card variant="default" padding="lg" className="my-6 shadow-card">
           <EmptyState
             title="No dreams set yet"
@@ -145,7 +126,7 @@ export const GoalsScreen = () => {
             icon={<Target size={32} color="#144a32" />}
           />
         </Card>
-      ) : (
+      ) : goals.length === 0 ? null : (
         <View className="mb-6 space-y-3.5">
           {goals.map((goal, idx) => {
             const deadlineStr = goal.deadline

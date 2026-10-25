@@ -1,7 +1,7 @@
 from typing import List
 
 from app.database import get_db
-from app.models.models import User
+from app.models.models import User, UserSession
 from app.schemas.schemas import TokenData
 from app.utils.security import decode_access_token
 from fastapi import Depends, HTTPException, status
@@ -11,6 +11,10 @@ from sqlalchemy.orm import Session
 # OAuth2PasswordBearer extracts the bearer token from the Authorization header.
 # Point it to the login path.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+# For endpoints that must also work without a (valid) access token, e.g. logout.
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="api/auth/login", auto_error=False
+)
 
 
 async def get_current_user(
@@ -39,6 +43,36 @@ async def get_current_user(
 
     token_data = TokenData(email=email, role=role, user_id=user_id)
 
+    # The token belongs to a login session; once that session is revoked (logout,
+    # or a detected refresh-token replay) every access token it issued is dead,
+    # not just the latest one.
+    sid = payload.get("sid")
+    if sid is not None:
+        session = (
+            db.query(UserSession.user_id, UserSession.revoked_at)
+            .filter(UserSession.session_id == sid)
+            .first()
+        )
+        if session is None or session.revoked_at is not None:
+            raise credentials_exception
+        if session.user_id != user_id:
+            raise credentials_exception
+
+    # Tokens issued before sessions carried an id (`sid`) are still checked by
+    # their token id until they expire.
+    jti = payload.get("jti")
+    if sid is None and jti:
+        revoked = (
+            db.query(UserSession.session_id)
+            .filter(
+                UserSession.jwt_token_id == jti,
+                UserSession.revoked_at.isnot(None),
+            )
+            .first()
+        )
+        if revoked:
+            raise credentials_exception
+
     user = db.query(User).filter(User.user_id == token_data.user_id).first()
     if user is None:
         raise credentials_exception
@@ -49,7 +83,7 @@ async def get_current_user(
 class RoleChecker:
     """
     Dependency class to enforce role-based access control.
-    Example usage: current_user: User = Depends(RoleChecker(["educator"]))
+    Example usage: current_user: User = Depends(RoleChecker(["student"]))
     """
 
     def __init__(self, allowed_roles: List[str]):
@@ -66,4 +100,3 @@ class RoleChecker:
 
 # Conveniences for common requirements
 require_student = RoleChecker(["student"])
-require_educator = RoleChecker(["educator"])

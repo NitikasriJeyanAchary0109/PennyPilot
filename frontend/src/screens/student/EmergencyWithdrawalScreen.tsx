@@ -17,7 +17,7 @@ import {
   AlertTriangle,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
 import {
   ScreenContainer,
   Card,
@@ -85,6 +85,7 @@ export const EmergencyWithdrawalScreen = ({
       }
     } catch (e: any) {
       console.warn("Failed to load goal for withdrawal:", e?.message);
+      Alert.alert("Couldn't load goals", getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -129,22 +130,22 @@ export const EmergencyWithdrawalScreen = ({
     setIsProcessing(true);
 
     try {
-      await apiService.withdrawGoal(goalId, { amount: val, reason });
+      const result = await apiService.withdrawGoal(goalId, { amount: val, reason });
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {
         // Ignore on web
       }
 
-      Alert.alert(
-        "Withdrawal Processed",
-        `₹${formatINR(val)} has been transferred from "${goalName}" to your primary bank account.`,
-        [{ text: "Done", onPress: () => navigation.goBack() }]
-      );
+      // The backend message is explicit that this updates Penny Pilot's records
+      // and does not move money in a bank account.
+      Alert.alert("Withdrawal recorded", result.message, [
+        { text: "Done", onPress: () => navigation.goBack() },
+      ]);
     } catch (e: any) {
       Alert.alert(
-        "Withdrawal Error",
-        e?.message || "Failed to process emergency withdrawal. Please try again."
+        "Withdrawal not recorded",
+        getErrorMessage(e, "Failed to record the withdrawal. Please try again.")
       );
     } finally {
       setIsProcessing(false);
@@ -205,7 +206,7 @@ export const EmergencyWithdrawalScreen = ({
                   Life happens. You're protected.
                 </Text>
                 <Text className="text-xs text-text-secondary font-sans mt-1 leading-relaxed">
-                  Your micro-savings are designed to support you when urgent needs arise. Withdraw what you need now without penalties.
+                  Your micro-savings are there for urgent needs. Release what you need now — there are no penalties, and your goal history stays accurate.
                 </Text>
               </View>
             </View>
@@ -236,7 +237,7 @@ export const EmergencyWithdrawalScreen = ({
 
             <View className="flex-row items-baseline mt-2 pt-2 border-t border-border/50">
               <Text className="text-xs text-text-secondary font-sans">
-                Available to withdraw:
+                Available to release:
               </Text>
               <Text className="text-base font-bold text-primary font-sans ml-2">
                 ₹{formatINR(balance)}
@@ -333,7 +334,7 @@ export const EmergencyWithdrawalScreen = ({
 
           {/* Action Button */}
           <Button
-            title={isProcessing ? "Processing..." : "Confirm Emergency Withdrawal"}
+            title={isProcessing ? "Recording..." : "Record Emergency Withdrawal"}
             variant="danger"
             size="lg"
             disabled={isProcessing || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > balance}

@@ -3,7 +3,7 @@ import datetime
 import pytest
 from app.database import Base, get_db
 from app.main import app
-from app.middleware.auth_middleware import require_educator, require_student
+from app.middleware.auth_middleware import require_student
 from app.models.models import (
     AuditLog,
     Budget,
@@ -57,27 +57,6 @@ def override_require_student():
         db.close()
 
 
-def override_require_educator():
-    db = TestingSessionLocal()
-    try:
-        user = db.query(User).filter(User.user_id == 2).first()
-        if user is None:
-            user = User(
-                user_id=2,
-                full_name="Test Educator",
-                email="educator@test.com",
-                role="educator",
-                created_at=datetime.datetime.utcnow(),
-                updated_at=datetime.datetime.utcnow(),
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        return user
-    finally:
-        db.close()
-
-
 client = TestClient(app)
 
 
@@ -100,7 +79,6 @@ def setup_database():
     app.dependency_overrides.clear()
     app.dependency_overrides[get_db] = get_testing_db
     app.dependency_overrides[require_student] = override_require_student
-    app.dependency_overrides[require_educator] = override_require_educator
 
     db = TestingSessionLocal()
     # Clean tables
@@ -116,20 +94,87 @@ def setup_database():
     yield
 
 
-def test_auth_google():
-    # Test POST /api/auth/google
-    response = client.post(
-        "/api/auth/google",
-        json={
-            "email": "googleuser@test.com",
-            "full_name": "Google User",
-            "oauth_id": "123456789",
-        },
-    )
+def test_auth_google_verifies_token_with_google():
+    from unittest.mock import patch
+
+    claims = {
+        "email": "GoogleUser@Test.com",
+        "sub": "123456789",
+        "name": "Google User",
+    }
+    with patch("app.routers.auth.verify_google_id_token", return_value=claims):
+        response = client.post(
+            "/api/auth/google",
+            # The body's identity fields (if any) must be ignored: only the
+            # verified token decides who is signing in.
+            json={"id_token": "x" * 20, "email": "victim@test.com"},
+        )
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
     assert data["role"] == "student"
+
+    me = client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {data['access_token']}"}
+    )
+    assert me.json()["email"] == "googleuser@test.com"
+
+
+def test_auth_google_rejects_unverified_identity_claims():
+    # The old contract (email + oauth_id in the body, no token) was an
+    # account-takeover hole and must no longer work.
+    response = client.post(
+        "/api/auth/google",
+        json={
+            "email": "victim@test.com",
+            "full_name": "Victim",
+            "oauth_id": "123456789",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_auth_google_invalid_token_is_401(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(
+        settings, "GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com"
+    )
+
+    class FakeResponse:
+        status_code = 400
+
+        def json(self):
+            return {"error": "invalid_token"}
+
+    monkeypatch.setattr(
+        "app.services.google_auth.httpx.get", lambda *a, **k: FakeResponse()
+    )
+    response = client.post("/api/auth/google", json={"id_token": "bad" * 10})
+    assert response.status_code == 401
+
+
+def test_auth_google_wrong_audience_is_401(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "mine.apps.googleusercontent.com")
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "aud": "someone-elses-app",
+                "email": "a@b.com",
+                "email_verified": "true",
+                "sub": "1",
+            }
+
+    monkeypatch.setattr(
+        "app.services.google_auth.httpx.get", lambda *a, **k: FakeResponse()
+    )
+    response = client.post("/api/auth/google", json={"id_token": "tok" * 10})
+    assert response.status_code == 401
 
 
 def test_google_callback_html_onboarding_states():
@@ -200,7 +245,12 @@ def test_wellness_and_stress():
     assert "health_score" in data
     assert "stress_score" in data
     assert "ai_summary" in data
-    assert "Mocked AI Response" in data["ai_summary"]
+    # The score returns at once with a plain summary; the AI text is a second step.
+    assert data["summary_source"] == "factual"
+    narrated = client.post(f"/api/wellness/narrate/{data['report_id']}")
+    assert narrated.status_code == 200
+    assert "Mocked AI Response" in narrated.json()["ai_summary"]
+    assert narrated.json()["summary_source"] == "ai"
 
     # Test POST /api/wellness/score
     response = client.post("/api/wellness/score", json={"timeframe_days": 30})
@@ -322,42 +372,6 @@ def test_notifications():
     response = client.patch(f"/api/notifications/{notif_id}/read")
     assert response.status_code == 200
     assert response.json()["status"] == "read"
-
-
-def test_educator_overview_trends():
-    db = TestingSessionLocal()
-    # Ensure there is a student and some data
-    std = db.query(User).filter(User.user_id == 1).first()
-    if std is None:
-        std = User(
-            user_id=1,
-            full_name="Test Student",
-            email="student@test.com",
-            role="student",
-        )
-        db.add(std)
-
-    db_goal = Goal(
-        user_id=1,
-        title="Holiday",
-        target_amount=1000.00,
-        current_amount=200.00,
-        status="active",
-    )
-    db.add(db_goal)
-    db.commit()
-    db.close()
-
-    # Test GET /api/educator/overview
-    response = client.get("/api/educator/overview")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["total_students"] >= 1
-    assert float(data["total_savings"]) >= 200.00
-
-    # Test GET /api/educator/trends
-    response = client.get("/api/educator/trends")
-    assert response.status_code == 200
 
 
 def test_legacy_bcrypt_hash_backward_compatibility():

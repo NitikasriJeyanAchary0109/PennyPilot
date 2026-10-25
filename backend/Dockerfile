@@ -32,5 +32,5 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# Run Uvicorn server in production mode
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Apply database migrations, then run Uvicorn in production mode
+CMD ["sh", "-c", "python scripts/migrate.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

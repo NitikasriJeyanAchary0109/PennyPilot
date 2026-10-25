@@ -5,6 +5,8 @@ Architecture contract
 ---------------------
 - ONLY responsibility: format a prompt, POST it to Ollama, and return raw text.
 - NEVER perform financial calculations, access the database, or import rule_engine.
+- Output is checked, not trusted: a reply containing a number that was not in the
+  prompt is rejected (see call_llama / ai_guard).
 - All numbers in prompts must be pre-computed by rule_engine.py BEFORE this module
   is called. This module treats every numeric value it receives as an opaque string
   inside a prompt — it never interprets or transforms them.
@@ -26,11 +28,13 @@ which Ollama endpoint is in use.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Optional
 
 import httpx
 from app.config import settings
+from app.services.ai_guard import ungrounded_figures
 
 # ---------------------------------------------------------------------------
 # Module logger — uses the same name as the root app logger so log aggregators
@@ -41,7 +45,7 @@ logger = logging.getLogger("pennypilot.ai_engine")
 # ---------------------------------------------------------------------------
 # Runtime constants — change here; reflected everywhere automatically.
 # ---------------------------------------------------------------------------
-_REQUEST_TIMEOUT_SECONDS: float = 30.0  # per-attempt wall-clock timeout
+_REQUEST_TIMEOUT_SECONDS: float = 60.0  # per-attempt wall-clock timeout
 _MAX_RETRIES: int = 1  # retry once on timeout or 5xx, then raise
 
 
@@ -100,15 +104,35 @@ class AIEngineError(Exception):
         )
 
 
+class UngroundedReplyError(AIEngineError):
+    """The model's reply contained figures that were not in the data it was given."""
+
+
+_SENTENCE_END = re.compile(r"^(.*[.!?])(?=\s|$)", re.DOTALL)
+
+
+def trim_to_last_sentence(text: str) -> str:
+    """
+    Drop a trailing fragment left by hitting the token limit.
+
+    Keeps everything up to the last sentence terminator (a "." inside a number
+    such as ₹1,200.50 doesn't count). If the reply has no complete sentence it
+    is returned unchanged rather than emptied.
+    """
+    text = text.strip()
+    match = _SENTENCE_END.match(text)
+    return match.group(1).strip() if match else text
+
+
 # ---------------------------------------------------------------------------
 # Core LLM caller
 # ---------------------------------------------------------------------------
 
 
-async def call_llama(
+async def _generate(
     system_prompt: str,
     user_prompt: str,
-    model: str = "llama3",
+    model: Optional[str] = None,
 ) -> str:
     """
     Send a chat-style request to Ollama and return the assistant's reply as a
@@ -134,7 +158,7 @@ async def call_llama(
     Args:
         system_prompt: Persona/role instructions for the LLM.
         user_prompt:   The actual question or narration request.
-        model:         Ollama model tag (default: "llama3").
+        model:         Ollama model tag (default: settings.OLLAMA_MODEL).
 
     Returns:
         The assistant's response text, stripped of leading/trailing whitespace.
@@ -144,6 +168,7 @@ async def call_llama(
                        unexpected network error.
     """
     url = _chat_url()
+    model = model or settings.OLLAMA_MODEL
     payload = {
         "model": model,
         "messages": [
@@ -151,6 +176,11 @@ async def call_llama(
             {"role": "user", "content": user_prompt},
         ],
         "stream": False,
+        "keep_alive": -1,
+        "options": {
+            "num_predict": settings.OLLAMA_NUM_PREDICT,
+            "temperature": 0.4,
+        },
     }
 
     last_error: Optional[Exception] = None
@@ -215,6 +245,9 @@ async def call_llama(
                 or data.get("response", "")  # fallback for older Ollama builds
             ).strip()
 
+            if data.get("done_reason") == "length":
+                content = trim_to_last_sentence(content)
+
             if not content:
                 logger.error(
                     "ai_engine.call_llama | attempt=%s latency_ms=%d — empty content in response",
@@ -278,6 +311,63 @@ async def call_llama(
     # All attempts exhausted — raise the last recorded error
     assert last_error is not None, "Retry loop exited without setting last_error"
     raise last_error
+
+
+# Appended to the prompt when a reply is rejected, for the single retry.
+_GROUNDING_REMINDER = (
+    "\n\nIMPORTANT: your last answer used numbers that are not in the data above. "
+    "Use only the numbers given. Do not add percentages, totals, estimates or dates "
+    "of your own; if a figure isn't provided, describe it in words instead."
+)
+_GROUNDING_ATTEMPTS = 2
+
+
+async def call_llama(
+    system_prompt: str,
+    user_prompt: str,
+    model: Optional[str] = None,
+) -> str:
+    """
+    Ask the model and return its reply — but only a reply whose numbers all come
+    from the prompt.
+
+    Zero-Arithmetic rule: code computes every figure, the model only phrases them.
+    The reply is checked (services/ai_guard.py); if it contains a number that was
+    not supplied, the model gets one more attempt with a reminder, and if it still
+    does, UngroundedReplyError is raised so callers use their factual fallback (or
+    report the AI as unavailable). Nothing is ever shown that the model made up.
+    """
+    prompt = user_prompt
+    offenders: list = []
+    for attempt in range(_GROUNDING_ATTEMPTS):
+        reply = await _generate(system_prompt, prompt, model)
+        offenders = ungrounded_figures(reply, (system_prompt, user_prompt))
+        if not offenders:
+            return reply
+        logger.warning(
+            "ai_engine.call_llama | ungrounded figures in reply (attempt %d/%d): %s",
+            attempt + 1,
+            _GROUNDING_ATTEMPTS,
+            ", ".join(offenders[:5]),
+        )
+        prompt = user_prompt + _GROUNDING_REMINDER
+
+    raise UngroundedReplyError(
+        "The AI's reply included figures that were not in your data "
+        f"({', '.join(offenders[:3])}), so it was discarded.",
+        retried=True,
+    )
+
+
+def user_facing_error(exc: AIEngineError, default: str) -> str:
+    """Message to show a user for a failed AI call (distinguishes a rejected reply)."""
+    if isinstance(exc, UngroundedReplyError):
+        return (
+            "I couldn't give an answer I could stand behind — it needed figures "
+            "that aren't in your data. Try rephrasing, or ask about something "
+            "specific in your goals or budgets."
+        )
+    return default
 
 
 # ---------------------------------------------------------------------------

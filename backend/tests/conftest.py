@@ -86,32 +86,3 @@ def student_token(student_user):
             "user_id": student_user.user_id,
         }
     )
-
-
-@pytest.fixture
-def educator_user(db):
-    user = db.query(User).filter(User.email == "educator_fixt@test.com").first()
-    if not user:
-        user = User(
-            full_name="Educator Fixture",
-            email="educator_fixt@test.com",
-            password_hash=get_password_hash("password123"),
-            role="educator",
-            created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow(),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    return user
-
-
-@pytest.fixture
-def educator_token(educator_user):
-    return create_access_token(
-        data={
-            "sub": educator_user.email,
-            "role": educator_user.role,
-            "user_id": educator_user.user_id,
-        }
-    )

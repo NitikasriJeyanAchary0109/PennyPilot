@@ -1,67 +1,18 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import List
 
 from app.database import get_db
 from app.middleware.auth_middleware import require_student
-from app.models.models import AuditLog, Budget, Transaction, User
+from app.models.models import AuditLog, Budget, User
 from app.schemas.schemas import BudgetCreate, BudgetResponse, BudgetUpdate
+from app.services.ledger import calculate_spent_amount
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/budgets", tags=["Budgets"])
-
-
-def _get_period_bounds(period: str, start_date: Optional[datetime] = None):
-    if period not in {"weekly", "monthly"}:
-        raise HTTPException(
-            status_code=400, detail="period must be either weekly or monthly"
-        )
-
-    if start_date is None:
-        start_date = datetime.utcnow()
-
-    if period == "weekly":
-        start = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + timedelta(
-            days=6, hours=23, minutes=59, seconds=59, microseconds=999999
-        )
-    else:
-        start = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = start.replace(
-            year=start.year + (start.month // 12), month=((start.month % 12) + 1), day=1
-        ) - timedelta(microseconds=1)
-
-    return start, end
-
-
-def calculate_spent_amount(
-    db: Session,
-    user_id: int,
-    category: str,
-    period: str,
-    start_date: Optional[datetime] = None,
-) -> Decimal:
-    start, end = _get_period_bounds(period, start_date)
-    spent_amount = (
-        db.query(Transaction.amount)
-        .filter(
-            Transaction.user_id == user_id,
-            Transaction.category == category,
-            Transaction.is_deleted == False,
-            Transaction.transaction_date >= start,
-            Transaction.transaction_date <= end,
-        )
-        .all()
-    )
-    spent_total = Decimal("0.00")
-    for amount in spent_amount:
-        raw_value = amount[0]
-        if raw_value is None:
-            continue
-        spent_total += Decimal(str(raw_value))
-    return spent_total
 
 
 def _serialize_budget(budget: Budget, db: Session) -> dict:
@@ -106,7 +57,7 @@ def create_budget(
         db.query(Budget)
         .filter(
             Budget.user_id == current_user.user_id,
-            Budget.category == budget_data.category,
+            func.lower(Budget.category) == budget_data.category.lower(),
             Budget.period == budget_data.period,
             Budget.is_deleted == False,
         )

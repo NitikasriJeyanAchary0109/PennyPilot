@@ -18,7 +18,13 @@ from sqlalchemy.orm import Session
 router = APIRouter(prefix="/forecast", tags=["Dream Engine"])
 
 
-@router.post("/", response_model=ChatHistoryResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/",
+    response_model=ChatHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    deprecated=True,
+    summary="Deprecated — use GET /goals/{goal_id}/forecast",
+)
 async def forecast_savings(
     request: ForecastRequest,
     current_user: User = Depends(require_student),

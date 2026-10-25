@@ -15,6 +15,7 @@ import OnboardingSetupScreen from "../screens/student/OnboardingSetupScreen";
 import SpendingEntryChoiceScreen from "../screens/student/SpendingEntryChoiceScreen";
 import ManualIncomeExpenseScreen from "../screens/student/ManualIncomeExpenseScreen";
 import CreateGoalScreen from "../screens/student/CreateGoalScreen";
+import SpendingAnalysisScreen from "../screens/student/SpendingAnalysisScreen";
 
 // Student Screens
 import HomeScreen from "../screens/student/HomeScreen";
@@ -29,15 +30,11 @@ import ProfileScreen from "../screens/student/ProfileScreen";
 import NotificationsScreen from "../screens/student/NotificationsScreen";
 import BudgetsScreen from "../screens/student/BudgetsScreen";
 
-// Educator Screens
-import OverviewScreen from "../screens/educator/OverviewScreen";
-import TrendsScreen from "../screens/educator/TrendsScreen";
-import LiteracyScreen from "../screens/educator/LiteracyScreen";
-
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const studentScreenOptions = {
+  headerShown: false,
   headerStyle: {
     backgroundColor: "#fbf7ee",
   },
@@ -154,6 +151,10 @@ function StudentStackScreen() {
         name="CSVUpload" 
         component={CSVUploadScreen} 
       />
+      <StudentStackNavigator.Screen
+        name="SpendingAnalysis"
+        component={SpendingAnalysisScreen}
+      />
       <StudentStackNavigator.Screen 
         name="SubscriptionNegotiator" 
         component={SubscriptionNegotiatorScreen} 
@@ -187,51 +188,9 @@ function OnboardingStackScreen() {
       <OnboardingStackNavigator.Screen name="SpendingEntryChoice" component={SpendingEntryChoiceScreen} />
       <OnboardingStackNavigator.Screen name="ManualIncomeExpense" component={ManualIncomeExpenseScreen} />
       <OnboardingStackNavigator.Screen name="CSVUpload" component={CSVUploadScreen} />
+      <OnboardingStackNavigator.Screen name="SpendingAnalysis" component={SpendingAnalysisScreen} />
       <OnboardingStackNavigator.Screen name="CreateGoal" component={CreateGoalScreen} />
     </OnboardingStackNavigator.Navigator>
-  );
-}
-
-// ==========================
-// EDUCATOR TABS
-// ==========================
-function EducatorTabs() {
-  return (
-    <Tab.Navigator screenOptions={studentScreenOptions}>
-      <Tab.Screen
-        name="Overview"
-        component={OverviewScreen}
-        options={{
-          title: "Educator Dashboard",
-          tabBarLabel: "Overview",
-          tabBarIcon: ({ color, size }) => (
-            <LayoutDashboard size={size || 22} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Trends"
-        component={TrendsScreen}
-        options={{
-          title: "Cohort Trends",
-          tabBarLabel: "Trends",
-          tabBarIcon: ({ color, size }) => (
-            <TrendingUp size={size || 22} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Literacy"
-        component={LiteracyScreen}
-        options={{
-          title: "AI Quality Oversight",
-          tabBarLabel: "Oversight",
-          tabBarIcon: ({ color, size }) => (
-            <GraduationCap size={size || 22} color={color} />
-          ),
-        }}
-      />
-    </Tab.Navigator>
   );
 }
 
@@ -239,7 +198,7 @@ function EducatorTabs() {
 // ROOT NAVIGATOR
 // ==========================
 export const RootNavigator = () => {
-  const { userToken, userRole, isLoading, hasCompletedOnboarding } = useAuth();
+  const { userToken, isLoading, hasCompletedOnboarding } = useAuth();
 
   if (isLoading) {
     return (
@@ -263,11 +222,6 @@ export const RootNavigator = () => {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
         </>
-      ) : userRole === "educator" ? (
-        <Stack.Screen
-          name="EducatorHome"
-          component={EducatorTabs}
-        />
       ) : hasCompletedOnboarding ? (
         <Stack.Screen
           name="StudentHome"

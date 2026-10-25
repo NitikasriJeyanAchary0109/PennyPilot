@@ -48,19 +48,6 @@ export default function App() {
             </AuthProvider>
           </ErrorBoundary>
         )}
-
-        {/* Floating Test Mode Pill for Step 0 styling verification (DEV only) */}
-        {__DEV__ && Platform.OS === "web" && (
-          <TouchableOpacity
-            onPress={() => setShowTestScreen(!showTestScreen)}
-            style={styles.testBadge}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.testBadgeText}>
-              {showTestScreen ? "Show App" : "Step 0 Test Screen"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
@@ -101,22 +88,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#fbf7ee",
     alignItems: "center",
     justifyContent: "center",
-  },
-  testBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    backgroundColor: "rgba(15, 23, 42, 0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(99, 102, 241, 0.4)",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    zIndex: 9999,
-  },
-  testBadgeText: {
-    color: "#818cf8",
-    fontSize: 11,
-    fontWeight: "600",
   },
 });

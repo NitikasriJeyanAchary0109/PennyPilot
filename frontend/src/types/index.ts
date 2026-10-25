@@ -3,7 +3,7 @@ export interface User {
   full_name: string;
   email: string;
   phone?: string;
-  role: "student" | "educator";
+  role: "student";
   has_completed_onboarding: boolean;
   created_at: string;
   updated_at: string;
@@ -33,6 +33,9 @@ export interface Goal {
   target: number;
   saved: number;
   deadline?: string;
+  status?: string;
+  progress_percentage?: number;
+  projected_completion_date?: string | null;
 }
 
 export interface Savings {
@@ -46,6 +49,7 @@ export interface Savings {
 export interface Notification {
   notif_id: number;
   user_id: number;
+  type?: string | null;
   title: string;
   message: string;
   status: "unread" | "read";
@@ -78,6 +82,9 @@ export interface Transaction {
   type: string;  // credit or debit
   date: string;
   description?: string;
+  round_up_amount?: number;
+  is_round_up_applied?: boolean;
+  source?: string; // "manual" | "csv_import" | "bank_simulation"
 }
 
 export interface Budget {
@@ -107,23 +114,11 @@ export interface AuditLog {
 
 export interface TokenResponse {
   access_token: string;
+  refresh_token: string;
+  expires_in: number;
   token_type: string;
-  role: "student" | "educator";
+  role: "student";
   has_completed_onboarding: boolean;
-}
-
-export interface EducatorAnalytics {
-  total_students: number;
-  total_savings: number;
-  average_savings_per_student: number;
-  total_transactions_processed: number;
-  recent_insights: ChatHistory[];
-}
-
-export interface EducatorTrends {
-  total_student_messages_last_30_days: number;
-  top_categories_discussed: { category: string | null; count: number }[];
-  average_round_up_amount: number;
 }
 
 export interface AIInsight {

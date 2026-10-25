@@ -243,19 +243,22 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
                 </Text>
               </View>
 
-              {formattedProjected && (
-                <View className="flex-row items-center justify-between py-2 border-b border-border/50">
-                  <View className="flex-row items-center">
-                    <Clock size={16} color="#144a32" className="mr-2.5" />
-                    <Text className="text-xs font-medium text-text-secondary font-sans ml-2">
-                      Projected Completion
-                    </Text>
-                  </View>
-                  <Text className="text-xs font-bold text-primary font-sans">
-                    {formattedProjected}
+              <View className="flex-row items-center justify-between py-2 border-b border-border/50">
+                <View className="flex-row items-center">
+                  <Clock size={16} color="#144a32" className="mr-2.5" />
+                  <Text className="text-xs font-medium text-text-secondary font-sans ml-2">
+                    Projected Completion
                   </Text>
                 </View>
-              )}
+                <Text
+                  className={`text-xs font-bold font-sans ${
+                    formattedProjected ? "text-primary" : "text-text-muted"
+                  }`}
+                >
+                  {formattedProjected ??
+                    "Not enough recent savings to project"}
+                </Text>
+              </View>
             </View>
           </Card>
 
@@ -275,7 +278,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
               </Text>
             ) : (
               <Text className="text-xs text-text-secondary font-sans leading-relaxed">
-                Keep accumulating micro-savings! Penny Pilot will continuously calculate your completion trajectory based on your daily round-up momentum.
+                A narrative forecast isn't available right now. Your projected date above is calculated from your last 30 days of savings.
               </Text>
             )}
           </Card>
@@ -291,7 +294,7 @@ export const GoalDetailScreen = ({ route, navigation }: { route: any; navigation
                   Need emergency access?
                 </Text>
                 <Text className="text-xs text-text-secondary font-sans mt-1 leading-relaxed">
-                  Life happens. Your savings are here to protect you. You can withdraw your balance to your primary bank account at any time without penalty.
+                  Life happens. You can release money from this goal at any time — Penny Pilot records it, so your balance and history stay accurate. (Moving the money in your bank is up to you.)
                 </Text>
                 <TouchableOpacity
                   onPress={() => {

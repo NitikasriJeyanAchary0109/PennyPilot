@@ -150,6 +150,14 @@ class UserSession(Base):
 
     revoked_at = Column(DateTime)
 
+    # Refresh-token rotation: only a SHA-256 hash of the current refresh token is
+    # stored. The previous hash is kept so a replayed (stolen) token is detected.
+    refresh_token_hash = Column(String, unique=True, nullable=True)
+
+    previous_refresh_token_hash = Column(String, nullable=True)
+
+    refresh_expires_at = Column(DateTime)
+
     user = relationship(
         "User",
         back_populates="sessions",
@@ -430,6 +438,12 @@ class FinancialHealth(Base):
 
     ai_summary = Column(Text)
 
+    # "factual": plain statement of the computed score (always available);
+    # "ai": the model's narration, which passed the numbers check.
+    summary_source = Column(
+        String, nullable=False, default="factual", server_default="factual"
+    )
+
     contributing_factors = Column(JSON)
 
     created_at = Column(
@@ -472,6 +486,9 @@ class Transaction(Base):
     type = Column(String, nullable=False)
 
     description = Column(String)
+
+    # Where the row came from: "manual", "csv_import" or "bank_simulation".
+    source = Column(String, nullable=False, default="manual", server_default="manual")
 
     transaction_date = Column(
         DateTime,

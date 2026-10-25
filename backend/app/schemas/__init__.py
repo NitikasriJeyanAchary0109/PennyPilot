@@ -6,7 +6,6 @@ from app.schemas.schemas import (
     BudgetResponse,
     ChatHistoryResponse,
     ChatRequest,
-    EducatorAnalyticsResponse,
     FinancialHealthResponse,
     ForecastRequest,
     GoalBase,

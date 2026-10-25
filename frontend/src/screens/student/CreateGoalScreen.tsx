@@ -9,7 +9,7 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { useAuth } from "../../hooks/useAuth";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
 import { ScreenContainer } from "../../components/ui/ScreenContainer";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -22,7 +22,7 @@ const QUICK_GOAL_TEMPLATES = [
 ];
 
 export default function CreateGoalScreen({ navigation }: { navigation: any }) {
-  const { completeOnboarding } = useAuth();
+  const { completeOnboarding, hasCompletedOnboarding } = useAuth();
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
   const [saving, setSaving] = useState(false);
@@ -52,11 +52,16 @@ export default function CreateGoalScreen({ navigation }: { navigation: any }) {
         goal_name: name.trim(),
         target: targetAmount,
       });
-      await completeOnboarding();
+      if (hasCompletedOnboarding) {
+        // Created from the Goals tab: return to it (it refreshes on focus).
+        navigation.goBack();
+      } else {
+        await completeOnboarding();
+      }
     } catch (error: any) {
       Alert.alert(
         "Could Not Create Goal",
-        error?.response?.data?.detail || "Please check your inputs and try again."
+        getErrorMessage(error, "Please check your inputs and try again.")
       );
     } finally {
       setSaving(false);
@@ -78,7 +83,7 @@ export default function CreateGoalScreen({ navigation }: { navigation: any }) {
           <ArrowLeft size={22} color="#144a32" />
         </TouchableOpacity>
         <Text className="font-sans font-bold text-lg text-primary">
-          Step 2: Set First Goal
+          {hasCompletedOnboarding ? "New Savings Goal" : "Step 2: Set First Goal"}
         </Text>
       </View>
 
@@ -97,9 +102,16 @@ export default function CreateGoalScreen({ navigation }: { navigation: any }) {
 
       {/* Quick Templates */}
       <View className="mb-5">
-        <Text className="font-sans font-semibold text-xs text-text-secondary uppercase tracking-wider mb-2.5">
-          Popular Student Goals
-        </Text>
+        <View className="flex-row items-center justify-between mb-2.5">
+          <Text className="font-sans font-semibold text-xs text-text-secondary uppercase tracking-wider">
+            Popular Student Goals
+          </Text>
+          <View className="flex-row items-center bg-primary-tint/70 px-2.5 py-0.5 rounded-full">
+            <Text className="text-[10px] font-semibold text-primary font-sans">
+              ✍️ Or type custom goal
+            </Text>
+          </View>
+        </View>
         <View className="flex-row flex-wrap gap-2">
           {QUICK_GOAL_TEMPLATES.map((tmpl) => {
             const isMatch = name === tmpl.name;
@@ -127,6 +139,9 @@ export default function CreateGoalScreen({ navigation }: { navigation: any }) {
             );
           })}
         </View>
+        <Text className="text-[11px] text-text-muted font-sans mt-2">
+          💡 You can choose a preset above or directly type any custom goal name and amount below.
+        </Text>
       </View>
 
       {/* Form Card */}
@@ -186,7 +201,13 @@ export default function CreateGoalScreen({ navigation }: { navigation: any }) {
       {/* Submit Button */}
       <View className="w-full mb-6">
         <Button
-          title={saving ? "Creating Your Goal…" : "Complete Setup & Launch"}
+          title={
+            saving
+              ? "Creating Your Goal…"
+              : hasCompletedOnboarding
+              ? "Create Goal"
+              : "Complete Setup & Launch"
+          }
           onPress={handleCreateGoal}
           loading={saving}
           disabled={saving}

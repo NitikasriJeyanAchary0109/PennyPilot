@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useRef, useState } from "react";
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView } from "react-native";
 import {
   ArrowLeft,
@@ -12,7 +12,7 @@ import {
   IndianRupee,
   PlusCircle,
 } from "lucide-react-native";
-import { apiService } from "../../services/api";
+import { apiService, getErrorMessage } from "../../services/api";
 import { ScreenContainer } from "../../components/ui/ScreenContainer";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -20,28 +20,27 @@ import { Button } from "../../components/ui/Button";
 interface ExpenseItem {
   id: string;
   name: string;
-  amount: number;
   icon: React.ComponentType<{ size: number; color: string }>;
 }
 
+// Only the *kinds* of recurring cost are preset. The amount is always what the
+// student types — nothing is assumed on their behalf.
 const PRESET_EXPENSES: ExpenseItem[] = [
-  { id: "rent", name: "Rent & Housing", amount: 8000, icon: Home },
-  { id: "tuition", name: "Tuition & Books", amount: 12000, icon: GraduationCap },
-  { id: "food", name: "Food & Groceries", amount: 3000, icon: Utensils },
-  { id: "utilities", name: "Utilities & Wifi", amount: 1500, icon: Zap },
-  { id: "transport", name: "Transport & Transit", amount: 1000, icon: Bus },
+  { id: "rent", name: "Rent & Housing", icon: Home },
+  { id: "tuition", name: "Tuition & Books", icon: GraduationCap },
+  { id: "food", name: "Food & Groceries", icon: Utensils },
+  { id: "utilities", name: "Utilities & Wifi", icon: Zap },
+  { id: "transport", name: "Transport & Transit", icon: Bus },
 ];
 
 export default function ManualIncomeExpenseScreen({ navigation }: { navigation: any }) {
   const [income, setIncome] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-
-  const totalRecurring = useMemo(() => {
-    return PRESET_EXPENSES
-      .filter((item) => selectedIds.includes(item.id))
-      .reduce((sum, item) => sum + item.amount, 0);
-  }, [selectedIds]);
+  // Entries already saved by a previous (partially failed) attempt, so a retry
+  // doesn't record them twice.
+  const savedKeys = useRef<Set<string>>(new Set());
 
   const toggleExpense = (id: string) => {
     setSelectedIds((prev) =>
@@ -59,36 +58,50 @@ export default function ManualIncomeExpenseScreen({ navigation }: { navigation: 
       return;
     }
 
+    const selectedExpenses = PRESET_EXPENSES.filter((item) => selectedIds.includes(item.id));
+    for (const item of selectedExpenses) {
+      const value = Number((amounts[item.id] || "").replace(/,/g, ""));
+      if (!Number.isFinite(value) || value <= 0) {
+        Alert.alert("Amount needed", `Enter a monthly amount for ${item.name}, or untick it.`);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
+      // Baseline entries are bookkeeping, not purchases: no round-ups.
       // 1. Record the baseline income credit
-      await apiService.createTransaction({
-        amount: monthlyIncome,
-        category: "Income",
-        merchant: "Monthly Income / Allowance",
-        type: "credit",
-        description: "Initial baseline added during onboarding",
-      });
+      if (!savedKeys.current.has("income")) {
+        await apiService.createTransaction({
+          amount: monthlyIncome,
+          category: "Income",
+          merchant: "Monthly Income / Allowance",
+          type: "credit",
+          description: "Initial baseline added during onboarding",
+          applyRoundup: false,
+        });
+        savedKeys.current.add("income");
+      }
 
-      // 2. Record selected recurring expenses
-      const selectedExpenses = PRESET_EXPENSES.filter((item) => selectedIds.includes(item.id));
-      await Promise.all(
-        selectedExpenses.map((item) =>
-          apiService.createTransaction({
-            amount: item.amount,
-            category: item.name,
-            merchant: item.name,
-            type: "debit",
-            description: "Recurring monthly cost added during onboarding",
-          })
-        )
-      );
+      // 2. Record selected recurring expenses, one at a time
+      for (const item of selectedExpenses) {
+        if (savedKeys.current.has(item.id)) continue;
+        await apiService.createTransaction({
+          amount: Number((amounts[item.id] || "").replace(/,/g, "")),
+          category: item.name,
+          merchant: item.name,
+          type: "debit",
+          description: "Recurring monthly cost added during onboarding",
+          applyRoundup: false,
+        });
+        savedKeys.current.add(item.id);
+      }
 
       navigation.navigate("CreateGoal");
     } catch (error: any) {
       Alert.alert(
         "Could Not Save Setup",
-        error?.response?.data?.detail || "An error occurred while saving. Please try again."
+        getErrorMessage(error, "An error occurred while saving. Please try again.")
       );
     } finally {
       setSaving(false);
@@ -131,7 +144,7 @@ export default function ManualIncomeExpenseScreen({ navigation }: { navigation: 
             value={income}
             onChangeText={(val) => setIncome(val.replace(/[^0-9]/g, ""))}
             keyboardType="number-pad"
-            placeholder="15000"
+            placeholder="Enter amount"
             placeholderTextColor="#707773"
             className="flex-1 font-sans font-bold text-2xl text-text py-2"
             accessibilityLabel="Monthly income input in Rupees"
@@ -153,7 +166,7 @@ export default function ManualIncomeExpenseScreen({ navigation }: { navigation: 
           </View>
         </View>
         <Text className="font-sans text-xs text-text-secondary mb-4 leading-relaxed">
-          Select typical monthly commitments you expect to pay.
+          Tick the monthly costs you have and enter what you pay for each.
         </Text>
 
         <View className="gap-2.5">
@@ -167,7 +180,7 @@ export default function ManualIncomeExpenseScreen({ navigation }: { navigation: 
                 activeOpacity={0.8}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: isSelected }}
-                accessibilityLabel={`${item.name}, ₹${item.amount.toLocaleString("en-IN")} per month`}
+                accessibilityLabel={item.name}
                 className={`flex-row items-center justify-between p-3.5 rounded-2xl border transition-all ${
                   isSelected
                     ? "bg-primary-tint border-primary shadow-sm"
@@ -186,9 +199,29 @@ export default function ManualIncomeExpenseScreen({ navigation }: { navigation: 
                     <Text className="font-sans font-semibold text-sm text-text">
                       {item.name}
                     </Text>
-                    <Text className="font-sans text-xs text-text-secondary">
-                      ₹{item.amount.toLocaleString("en-IN")}/mo
-                    </Text>
+                    {isSelected ? (
+                      <View className="flex-row items-center">
+                        <Text className="font-sans text-xs text-text-secondary mr-1">₹</Text>
+                        <TextInput
+                          value={amounts[item.id] || ""}
+                          onChangeText={(val) =>
+                            setAmounts((prev) => ({
+                              ...prev,
+                              [item.id]: val.replace(/[^0-9]/g, ""),
+                            }))
+                          }
+                          keyboardType="number-pad"
+                          placeholder="per month"
+                          placeholderTextColor="#707773"
+                          className="font-sans text-sm text-text min-w-[90px] py-0.5"
+                          accessibilityLabel={`Monthly amount for ${item.name}`}
+                        />
+                      </View>
+                    ) : (
+                      <Text className="font-sans text-xs text-text-secondary">
+                        Tap to add
+                      </Text>
+                    )}
                   </View>
                 </View>
 
@@ -204,15 +237,6 @@ export default function ManualIncomeExpenseScreen({ navigation }: { navigation: 
           })}
         </View>
 
-        {/* Total Summary Footer */}
-        <View className="mt-5 pt-4 border-t border-border flex-row items-center justify-between">
-          <Text className="font-sans text-xs font-medium text-text-secondary">
-            Estimated Monthly Costs
-          </Text>
-          <Text className="font-sans font-extrabold text-base text-primary">
-            ₹{totalRecurring.toLocaleString("en-IN")}
-          </Text>
-        </View>
       </Card>
 
       {/* Action Button */}

@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+_NOW = datetime.datetime.utcnow().replace(microsecond=0)
+
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_calculations.db"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
@@ -92,7 +94,7 @@ def test_net_savings_rate_and_stress_score_endpoints():
             category="Income",
             merchant="Salary",
             type="credit",
-            transaction_date=datetime.datetime(2026, 8, 1, 9, 0, 0),
+            transaction_date=_NOW,
             is_deleted=False,
         )
     )
@@ -103,7 +105,7 @@ def test_net_savings_rate_and_stress_score_endpoints():
             category="Food",
             merchant="Cafe",
             type="debit",
-            transaction_date=datetime.datetime(2026, 8, 2, 12, 0, 0),
+            transaction_date=_NOW,
             is_deleted=False,
         )
     )
@@ -113,7 +115,7 @@ def test_net_savings_rate_and_stress_score_endpoints():
             category="Food",
             limit_amount=Decimal("40.00"),
             period="monthly",
-            start_date=datetime.datetime(2026, 8, 1, 0, 0, 0),
+            start_date=_NOW.replace(day=1, hour=0, minute=0, second=0),
         )
     )
     db.add(
@@ -151,7 +153,7 @@ def test_round_up_projection_and_goal_feasibility_endpoints():
             category="Food",
             merchant="Lunch",
             type="debit",
-            transaction_date=datetime.datetime(2026, 8, 1, 12, 0, 0),
+            transaction_date=_NOW - datetime.timedelta(days=10),
             is_deleted=False,
         )
     )
@@ -162,7 +164,7 @@ def test_round_up_projection_and_goal_feasibility_endpoints():
             category="Shopping",
             merchant="Books",
             type="debit",
-            transaction_date=datetime.datetime(2026, 8, 8, 18, 0, 0),
+            transaction_date=_NOW - datetime.timedelta(days=3),
             is_deleted=False,
         )
     )
@@ -173,7 +175,7 @@ def test_round_up_projection_and_goal_feasibility_endpoints():
             title="Emergency Fund",
             target_amount=Decimal("1000.00"),
             current_amount=Decimal("100.00"),
-            target_date=datetime.datetime(2026, 12, 31, 0, 0, 0),
+            target_date=_NOW + datetime.timedelta(days=120),
             status="active",
         )
     )
@@ -183,6 +185,15 @@ def test_round_up_projection_and_goal_feasibility_endpoints():
             goal_id=1,
             amount=Decimal("50.00"),
             source="manual",
+        )
+    )
+    db.add(
+        Savings(
+            user_id=1,
+            goal_id=1,
+            amount=Decimal("0.40"),
+            source="round_up",
+            created_at=_NOW - datetime.timedelta(days=5),
         )
     )
     db.commit()

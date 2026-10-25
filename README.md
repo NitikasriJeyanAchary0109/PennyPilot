@@ -10,7 +10,7 @@
 [![WCAG 2.1 AA](https://img.shields.io/badge/WCAG_2.1_AA-100%25_Verified-144a32.svg)](docs/evidence/ui/step2/contrast.txt)
 [![Zero-Arithmetic Rule](https://img.shields.io/badge/Zero--Arithmetic-Backend_Deterministic-gold.svg)](#-zero-arithmetic-rule)
 
-**Penny Pilot** is an automated micro-savings, intelligent budgeting, and financial literacy platform tailored for college students, paired with a companion oversight portal for campus educators and advisors.
+**Penny Pilot** is an automated micro-savings, intelligent budgeting, and financial literacy platform tailored specifically for college students.
 
 By transforming loose digital change from everyday transactions into purpose-driven savings, Penny Pilot helps students painlessly achieve financial milestones. It couples deterministic financial math with an on-device, privacy-preserving AI financial coach (**LLaMA 3 via Ollama**) to explain spending patterns, flag recurring subscription leakages, and instill lifelong financial discipline.
 
@@ -41,18 +41,15 @@ By transforming loose digital change from everyday transactions into purpose-dri
 
 For many college students, managing personal finances is intimidating, opaque, and stressful. Most budgeting apps rely on tedious manual categorization, sell user transaction histories to data brokers, or present discouraging debt graphs that heighten financial anxiety.
 
-**Penny Pilot bridges this gap through a dual-persona platform:**
+**Penny Pilot bridges this gap through an empathetic, student-centric platform:**
 
-1. **The Student Saver Experience (Mobile & Web)**:
-   - **Automated Round-Up Engine**: Automatically calculates spare change on debit/UPI transactions to the nearest ₹10, ₹50, or ₹100 and channels the difference directly into targeted savings goals.
-   - **Deterministic Progress Tracking**: Goals, balances, and savings forecasts are calculated securely by the backend engine, preventing confusing rounding discrepancies on client devices.
-   - **Private AI Financial Coach**: Students converse with an empathetic, local AI coach that offers clear, non-judgmental guidance, personalized spending insights, and pre-drafted subscription cancellation letters.
-   - **Impulse Spending Monitor**: Replaces guilt-inducing metrics with actionable behavioral nudges that identify emotional spending triggers before budgets break.
-   - **Emergency Vault Protection**: Locks emergency cushions with multi-step confirmation modals to protect rainy-day funds from casual withdrawal.
-
-2. **The Campus Educator & Advisor Portal**:
-   - **Cohort Financial Literacy Analytics**: Anonymized metrics on aggregate cohort savings velocity, average budget health scores, and common student expenditure categories.
-   - **AI Safety & Accuracy Auditing**: Real-time logging of AI advice accuracy, prompt guardrail adherence, and educational efficacy.
+- **Automated Round-Up Engine**: Automatically calculates spare change on debit/UPI transactions to the nearest ₹10, ₹50, or ₹100 and channels the difference directly into targeted savings goals.
+- **Bank Statement Import & Spending Analysis**: Upload a bank statement CSV (HDFC/ICICI/SBI-style columns work as-is; see `docs/samples/bank_statement_sample.csv`). Categories are inferred from narrations, and Penny Pilot shows your typical month, where it goes, repeating charges, suggested budgets and what round-ups would have saved.
+- **Bank Sandbox**: No real bank is connected. "Simulate a payment" creates the next transaction a bank feed might deliver, modelled on your own imported history, and runs it through round-ups and budget alerts (labelled *Simulated*).
+- **Deterministic Progress Tracking**: Goals, balances, and savings forecasts are calculated securely by the backend engine, preventing confusing rounding discrepancies on client devices.
+- **Private AI Financial Coach**: Students converse with an empathetic, local AI coach that offers clear, non-judgmental guidance and personalized spending insights grounded in your own transactions, goals and budgets.
+- **Impulse Spending Monitor**: Replaces guilt-inducing metrics with actionable behavioral nudges that identify emotional spending triggers before budgets break.
+- **Emergency Vault Protection**: Locks emergency cushions with multi-step confirmation modals to protect rainy-day funds from casual withdrawal.
 
 ---
 
@@ -81,17 +78,27 @@ Penny Pilot features a custom **Warm Cream & Forest Green** design system (`#fbf
 
 ---
 
-### 2. Authentication & Guided Student Onboarding
-Clean, accessible authentication supporting email/password and Google OAuth, followed by a personalized onboarding flow.
+### 2. Accessible Authentication & Student Registration
+Clean, accessible authentication supporting email/password and Google OAuth, with frictionless account creation tailored for student savers.
 
-| Warm Cream Authentication | Interactive Onboarding Flow |
+| Warm Cream Authentication | Seamless Student Registration |
 | :---: | :---: |
-| ![Login Screen](docs/screenshots/03_login.png) | ![Onboarding Setup](docs/screenshots/12_onboarding.png) |
-| *High-contrast inputs with 44pt tap targets and seamless student/educator role selection.* | *Step-by-step guidance to set up initial allowance, recurring bills, and savings targets.* |
+| ![Login Screen](docs/screenshots/03_login.png) | ![Register Screen](docs/screenshots/04_register.png) |
+| *High-contrast inputs with 44pt tap targets and seamless OAuth options.* | *Accessible onboarding with student validation, instant account creation, and password safeguards.* |
 
 ---
 
-### 3. Purpose-Driven Goals & Impulse Monitor
+### 3. Guided Student Onboarding & Budget Boundaries
+Personalized onboarding guides students to set sustainable baselines, paired with intelligent budget categories that establish safe monthly spending boundaries.
+
+| Interactive Onboarding Flow | Intelligent Budget Boundaries |
+| :---: | :---: |
+| ![Onboarding Setup](docs/screenshots/12_onboarding.png) | ![Budget Management](docs/screenshots/08_budgets.png) |
+| *Step-by-step guidance to set up initial allowance, recurring bills, and savings targets.* | *Category spending limits with real-time remaining balance and visual boundary alerts.* |
+
+---
+
+### 4. Purpose-Driven Goals & Impulse Monitor
 Students save for what matters most—laptop upgrades, semester travel, emergency cushions—with real-time progress percentages computed deterministically by the backend.
 
 | Smart Goals Dashboard | Impulse Monitor & Insights |
@@ -101,33 +108,35 @@ Students save for what matters most—laptop upgrades, semester travel, emergenc
 
 ---
 
-### 4. Private AI Financial Coach & Subscription Negotiator
+### 5. Private AI Financial Coach & Subscription Negotiator
 A conversational AI partner powered by on-device LLaMA 3 provides contextual financial literacy without sending student banking details to proprietary external cloud services.
 
 | AI Financial Coach Chat | Subscription Negotiator |
 | :---: | :---: |
 | ![AI Coach](docs/screenshots/07_ai_coach.png) | ![Subscription Negotiator](docs/screenshots/10_subscription_negotiator.png) |
-| *Conversational advice with prompt disclaimer banners and quick suggestion chips.* | *Automated recurring bill detection with pre-drafted negotiation and cancellation scripts.* |
+| *Conversational advice with prompt disclaimer banners and quick suggestion chips.* | *Subscriptions detected from your own transactions, with the effect of pausing them on your goal date.* |
 
 ---
 
-### 5. Automated Round-Up Tracker & Emergency Vault
+### 6. Automated Round-Up Tracker & Emergency Vault
 Automate micro-savings on every transaction and protect reserves from accidental spending.
 
 | Transaction Round-Up Tracker | Emergency Vault Guard |
 | :---: | :---: |
 | ![Round-Up Tracker](docs/screenshots/09_roundup_tracker.png) | ![Emergency Withdrawal](docs/screenshots/11_emergency_withdrawal.png) |
-| *Visual log of round-up spare change accumulated across debits.* | *Confirmation-locked withdrawal modal protecting emergency cushions.* |
+| *Visual log of round-up spare change accumulated across debits.* | *Compassionate rainy-day fund protection featuring multi-step confirmation modals.* |
 
 ---
 
-### 6. Educator Cohort Analytics & AI Literacy Dashboard
-Campus financial advisors and educators gain macro-level insights into student financial health and AI coaching safety without violating individual student privacy.
+### 7. Warm Cream Design System Tokens & Typography Scale
+A soothing visual palette, typography scale, and accessible spacing tokens built specifically to reduce student financial anxiety.
 
-| Educator Cohort Oversight Dashboard | Design System Mood Board |
-| :---: | :---: |
-| ![Educator Dashboard](docs/screenshots/13_educator_dashboard.png) | ![Design Mood Board](docs/screenshots/14_design_moodboard.png) |
-| *Aggregated cohort velocity, average savings rate, and AI literacy oversight metrics.* | *Curated warm palette, typography hierarchy, and spacing tokens.* |
+<p align="center">
+  <img src="docs/screenshots/14_design_moodboard.png" alt="Design System Mood Board" width="800" />
+</p>
+<p align="center">
+  <em>Curated warm palette (#fbf7ee, #144a32, #a88544), Inter typography hierarchy, and WCAG AA contrast tokens.</em>
+</p>
 
 ---
 
@@ -225,6 +234,12 @@ npm run start
 - Press `w` in your terminal to open the web application at `http://localhost:8081`.
 - Scan the QR code using the **Expo Go** app on your physical iOS or Android device.
 
+#### Demo account (local development only)
+```bash
+cd backend && python scripts/seed_demo.py
+```
+Creates a ready-to-use student (onboarding done, a savings goal, the sample bank statement imported) and prints its login. The credentials live in `backend/app/services/demo_seed.py`; the script refuses to run when `ENVIRONMENT=production`.
+
 #### 4. Local AI Engine Setup (Ollama)
 To enable the offline AI financial coach:
 ```bash
@@ -234,7 +249,7 @@ ollama pull llama3
 # Verify Ollama is listening
 curl http://localhost:11434/api/generate
 ```
-*Note: If Ollama is not running, Penny Pilot automatically activates graceful fallback heuristics so the application remains fully functional.*
+*Note: If Ollama is not running, AI features (coach, money-basics Q&A, purchase advice, goal narration) return a clear "temporarily unavailable" message — nothing is made up. Deterministic features (round-ups, budgets, scores, forecasts dates) keep working, and the round-up explanation and wellness summary fall back to plain factual sentences built from your real figures.*
 
 ---
 
@@ -262,7 +277,7 @@ Configure these settings in your `backend/.env` file:
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
 | `DATABASE_URL` | `sqlite:///./campus_drift.db` | Database connection string (SQLite or PostgreSQL) |
-| `JWT_SECRET` | `dev_secret_key` | Secret key for signing access tokens |
+| `JWT_SECRET` | `dev_secret_key` | Secret key for signing access tokens. **Required and must be a unique random string of ≥ 32 chars when `ENVIRONMENT=production`** (the API refuses to start otherwise; `docker compose` reads it from `.env`) |
 | `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days) | Token expiration duration |
 | `OLLAMA_URL` | `http://localhost:11434/api/generate` | Local Ollama AI inference endpoint |
@@ -287,7 +302,7 @@ To eliminate calculation drifts between platforms, the frontend code strictly ad
 
 ### Single Currency Standard (INR ₹)
 - All monetary displays use the Indian Rupee standard symbol (`₹`) formatted with `Intl.NumberFormat('en-IN')`.
-- Zero raw dollar (`$`) or foreign currency symbols appear in active student or educator screens.
+- Zero raw dollar (`$`) or foreign currency symbols appear in active student screens.
 
 ### WCAG 2.1 AA Color Contrast
 Every visual color token is validated against the Web Content Accessibility Guidelines:
@@ -329,14 +344,15 @@ ConsumerLiterarcyTrack/
 ├── frontend/
 │   ├── App.tsx                 # Root mobile/web application wrapper
 │   ├── src/
-│   │   ├── components/ui/      # Warm cream accessible UI components (Button, Card, etc.)
+│   │   ├── components/ui/      # Warm cream accessible UI components (Button, Card, Input, ScreenContainer, etc.)
 │   │   ├── context/            # AuthContext and state providers
-│   │   ├── navigation/         # Tab and Stack navigators (Student & Educator)
+│   │   ├── navigation/         # Tab and Stack navigators (Student & Onboarding)
 │   │   ├── screens/
 │   │   │   ├── auth/           # LoginScreen, RegisterScreen
-│   │   │   ├── educator/       # OverviewScreen, TrendsScreen, LiteracyScreen
-│   │   │   ├── onboarding/     # CSVUploadScreen
-│   │   │   └── student/        # HomeScreen, GoalsScreen, ChatScreen, BudgetsScreen...
+│   │   │   ├── onboarding/     # CSVUploadScreen (bank statement parser)
+│   │   │   └── student/        # Core student tabs (HomeScreen, GoalsScreen, ChatScreen, BudgetsScreen)
+│   │   │                       # Action screens (RoundupTracker, SubscriptionNegotiator, EmergencyWithdrawal)
+│   │   │                       # Guided onboarding flow (OnboardingSetup, SpendingEntryChoice, ManualIncomeExpense, CreateGoal)
 │   │   └── services/           # Typed Axios API client
 │   ├── tailwind.config.js      # Design tokens (warm cream, forest green, accessible gold)
 │   └── package.json            # Expo dependencies & scripts
@@ -364,7 +380,7 @@ ConsumerLiterarcyTrack/
 
 Penny Pilot is actively maintained by **Nitikasri Jeyan Achary** and the open source community.
 
-We welcome contributions from developers, designers, and educators! To contribute:
+We welcome contributions from developers, designers, and students! To contribute:
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feat/your-feature-name`.
 3. Adhere to the **Zero-Arithmetic Rule** and run type checks: `npm run ts:check`.
