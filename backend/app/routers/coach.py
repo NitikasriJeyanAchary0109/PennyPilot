@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import List
+from typing import List, Optional
 
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
@@ -68,6 +68,7 @@ class CoachChatResponse(BaseModel):
 
     chat_id: int
     user_id: int
+    role: Optional[str] = None
     question: str
     response: str
     created_at: datetime.datetime

@@ -76,6 +76,8 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
     amount: number;
     newGoalAmount?: number;
     explanation?: string;
+    explanationSource?: "ai" | "template";
+    transactionId?: number;
     note?: string;
   } | null>(null);
   const [simulating, setSimulating] = useState(false);
@@ -181,6 +183,22 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
     }
   }, [isFocused, loadDashboardData]);
 
+  // The banner shows an instant factual sentence. Ask for the AI's version in the
+  // background and swap it in only if it arrives for the same banner.
+  const upgradeExplanation = async (transactionId: number) => {
+    try {
+      const result = await apiService.explainRoundup(transactionId);
+      if (result.explanation_source !== "ai") return;
+      setRoundupAlert((current) =>
+        current && current.transactionId === transactionId
+          ? { ...current, explanation: result.explanation, explanationSource: "ai" }
+          : current
+      );
+    } catch {
+      // The factual sentence stays; nothing to report.
+    }
+  };
+
   // Sandbox: ask the backend for the next transaction a bank feed might deliver,
   // based on this student's own imported history. It goes through the normal
   // round-up / budget pipeline and is stored as "Simulated".
@@ -202,8 +220,11 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
               ? Number(res.roundup_details.new_goal_amount)
               : undefined,
           explanation: res.roundup_details.explanation,
+          explanationSource: res.roundup_details.explanation_source,
+          transactionId: res.trans_id,
           note: `${what}. ${basis}`,
         });
+        upgradeExplanation(res.trans_id);
       } else {
         Alert.alert(
           "Simulated bank transaction",
@@ -264,7 +285,10 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
           amount: amt,
           newGoalAmount: newGoalAmt,
           explanation: explanation,
+          explanationSource: response.roundup_details.explanation_source,
+          transactionId: response.trans_id,
         });
+        upgradeExplanation(response.trans_id);
       } else {
         Alert.alert(
           "Purchase logged",
@@ -457,8 +481,14 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
           )}
 
           {roundupAlert.explanation && (
-            <Text className="text-xs text-text-secondary italic mt-1 font-sans">
-              "{roundupAlert.explanation}"
+            <Text
+              className={`text-xs text-text-secondary mt-1 font-sans ${
+                roundupAlert.explanationSource === "ai" ? "italic" : ""
+              }`}
+            >
+              {roundupAlert.explanationSource === "ai"
+                ? `“${roundupAlert.explanation}”`
+                : roundupAlert.explanation}
             </Text>
           )}
         </Card>

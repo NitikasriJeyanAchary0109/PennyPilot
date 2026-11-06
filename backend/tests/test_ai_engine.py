@@ -61,18 +61,17 @@ async def test_call_llama_fallback_response_key():
 
 
 @pytest.mark.anyio
-async def test_call_llama_timeout_and_retry_exhaustion():
-    """Verify timeout triggers retry and raises AIEngineError when exhausted."""
+async def test_call_llama_timeout_is_not_retried():
+    """A timeout means the model is overloaded: fail once, don't make the user wait twice."""
     with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
         mock_post.side_effect = httpx.TimeoutException("Read timed out")
 
         with pytest.raises(AIEngineError) as exc_info:
             await call_llama("System", "User")
 
-        # 1 initial + 1 retry = 2 attempts
-        assert mock_post.call_count == 2
+        assert mock_post.call_count == 1
         assert "did not respond" in exc_info.value.message
-        assert exc_info.value.retried is True
+        assert exc_info.value.retried is False
 
 
 @pytest.mark.anyio

@@ -263,6 +263,9 @@ class ChatRequest(BaseModel):
 class ChatHistoryResponse(BaseModel):
     chat_id: int
     user_id: int
+    # "calculated": answered instantly from the student's data (no AI involved);
+    # "coach": written by the AI coach.
+    role: Optional[str] = None
     question: str
     response: str
     created_at: datetime

@@ -456,12 +456,26 @@ export const apiService = {
     const response = await api.post("/chat/", { message }, { timeout: AI_TIMEOUT_MS });
     return response.data;
   },
+  // Slow path: the AI's wording of a round-up. The purchase response already
+  // carries an instant factual sentence; this may replace it if the model delivers.
+  explainRoundup: async (transactionId: number) => {
+    const response = await api.post(
+      `/transactions/${transactionId}/explanation`,
+      undefined,
+      { timeout: AI_TIMEOUT_MS }
+    );
+    return response.data as {
+      explanation: string;
+      explanation_source: "ai" | "template";
+    };
+  },
   getCoachHistory: async (pageSize = 20) => {
     const response = await api.get("/coach/history", {
       params: { page: 1, page_size: pageSize },
     });
     return response.data.items as {
       chat_id: number;
+      role?: "calculated" | "coach" | null;
       question: string;
       response: string;
       created_at: string;

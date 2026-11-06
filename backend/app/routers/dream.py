@@ -187,6 +187,7 @@ async def get_goal_forecast(
                 "Keep your reply to 3 sentences or fewer."
             ),
             user_prompt=prompt,
+            max_tokens=120,  # 2–3 sentences
         )
     except AIEngineError as exc:
         logger.error(

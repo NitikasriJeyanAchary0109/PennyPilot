@@ -354,6 +354,7 @@ async def evaluate_purchase(
                 "Give concise, practical, non-preachy purchase advice."
             ),
             user_prompt=prompt,
+            max_tokens=120,  # 2–3 sentences
         )
     except AIEngineError as exc:
         logger.error(

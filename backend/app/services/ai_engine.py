@@ -30,6 +30,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections import OrderedDict
 from typing import Optional
 
 import httpx
@@ -45,8 +46,8 @@ logger = logging.getLogger("pennypilot.ai_engine")
 # ---------------------------------------------------------------------------
 # Runtime constants — change here; reflected everywhere automatically.
 # ---------------------------------------------------------------------------
-_REQUEST_TIMEOUT_SECONDS: float = 60.0  # per-attempt wall-clock timeout
-_MAX_RETRIES: int = 1  # retry once on timeout or 5xx, then raise
+_REQUEST_TIMEOUT_SECONDS: float = settings.OLLAMA_TIMEOUT_SECONDS  # per call
+_MAX_RETRIES: int = 1  # retry once on a 5xx (model still loading); never on timeout
 
 
 # Derive the /api/chat base URL from the configured OLLAMA_URL.
@@ -133,6 +134,7 @@ async def _generate(
     system_prompt: str,
     user_prompt: str,
     model: Optional[str] = None,
+    max_tokens: Optional[int] = None,
 ) -> str:
     """
     Send a chat-style request to Ollama and return the assistant's reply as a
@@ -178,7 +180,10 @@ async def _generate(
         "stream": False,
         "keep_alive": -1,
         "options": {
-            "num_predict": settings.OLLAMA_NUM_PREDICT,
+            # Generation time is roughly proportional to tokens produced, so each
+            # task asks for only as many as it needs.
+            "num_predict": max_tokens or settings.OLLAMA_NUM_PREDICT,
+            "num_ctx": settings.OLLAMA_NUM_CTX,
             "temperature": 0.4,
         },
     }
@@ -272,20 +277,20 @@ async def _generate(
         except httpx.TimeoutException as exc:
             latency_ms = int((time.monotonic() - t_start) * 1000)
             logger.error(
-                "ai_engine.call_llama | attempt=%s latency_ms=%d — timeout (%s), will %s",
+                "ai_engine.call_llama | attempt=%s latency_ms=%d — timeout (%s), giving up",
                 attempt_label,
                 latency_ms,
                 type(exc).__name__,
-                "retry" if attempt < _MAX_RETRIES else "raise",
             )
-            last_error = AIEngineError(
+            # No retry: a model that was too slow once is overloaded, and trying
+            # again would just double how long the user waits.
+            raise AIEngineError(
                 message=(
-                    f"Ollama did not respond within {_REQUEST_TIMEOUT_SECONDS}s. "
-                    "The model may be loading — please try again in a moment."
+                    f"Ollama did not respond within {_REQUEST_TIMEOUT_SECONDS:g}s. "
+                    "The model may be loading or the machine is busy — try again."
                 ),
-                retried=(attempt == _MAX_RETRIES),
-            )
-            continue  # go to retry
+                retried=False,
+            ) from exc
 
         except httpx.RequestError as exc:
             # Connection refused, DNS failure, etc. — not worth retrying
@@ -322,10 +327,47 @@ _GROUNDING_REMINDER = (
 _GROUNDING_ATTEMPTS = 2
 
 
+# ---------------------------------------------------------------------------
+# Reply cache: an identical prompt (which embeds the user's data) gets the same
+# validated answer back instantly instead of another multi-second generation.
+# ---------------------------------------------------------------------------
+_CACHE_MAX_ENTRIES = 128
+_reply_cache: "OrderedDict[tuple, tuple]" = OrderedDict()
+
+
+def clear_reply_cache() -> None:
+    _reply_cache.clear()
+
+
+def _cache_get(key: tuple) -> Optional[str]:
+    entry = _reply_cache.get(key)
+    if entry is None:
+        return None
+    expires_at, reply = entry
+    if expires_at < time.monotonic():
+        _reply_cache.pop(key, None)
+        return None
+    _reply_cache.move_to_end(key)
+    return reply
+
+
+def _cache_put(key: tuple, reply: str) -> None:
+    ttl = settings.AI_REPLY_CACHE_SECONDS
+    if ttl <= 0:
+        return
+    _reply_cache[key] = (time.monotonic() + ttl, reply)
+    _reply_cache.move_to_end(key)
+    while len(_reply_cache) > _CACHE_MAX_ENTRIES:
+        _reply_cache.popitem(last=False)
+
+
 async def call_llama(
     system_prompt: str,
     user_prompt: str,
     model: Optional[str] = None,
+    *,
+    max_tokens: Optional[int] = None,
+    grounding_attempts: int = _GROUNDING_ATTEMPTS,
 ) -> str:
     """
     Ask the model and return its reply — but only a reply whose numbers all come
@@ -333,21 +375,33 @@ async def call_llama(
 
     Zero-Arithmetic rule: code computes every figure, the model only phrases them.
     The reply is checked (services/ai_guard.py); if it contains a number that was
-    not supplied, the model gets one more attempt with a reminder, and if it still
-    does, UngroundedReplyError is raised so callers use their factual fallback (or
-    report the AI as unavailable). Nothing is ever shown that the model made up.
+    not supplied, the model may get another attempt with a reminder
+    (`grounding_attempts`), and if it still does, UngroundedReplyError is raised
+    so callers use their factual fallback (or report the AI as unavailable).
+    Nothing is ever shown that the model made up.
+
+    Speed: `max_tokens` caps generation to what the task needs; callers that are
+    time-boxed pass `grounding_attempts=1` so a rejected reply falls back at once
+    instead of paying for a second generation; validated replies are cached.
     """
+    key = (model or settings.OLLAMA_MODEL, system_prompt, user_prompt, max_tokens)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
     prompt = user_prompt
     offenders: list = []
-    for attempt in range(_GROUNDING_ATTEMPTS):
-        reply = await _generate(system_prompt, prompt, model)
+    attempts = max(1, grounding_attempts)
+    for attempt in range(attempts):
+        reply = await _generate(system_prompt, prompt, model, max_tokens)
         offenders = ungrounded_figures(reply, (system_prompt, user_prompt))
         if not offenders:
+            _cache_put(key, reply)
             return reply
         logger.warning(
             "ai_engine.call_llama | ungrounded figures in reply (attempt %d/%d): %s",
             attempt + 1,
-            _GROUNDING_ATTEMPTS,
+            attempts,
             ", ".join(offenders[:5]),
         )
         prompt = user_prompt + _GROUNDING_REMINDER
@@ -355,8 +409,40 @@ async def call_llama(
     raise UngroundedReplyError(
         "The AI's reply included figures that were not in your data "
         f"({', '.join(offenders[:3])}), so it was discarded.",
-        retried=True,
+        retried=attempts > 1,
     )
+
+
+async def warm_up() -> bool:
+    """
+    Load the model into memory with a one-token request.
+
+    Run at start-up (in the background) so the first real request doesn't pay the
+    model's cold-load time — often the slowest part on a small machine. Failure is
+    harmless: the model simply loads on first use.
+    """
+    payload = {
+        "model": settings.OLLAMA_MODEL,
+        "messages": [{"role": "user", "content": "ok"}],
+        "stream": False,
+        "keep_alive": -1,
+        "options": {"num_predict": 1, "num_ctx": settings.OLLAMA_NUM_CTX},
+    }
+    started = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(_chat_url(), json=payload)
+        ok = response.status_code == 200
+    except httpx.HTTPError as exc:
+        logger.info("ai_engine.warm_up | model not reachable (%s)", type(exc).__name__)
+        return False
+    logger.info(
+        "ai_engine.warm_up | model=%s ready=%s in %.1fs",
+        settings.OLLAMA_MODEL,
+        ok,
+        time.monotonic() - started,
+    )
+    return ok
 
 
 def user_facing_error(exc: AIEngineError, default: str) -> str:

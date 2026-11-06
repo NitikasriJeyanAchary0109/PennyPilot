@@ -32,6 +32,18 @@ class Settings(BaseSettings):
     # Max tokens per reply. Replies cut off by this limit are trimmed to the last
     # complete sentence rather than shown mid-word.
     OLLAMA_NUM_PREDICT: int = 160
+    # Context window. Penny Pilot prompts are a few hundred tokens, so a small
+    # window cuts memory use and speeds up prompt processing on modest hardware.
+    OLLAMA_NUM_CTX: int = 2048
+    # One slow call is abandoned after this long (no retry: an overloaded model
+    # would only make the user wait twice as long).
+    OLLAMA_TIMEOUT_SECONDS: float = 45.0
+    # Load the model into memory when the API starts, so the first user doesn't
+    # pay the cold-start cost.
+    OLLAMA_WARMUP: bool = True
+    # Validated replies are reused for identical prompts (the prompt contains the
+    # user's data, so a changed number changes the key).
+    AI_REPLY_CACHE_SECONDS: int = 600
 
     # ==========================
     # Bank simulation (sandbox: no real bank is connected)
