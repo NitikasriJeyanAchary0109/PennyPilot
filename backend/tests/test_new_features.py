@@ -62,7 +62,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def mock_ai(monkeypatch):
-    async def mock_call_llama(system_prompt, user_prompt):
+    async def mock_call_llama(system_prompt, user_prompt, **kwargs):
         return "Mocked AI Response: Keep saving and limit unnecessary expenditures."
 
     # Patch module level imports

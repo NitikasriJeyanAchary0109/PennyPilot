@@ -6,6 +6,7 @@ from app.models.models import ChatHistory, User
 from app.routers.coach import _load_context
 from app.schemas.schemas import ChatHistoryResponse, ChatRequest
 from app.services.ai_engine import AIEngineError, call_llama, user_facing_error
+from app.services.quick_answers import quick_answer
 from app.utils.prompts import coach_system_prompt, coach_user_prompt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -24,6 +25,22 @@ async def chat_with_coach(
     Builds context from recent transactions, savings goals, and budgets, then invokes the AI model.
     Logs conversation to the ChatHistory table.
     """
+    # 0. Common status questions are answered straight from the data — instantly,
+    #    and with no chance of an invented figure. Everything else goes to the model.
+    instant = quick_answer(db, current_user, request.message)
+    if instant is not None:
+        record = ChatHistory(
+            user_id=current_user.user_id,
+            role="calculated",
+            question=request.message,
+            response=instant,
+            created_at=datetime.datetime.utcnow(),
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record
+
     # 1. Load context
     recent_transactions, goals, budgets = _load_context(current_user.user_id, db)
 
@@ -53,6 +70,7 @@ async def chat_with_coach(
     # 4. Save to ChatHistory
     chat_record = ChatHistory(
         user_id=current_user.user_id,
+        role="coach",
         question=request.message,
         response=ai_reply,
         created_at=datetime.datetime.utcnow(),

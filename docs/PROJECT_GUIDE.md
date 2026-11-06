@@ -284,6 +284,7 @@ Relationships: `users` 1─* everything; `savings.goal_id → goals`; `savings.t
 | **Never trust the client for identity** | Verify Google token server-side | `services/google_auth.py` |
 | **Honest failure** | No invented data when something fails | `api.ts` (throws), `ai_engine` raises `AIEngineError` → 503, wellness/round-up template fallbacks |
 | **Deterministic fallback, labelled** | Factual sentence from real figures | `transactions._roundup_explanation`, `wellness._factual_summary` |
+| **Fast path / slow path (speed)** | Anything numeric is answered without the model; AI wording arrives afterwards and is swapped in | `quick_answers.py` (instant chat), `POST /transactions/{id}/explanation`, `/wellness/narrate`, reply cache + warm-up in `ai_engine.py` |
 | **AI output guard** | The model may only repeat numbers it was given; a reply with any other figure is retried once, then rejected | `services/ai_guard.py`, `ai_engine.call_llama` (+ `UngroundedReplyError`, `user_facing_error`) |
 | **History vs new spending** | Imports are analysis-only; only new spending rounds up | `transactions.upload_bank_statement` vs `record_transaction` |
 | **Fast path / slow path** | Deterministic numbers first, AI text second | `wellness._report_for`, `/wellness/narrate`, `InsightsScreen.narrate` |

@@ -23,6 +23,20 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 import app.database as app_db
 import app.main as app_main
+from app.config import settings
+from app.services.ai_engine import clear_reply_cache
+
+# Tests must never reach a real model: no start-up warm-up call.
+settings.OLLAMA_WARMUP = False
+
+
+@pytest.fixture(autouse=True)
+def _fresh_ai_reply_cache():
+    """Identical prompts across tests must not be served from the reply cache."""
+    clear_reply_cache()
+    yield
+    clear_reply_cache()
+
 
 app_db.engine = engine
 app_main.engine = engine

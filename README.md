@@ -234,6 +234,12 @@ npm run start
 - Press `w` in your terminal to open the web application at `http://localhost:8081`.
 - Scan the QR code using the **Expo Go** app on your physical iOS or Android device.
 
+#### Making the AI faster
+Penny Pilot already keeps the model off the critical path: logging a purchase, the wellness score and common chat questions ("How much have I saved?", "How is my goal going?", "Which budgets am I close to?", "What subscriptions do I have?") answer instantly from your data; only open-ended questions wait for the model. If those still feel slow:
+- **Free memory.** A local model on an 8 GB machine that is already swapping (check *Activity Monitor → Memory → Swap Used*) will crawl whatever the code does. Close heavy apps, or run Ollama on a machine with more RAM.
+- **Use a smaller model:** `ollama pull llama3.2:3b`, then set `OLLAMA_MODEL=llama3.2:3b`.
+- The API loads the model at start-up (`OLLAMA_WARMUP`), caches repeated answers (`AI_REPLY_CACHE_SECONDS`) and keeps prompts small (`OLLAMA_NUM_CTX`).
+
 #### Demo account (local development only)
 ```bash
 cd backend && python scripts/seed_demo.py

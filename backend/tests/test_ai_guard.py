@@ -134,9 +134,7 @@ def test_a_users_own_number_in_the_question_is_allowed(client, headers):
     assert res.status_code == 200
 
 
-def test_roundup_explanation_falls_back_to_the_factual_template(
-    client, db, student_user, headers
-):
+def _goal_and_purchase(client, db, student_user, headers):
     from decimal import Decimal
 
     from app.models.models import Goal
@@ -151,19 +149,176 @@ def test_roundup_explanation_falls_back_to_the_factual_template(
         )
     )
     db.commit()
+    return client.post(
+        "/api/transactions/",
+        json={
+            "amount": 261.05,
+            "category": "Food",
+            "merchant": "Swiggy",
+            "type": "debit",
+        },
+        headers=headers,
+    ).json()
+
+
+def test_a_purchase_never_waits_for_the_model(client, db, student_user, headers):
+    async def must_not_run(*args, **kwargs):
+        raise AssertionError("logging a purchase must not call the model")
+
+    with patch("app.routers.transactions.call_llama", must_not_run):
+        body = _goal_and_purchase(client, db, student_user, headers)
+
+    details = body["roundup_details"]
+    assert body["roundup_applied"] is True
+    assert details["explanation_source"] == "template"
+    assert "Swiggy" in details["explanation"] and "Laptop" in details["explanation"]
+
+
+def test_explanation_endpoint_returns_the_models_sentence(
+    client, db, student_user, headers
+):
+    body = _goal_and_purchase(client, db, student_user, headers)
+    tx_id = body["transaction"]["id"]
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as post:
+        post.return_value = reply("A small ₹0.95 round-up nudges you toward your goal.")
+        res = client.post(f"/api/transactions/{tx_id}/explanation", headers=headers)
+    assert res.status_code == 200
+    assert res.json() == {
+        "explanation": "A small ₹0.95 round-up nudges you toward your goal.",
+        "explanation_source": "ai",
+    }
+    sent = post.call_args.kwargs["json"]
+    assert sent["options"]["num_predict"] == 60  # one sentence, tiny budget
+    assert post.call_count == 1
+
+
+def test_explanation_endpoint_rejects_invented_figures_without_a_second_try(
+    client, db, student_user, headers
+):
+    body = _goal_and_purchase(client, db, student_user, headers)
+    tx_id = body["transaction"]["id"]
     with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as post:
         post.return_value = reply("This saves an additional 1% of your daily spending.")
+        res = client.post(f"/api/transactions/{tx_id}/explanation", headers=headers)
+    assert res.json()["explanation_source"] == "template"
+    assert "1%" not in res.json()["explanation"]
+    assert post.call_count == 1  # time-boxed callers don't pay for a regeneration
+
+
+def test_explanation_endpoint_falls_back_when_the_model_is_down(
+    client, db, student_user, headers
+):
+    body = _goal_and_purchase(client, db, student_user, headers)
+    with patch.object(
+        httpx.AsyncClient,
+        "post",
+        new_callable=AsyncMock,
+        side_effect=httpx.ConnectError("down"),
+    ):
         res = client.post(
-            "/api/transactions/",
-            json={
-                "amount": 261.05,
-                "category": "Food",
-                "merchant": "Swiggy",
-                "type": "debit",
-            },
+            f"/api/transactions/{body['transaction']['id']}/explanation",
             headers=headers,
         )
-    details = res.json()["roundup_details"]
-    assert details["explanation_source"] == "template"
-    assert "1%" not in details["explanation"]
-    assert "Swiggy" in details["explanation"]
+    assert res.status_code == 200
+    assert res.json()["explanation_source"] == "template"
+
+
+def test_explanation_endpoint_is_private_and_needs_a_roundup(
+    client, db, student_user, headers
+):
+    from decimal import Decimal
+
+    from app.models.models import Transaction, User
+
+    other = User(full_name="Other", email="o2@x.com", role="student")
+    db.add(other)
+    db.commit()
+    theirs = Transaction(
+        user_id=other.user_id,
+        amount=Decimal("10"),
+        merchant="X",
+        category="Food",
+        type="debit",
+        is_round_up_applied=True,
+        round_up_amount=Decimal("1"),
+    )
+    plain = Transaction(
+        user_id=student_user.user_id,
+        amount=Decimal("10"),
+        merchant="Y",
+        category="Food",
+        type="debit",
+    )
+    db.add_all([theirs, plain])
+    db.commit()
+    assert (
+        client.post(
+            f"/api/transactions/{theirs.id}/explanation", headers=headers
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/transactions/{plain.id}/explanation", headers=headers
+        ).status_code
+        == 404
+    )
+
+
+# ------------------------------------------------------- speed: cache, budgets, warm-up
+@pytest.mark.anyio
+async def test_identical_prompts_are_answered_from_the_cache():
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as post:
+        post.return_value = reply("Keep going, your goal is within reach.")
+        first = await call_llama("sys", "Goal needs ₹500 more.")
+        second = await call_llama("sys", "Goal needs ₹500 more.")
+        changed = await call_llama("sys", "Goal needs ₹450 more.")  # the data changed
+    assert first == second == changed
+    assert post.call_count == 2  # the repeat was free; the changed prompt was not
+
+
+@pytest.mark.anyio
+async def test_rejected_replies_are_never_cached():
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as post:
+        post.return_value = reply("You will save 30% more.")
+        for _ in range(2):
+            with pytest.raises(UngroundedReplyError):
+                await call_llama("sys", "Purchase ₹100.", grounding_attempts=1)
+    assert post.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_request_asks_for_a_small_context_and_the_requested_token_budget():
+    from app.config import settings
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as post:
+        post.return_value = reply("Fine.")
+        await call_llama("sys", "user a", max_tokens=40)
+        await call_llama("sys", "user b")
+    first, second = (c.kwargs["json"]["options"] for c in post.call_args_list)
+    assert first["num_predict"] == 40
+    assert second["num_predict"] == settings.OLLAMA_NUM_PREDICT
+    assert first["num_ctx"] == settings.OLLAMA_NUM_CTX
+
+
+@pytest.mark.anyio
+async def test_warm_up_loads_the_model_with_one_token_and_never_raises():
+    from app.services.ai_engine import warm_up
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as post:
+        post.return_value = httpx.Response(
+            200,
+            json={"message": {"content": "o"}},
+            request=httpx.Request("POST", "http://ollama:11434/api/chat"),
+        )
+        assert await warm_up() is True
+        assert post.call_args.kwargs["json"]["options"]["num_predict"] == 1
+        assert post.call_args.kwargs["json"]["keep_alive"] == -1
+
+    with patch.object(
+        httpx.AsyncClient,
+        "post",
+        new_callable=AsyncMock,
+        side_effect=httpx.ConnectError("down"),
+    ):
+        assert await warm_up() is False

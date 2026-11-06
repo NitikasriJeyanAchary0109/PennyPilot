@@ -32,8 +32,9 @@ logger = logging.getLogger("pennypilot.transactions")
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
-# The roundup explanation is a nicety; never let a slow LLM hold up a purchase.
-_EXPLANATION_TIMEOUT_SECONDS = 8.0
+# The AI roundup explanation is a nicety fetched after the purchase is saved.
+_EXPLANATION_TIMEOUT_SECONDS = 30.0
+_EXPLANATION_MAX_TOKENS = 60  # one sentence
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
 
@@ -95,12 +96,24 @@ def get_my_transactions(
     )
 
 
-async def _roundup_explanation(transaction: Transaction, goal) -> tuple:
-    """
-    One-sentence explanation of a round-up.
+def _template_explanation(transaction: Transaction, goal_title: str) -> str:
+    """Factual sentence built from the real figures — available instantly."""
+    description = transaction.description or transaction.merchant
+    return (
+        f"₹{Decimal(str(transaction.round_up_amount)):.2f} from your "
+        f"₹{Decimal(str(transaction.amount)):.2f} purchase at {description} "
+        f"was saved toward “{goal_title}”."
+    )
 
-    Tries the LLM briefly; otherwise falls back to a factual sentence assembled
-    from the real figures (clearly labelled "template", never presented as AI).
+
+async def _ai_explanation(transaction: Transaction, goal_title: str) -> tuple:
+    """
+    The model's one-sentence version, if it can produce one quickly.
+
+    Not part of the purchase request: the app asks for it afterwards
+    (POST /transactions/{id}/explanation) and swaps it in. A single attempt with a
+    tiny token budget; slow, offline or ungrounded (invented figures) → the
+    factual template, labelled "template".
     """
     description = transaction.description or transaction.merchant
     prompt = explain_roundup_prompt(
@@ -113,18 +126,15 @@ async def _roundup_explanation(transaction: Transaction, goal) -> tuple:
             call_llama(
                 system_prompt="You are Penny Pilot, explaining transaction roundups in one sentence.",
                 user_prompt=prompt,
+                max_tokens=_EXPLANATION_MAX_TOKENS,
+                grounding_attempts=1,
             ),
             timeout=_EXPLANATION_TIMEOUT_SECONDS,
         )
         return text, "ai"
     except Exception as exc:  # AIEngineError, timeout, anything else
         logger.warning("roundup explanation unavailable: %s", type(exc).__name__)
-        return (
-            f"₹{Decimal(str(transaction.round_up_amount)):.2f} from your "
-            f"₹{Decimal(str(transaction.amount)):.2f} purchase at {description} "
-            f"was saved toward “{goal.title}”.",
-            "template",
-        )
+        return _template_explanation(transaction, goal_title), "template"
 
 
 async def record_transaction(
@@ -198,9 +208,12 @@ async def record_transaction(
             db.commit()
             db.refresh(db_transaction)
 
-            roundup_result["explanation"], roundup_result["explanation_source"] = (
-                await _roundup_explanation(db_transaction, active_goal)
+            # Never wait for the model on a purchase: the factual sentence is
+            # returned now, the AI version is fetched separately and swapped in.
+            roundup_result["explanation"] = _template_explanation(
+                db_transaction, active_goal.title
             )
+            roundup_result["explanation_source"] = "template"
 
     if db_transaction.type == "debit":
         check_budget_alert(db, current_user.user_id, db_transaction.category)
@@ -237,6 +250,42 @@ async def create_transaction(
     Triggers automated roundups and logs audits.
     """
     return await record_transaction(db, current_user, transaction_data, "manual")
+
+
+@router.post("/{id}/explanation", response_model=dict)
+async def explain_roundup(
+    id: int,
+    current_user: User = Depends(require_student),
+    db: Session = Depends(get_db),
+):
+    """
+    AI explanation of the round-up on a transaction (slow path).
+
+    Always answers: `explanation_source` is "ai" when the model delivered a
+    grounded sentence in time, otherwise "template" (the factual sentence).
+    """
+    tx = (
+        db.query(Transaction)
+        .filter(
+            Transaction.id == id,
+            Transaction.user_id == current_user.user_id,
+            Transaction.is_deleted == False,
+        )
+        .first()
+    )
+    if not tx or not tx.is_round_up_applied:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No round-up found for this transaction.",
+        )
+    goal = (
+        db.query(Goal)
+        .join(Savings, Savings.goal_id == Goal.id)
+        .filter(Savings.triggered_by_transaction_id == tx.id)
+        .first()
+    )
+    text, source = await _ai_explanation(tx, goal.title if goal else "your goal")
+    return {"explanation": text, "explanation_source": source}
 
 
 @router.get("/{id}", response_model=TransactionResponse)

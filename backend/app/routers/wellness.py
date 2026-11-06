@@ -29,7 +29,8 @@ HIGH_SPEND_THRESHOLD = Decimal("15000")
 # A stored narrative is reused only while the underlying score is unchanged and
 # the report is this fresh.
 NARRATIVE_REUSE_WINDOW = datetime.timedelta(hours=1)
-AI_NARRATION_TIMEOUT_SECONDS = 20.0
+AI_NARRATION_TIMEOUT_SECONDS = 45.0
+NARRATION_MAX_TOKENS = 110  # 2–3 sentences
 
 router = APIRouter(prefix="", tags=["Financial Wellness"])
 
@@ -220,6 +221,8 @@ async def narrate_wellness_report(
             call_llama(
                 system_prompt="You are Penny Pilot, giving friendly, non-judgmental wellness insights.",
                 user_prompt=prompt,
+                max_tokens=NARRATION_MAX_TOKENS,
+                grounding_attempts=1,
             ),
             timeout=AI_NARRATION_TIMEOUT_SECONDS,
         )

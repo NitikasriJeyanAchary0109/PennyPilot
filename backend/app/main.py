@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -24,6 +25,7 @@ from app.routers import (
     users,
     wellness,
 )
+from app.services.ai_engine import warm_up
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -37,6 +39,11 @@ from starlette.middleware.sessions import SessionMiddleware
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     assert_production_ready()
+    warm_up_task = None
+    if settings.OLLAMA_WARMUP:
+        # Fire and forget: never delays start-up, and failure just means the model
+        # loads on first use.
+        warm_up_task = asyncio.create_task(warm_up())
     # Production schemas are managed by Alembic; create_all is a dev/test
     # convenience only (it would bypass migrations).
     if settings.ENVIRONMENT.lower() != "production":
@@ -45,6 +52,9 @@ async def lifespan(app: FastAPI):
         upgrade_sqlite_schema(engine)
 
     yield
+
+    if warm_up_task is not None and not warm_up_task.done():
+        warm_up_task.cancel()
 
 
 # ==========================

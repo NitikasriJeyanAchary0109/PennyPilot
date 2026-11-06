@@ -76,6 +76,7 @@ async def forecast_savings(
                 "and never calculate, estimate, project, or invent dates or amounts."
             ),
             user_prompt=prompt,
+            max_tokens=120,  # 2–3 sentences
         )
     except AIEngineError as exc:
         raise HTTPException(

@@ -29,6 +29,8 @@ interface ChatMessage {
   time: string;
   isError?: boolean;
   disclaimer?: string;
+  /** Answered straight from the student's data — no AI involved. */
+  instant?: boolean;
 }
 
 const formatTime = (value?: string | Date): string =>
@@ -37,9 +39,12 @@ const formatTime = (value?: string | Date): string =>
     minute: "2-digit",
   });
 
+// The first three are answered instantly from your data; the rest use the AI coach.
 const COACH_PROMPTS = [
+  "How much have I saved so far?",
+  "How is my goal going?",
+  "Which budgets am I close to?",
   "How do micro-savings and round-ups work?",
-  "How can I save ₹1,000 extra this month?",
   "Tips for avoiding impulsive purchases on campus",
 ];
 
@@ -55,6 +60,7 @@ export const ChatScreen = () => {
   const [advisorMessages, setAdvisorMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
   const triggerHaptic = () => {
@@ -89,6 +95,7 @@ export const ChatScreen = () => {
             sender: "ai",
             text: item.response,
             time,
+            instant: item.role === "calculated",
           });
         });
         setCoachMessages((prev) => (prev.length === 0 ? restored : prev));
@@ -98,6 +105,16 @@ export const ChatScreen = () => {
       cancelled = true;
     };
   }, []);
+
+  // After a few seconds, say why it's taking a while instead of looking frozen.
+  useEffect(() => {
+    if (!isTyping) {
+      setThinkingSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => setThinkingSeconds((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isTyping]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -136,6 +153,7 @@ export const ChatScreen = () => {
           sender: "ai",
           text: res.response,
           time: formatTime(),
+          instant: res.role === "calculated",
         });
       } else {
         const res = await apiService.askAdvisor(messageText);
@@ -360,7 +378,7 @@ export const ChatScreen = () => {
                         isUser ? "text-right mr-1" : "ml-1"
                       }`}
                     >
-                      {msg.time}
+                      {msg.instant ? `⚡ Instant answer from your data · ${msg.time}` : msg.time}
                     </Text>
                   </View>
 
@@ -381,7 +399,9 @@ export const ChatScreen = () => {
                 <View className="bg-white border border-border px-3.5 py-2.5 rounded-2xl rounded-tl-xs flex-row items-center space-x-1.5 shadow-card">
                   <ActivityIndicator size="small" color="#144a32" />
                   <Text className="text-xs text-text-muted font-sans ml-2">
-                    Penny Pilot is thinking...
+                    {thinkingSeconds >= 8
+                      ? "Still thinking… the AI runs on this device and can be slow when it's busy."
+                      : "Penny Pilot is thinking..."}
                   </Text>
                 </View>
               </View>
